@@ -1,0 +1,68 @@
+# 🗺️ Slotify — Product Development Roadmap
+
+> **Target Release:** Q4 2026 – Q1 2027  
+> **Platform:** Android Native (Jetpack Compose)  
+> **Current Version:** `1.0.0-alpha01`
+
+---
+
+```mermaid
+gantt
+    title Pelan Pembangunan Slotify (Roadmap)
+    dateFormat  YYYY-MM-DD
+    section Fasa 1: Teras & UI
+    Scaffolding Projek & Enjin Neumorphic Compose    :done, 2026-09-21, 7d
+    Pangkalan Data Room & Data Awal Keluarga        :done, 2026-09-21, 7d
+    section Fasa 2: Jadual & Beg
+    Jadual Waktu Interaktif & Subjek KPM            :active, 2026-10-01, 14d
+    Senarai Semak Beg Sekolah (Buku Kena Bawa)      :2026-10-15, 10d
+    section Fasa 3: Logistik & Peta
+    Integrasi Peta Vektor OSM & OSRM Routing        :2026-10-25, 14d
+    Laluan Ambilan Berantai Abah & Geofens Van      :2026-11-08, 14d
+    section Fasa 4: Ganjaran & Akademik
+    Bank Ganjaran Bintang & Sistem Penebusan Hadiah :2026-11-22, 12d
+    Rekod Pentaksiran PBD (TP1-TP6) & Markah UASA   :2026-12-04, 14d
+    section Fasa 5: Kewangan & Takwim
+    Pantauan Duit Poket Kantin & Tabung Simpanan    :2026-12-18, 10d
+    Peringatan Yuran (Van, Taska, Tadika, PIBG)     :2026-12-28, 10d
+    Penyelarasan Takwim Cuti Sekolah KPM 2026/2027  :2027-01-08, 10d
+    section Fasa 6: Ujian & Pelancaran
+    Ujian Beta Keluarga Keluarga (Real-world testing)   :2027-01-18, 14d
+    Bina APK / AAB untuk Google Play Store          :2027-02-01, 7d
+```
+
+---
+
+## 📌 Huraian Fasa Pembangunan
+
+### 🔹 Fasa 1: Asas Teras & Seni Bina UI Neumorphic (SIAP ✅)
+- [x] Inisialisasi projek Android Native dengan Kotlin 2.0 & Jetpack Compose BOM.
+- [x] Reka cipta modifier Neumorphic (`NeumorphicModifier.kt`) dengan fizik bayang berkembar.
+- [x] Skema pangkalan data Room (`StudentEntity`, `SchoolSessionEntity`, `TimetableSlotEntity`, `LocationNodeEntity`).
+- [x] Seeder data sebenar keluarga (Adam, Aisyah, Danial).
+
+### 🔹 Fasa 2: Pengurusan Jadual & Pembantu Beg Sekolah (Sedang Berjalan 🟡)
+- [ ] Paparan jadual penuh Isnin hingga Jumaat dengan penapis hari dan sesi.
+- [ ] Logik pertukaran sesi automatik Tahun 4 vs Tahun 5 (Pagi/Petang).
+- [ ] Ciri pintar "Buku Kena Bawa" berpandukan jadual hari esok berserta butang ganjaran `+5 ⭐`.
+- [ ] Panduan baju seragam harian (Isnin: Rasmi, Selasa: Sukan, Rabu: Koku, Khamis: Batik, Jumaat: Baju Melayu).
+
+### 🔹 Fasa 3: Logistik, Peta OpenStreetMap & Pengesanan Van (Akan Datang ⚪)
+- [ ] Integrasi paparan peta OpenStreetMap (OSMDroid / MapLibre Native).
+- [ ] Pengiraan laluan berantai petang Abah (`Pejabat ➔ Tadika Danial ➔ Taska Aisyah ➔ Rumah`) berserta ETA masa pemanduan.
+- [ ] Paparan status geofens Van Sekolah A dan Van Sekolah B.
+
+### 🔹 Fasa 4: Bank Ganjaran Bintang & Pentaksiran Akademik (Akan Datang ⚪)
+- [ ] Pengumpulan syiling bintang secara automatik bila siap kerja rumah.
+- [ ] Katalog penebusan hadiah dengan pengesahan PIN ibu bapa.
+- [ ] Modul rekod markah UASA (Gred A-E) dan laporan PBD (Tahap Penguasaan TP1-TP6).
+
+### 🔹 Fasa 5: Pengurusan Duit Poket, Yuran & Takwim KPM (Akan Datang ⚪)
+- [ ] Rekod belanja kantin harian & simpanan baki ke tabung maya.
+- [ ] Pusat peringatan tarikh akhir yuran bulanan dan tahunan PIBG.
+- [ ] Sinkronisasi kalendar takwim cuti sekolah KPM (Kumpulan B - Selangor).
+
+### 🔹 Fasa 6: Ujian Beta & Pelancaran (Akan Datang ⚪)
+- [ ] Pemasangan APK terus ke telefon bimbit Keluarga untuk ujian lapangan harian.
+- [ ] Penambahbaikan berdasarkan pengalaman penggunaan sebenar.
+- [ ] Pembungkusan AAB ditandatangani (*Signed Release AAB*) untuk Google Play Store.
