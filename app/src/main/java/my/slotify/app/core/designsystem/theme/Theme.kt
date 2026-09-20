@@ -7,23 +7,23 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
 private val LightColorScheme = lightColorScheme(
-    primary = SlotifyColors.KpmBlue,
+    primary = SlotifyColors.KpmSkyBlue,
     onPrimary = SlotifyColors.LightHighlight,
-    secondary = SlotifyColors.MathAmber,
-    onSecondary = SlotifyColors.TextPrimary,
-    tertiary = SlotifyColors.ScienceGreen,
-    background = SlotifyColors.BackgroundLight,
+    secondary = SlotifyColors.ActionAmber,
+    onSecondary = SlotifyColors.LightHighlight,
+    tertiary = SlotifyColors.SuccessMint,
+    background = SlotifyColors.CanvasBase,
     surface = SlotifyColors.SurfaceCard,
     onBackground = SlotifyColors.TextPrimary,
     onSurface = SlotifyColors.TextPrimary
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary = SlotifyColors.KpmBlue,
+    primary = SlotifyColors.KpmSkyBlue,
     onPrimary = SlotifyColors.TextPrimary,
-    secondary = SlotifyColors.MathAmber,
-    background = SlotifyColors.BackgroundDark,
-    surface = SlotifyColors.SurfaceDark,
+    secondary = SlotifyColors.ActionAmber,
+    background = SlotifyColors.CanvasBaseDark,
+    surface = SlotifyColors.SurfaceCardDark,
     onBackground = SlotifyColors.LightHighlight,
     onSurface = SlotifyColors.LightHighlight
 )

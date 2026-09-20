@@ -27,7 +27,6 @@ import my.slotify.app.core.designsystem.theme.NeumorphicElevation
 import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.designsystem.theme.neumorphic
 import my.slotify.app.core.designsystem.theme.neumorphicClickable
-import my.slotify.app.core.model.KpmSubjectCatalog
 
 @Composable
 fun TodayDashboardScreen(
@@ -41,7 +40,7 @@ fun TodayDashboardScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(SlotifyColors.BackgroundLight)
+            .background(SlotifyColors.CanvasBase) // 60% Dominant Base
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -55,9 +54,9 @@ fun TodayDashboardScreen(
                 Column {
                     Text(
                         text = stringResource(R.string.app_name),
-                        fontSize = 24.sp,
+                        fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,
-                        color = SlotifyColors.KpmBlue
+                        color = SlotifyColors.KpmSkyBlue // 30% Structural Blue
                     )
                     Text(
                         text = stringResource(R.string.app_tagline),
@@ -66,16 +65,21 @@ fun TodayDashboardScreen(
                     )
                 }
 
-                // Star Coins Badge
+                // 10% Radiant Star Accent
                 Box(
                     modifier = Modifier
                         .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 20.dp)
                         .background(SlotifyColors.SurfaceCard, RoundedCornerShape(20.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Star, contentDescription = null, tint = SlotifyColors.MathAmber, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = SlotifyColors.StarGold,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
                         Text(
                             text = "${selectedStudent?.starCoinsBalance ?: 0} ⭐",
                             fontWeight = FontWeight.Bold,
@@ -87,7 +91,7 @@ fun TodayDashboardScreen(
             }
         }
 
-        // Child Profile Switcher Tabs
+        // Child Profile Switcher Tabs (30% Secondary Structure)
         item {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -99,20 +103,20 @@ fun TodayDashboardScreen(
                         modifier = Modifier
                             .neumorphicClickable(cornerRadius = 24.dp) { onSelectStudent(student) }
                             .background(
-                                if (isSelected) SlotifyColors.KpmBlue.copy(alpha = 0.15f) else SlotifyColors.SurfaceCard,
+                                if (isSelected) SlotifyColors.KpmSkyBlue.copy(alpha = 0.15f) else SlotifyColors.SurfaceCard,
                                 RoundedCornerShape(24.dp)
                             )
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = student.avatarEmoji, fontSize = 20.sp)
+                            Text(text = student.avatarEmoji, fontSize = 22.sp)
                             Spacer(Modifier.width(8.dp))
                             Column {
                                 Text(
                                     text = student.nickname,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     fontSize = 14.sp,
-                                    color = if (isSelected) SlotifyColors.KpmBlue else SlotifyColors.TextPrimary
+                                    color = if (isSelected) SlotifyColors.KpmSkyBlue else SlotifyColors.TextPrimary
                                 )
                                 Text(
                                     text = student.currentLevel,
@@ -126,55 +130,52 @@ fun TodayDashboardScreen(
             }
         }
 
-        // Morning Transit Drop Reminder (Special Keluarga Routine)
+        // Morning Transit Drop Reminder (Parent & Student Friendly)
         item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = 16.dp)
-                    .background(SlotifyColors.SurfaceCard, RoundedCornerShape(16.dp))
+                    .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = 20.dp)
+                    .background(SlotifyColors.SurfaceCard, RoundedCornerShape(20.dp))
                     .padding(16.dp)
             ) {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(SlotifyColors.IslamTeal.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("🎒", fontSize = 18.sp)
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = stringResource(R.string.section_transit_drop),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = SlotifyColors.TextPrimary
-                            )
-                            Text(
-                                text = "Hantar Beg Transit & Baju SK ke Taska Ceria",
-                                fontSize = 12.sp,
-                                color = SlotifyColors.TextSecondary
-                            )
-                        }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(SlotifyColors.IslamTeal.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("🎒", fontSize = 20.sp)
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.section_transit_drop),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = SlotifyColors.TextPrimary
+                        )
+                        Text(
+                            text = "Hantar Beg Transit & Baju SK ke Taska Ceria",
+                            fontSize = 12.sp,
+                            color = SlotifyColors.TextSecondary
+                        )
                     }
                 }
             }
         }
 
-        // Ongoing Session Card
+        // Ongoing Session Card with 10% Radiant Accent
         item {
-            val studentName = selectedStudent?.nickname ?: "Anak"
             val vanName = selectedStudent?.vanDriverName ?: "Van Sekolah"
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = 16.dp)
-                    .background(SlotifyColors.SurfaceCard, RoundedCornerShape(16.dp))
-                    .padding(16.dp)
+                    .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = 20.dp)
+                    .background(SlotifyColors.SurfaceCard, RoundedCornerShape(20.dp))
+                    .padding(18.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(
@@ -186,12 +187,22 @@ fun TodayDashboardScreen(
                             text = stringResource(R.string.section_active_slot),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = SlotifyColors.KpmBlue
+                            color = SlotifyColors.ActionAmber // 10% Radiant Action Glow
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.DirectionsBus, contentDescription = null, tint = SlotifyColors.VanPrimaryBlue, modifier = Modifier.size(16.dp))
+                            Icon(
+                                Icons.Default.DirectionsBus,
+                                contentDescription = null,
+                                tint = SlotifyColors.VanPrimaryBlue,
+                                modifier = Modifier.size(16.dp)
+                            )
                             Spacer(Modifier.width(4.dp))
-                            Text(text = vanName, fontSize = 11.sp, color = SlotifyColors.VanPrimaryBlue, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                text = vanName,
+                                fontSize = 11.sp,
+                                color = SlotifyColors.VanPrimaryBlue,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
 
@@ -210,13 +221,13 @@ fun TodayDashboardScreen(
             }
         }
 
-        // Daily Attire & Uniform Card
+        // Daily Attire Card
         item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = 16.dp)
-                    .background(SlotifyColors.SurfaceCard, RoundedCornerShape(16.dp))
+                    .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = 20.dp)
+                    .background(SlotifyColors.SurfaceCard, RoundedCornerShape(20.dp))
                     .padding(16.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -239,16 +250,16 @@ fun TodayDashboardScreen(
             }
         }
 
-        // School Bag Pack Helper (Buku Kena Bawa)
+        // School Bag Pack Helper (10% Accent CTA Action)
         item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = 16.dp)
-                    .background(SlotifyColors.SurfaceCard, RoundedCornerShape(16.dp))
-                    .padding(16.dp)
+                    .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = 20.dp)
+                    .background(SlotifyColors.SurfaceCard, RoundedCornerShape(20.dp))
+                    .padding(18.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
                         text = stringResource(R.string.section_bag_pack),
                         fontWeight = FontWeight.Bold,
@@ -256,19 +267,28 @@ fun TodayDashboardScreen(
                         color = SlotifyColors.TextPrimary
                     )
 
-                    // Books to pack list
-                    val books = listOf("📘 Buku Teks Bahasa Melayu Jilid 1", "📙 Buku Aktiviti Matematik", "📗 Buku Latihan Sains", "📕 Buku Teks English")
+                    val books = listOf(
+                        "📘 Buku Teks Bahasa Melayu Jilid 1",
+                        "📙 Buku Aktiviti Matematik",
+                        "📗 Buku Latihan Sains",
+                        "📕 Buku Teks English"
+                    )
                     books.forEach { book ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SlotifyColors.ScienceGreen, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = SlotifyColors.SuccessMint,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
                             Text(text = book, fontSize = 13.sp, color = SlotifyColors.TextPrimary)
                         }
                     }
 
                     Spacer(Modifier.height(4.dp))
 
-                    // Bag Pack Button
+                    // 10% Radiant Accent Action Button
                     Button(
                         onClick = {
                             if (!bagPacked) {
@@ -277,15 +297,17 @@ fun TodayDashboardScreen(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (bagPacked) SlotifyColors.ScienceGreen else SlotifyColors.KpmBlue
+                            containerColor = if (bagPacked) SlotifyColors.SuccessMint else SlotifyColors.ActionAmber
                         ),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
                     ) {
                         Text(
                             text = if (bagPacked) stringResource(R.string.bag_packed_done) else stringResource(R.string.btn_bag_packed),
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
+                            fontSize = 14.sp
                         )
                     }
                 }
