@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Slotify Adaptive Icon Background Layer
+    Flat KpmSkyBlue (#0284C7) — most compatible approach for adaptive icons
+    The foreground bolt/star provides all the visual interest
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Base fill: KpmSkyBlue -->
+    <path
+        android:pathData="M0,0 L108,0 L108,108 L0,108 Z"
+        android:fillColor="#FF0284C7" />
+
+    <!-- Darker blue corner accent (bottom-right triangle for depth) -->
+    <path
+        android:pathData="M108,108 L108,42 L42,108 Z"
+        android:fillColor="#FF0369A1"
+        android:fillAlpha="0.6" />
+
+    <!-- Lighter highlight (top-left corner) -->
+    <path
+        android:pathData="M0,0 L66,0 L0,66 Z"
+        android:fillColor="#FF38BDF8"
+        android:fillAlpha="0.3" />
+
+    <!-- Subtle dot grid texture -->
+    <path android:pathData="M18,18 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#FFFFFFFF" android:fillAlpha="0.07"/>
+    <path android:pathData="M54,18 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#FFFFFFFF" android:fillAlpha="0.07"/>
+    <path android:pathData="M90,18 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#FFFFFFFF" android:fillAlpha="0.07"/>
+    <path android:pathData="M18,54 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#FFFFFFFF" android:fillAlpha="0.07"/>
+    <path android:pathData="M90,54 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#FFFFFFFF" android:fillAlpha="0.07"/>
+    <path android:pathData="M18,90 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#FFFFFFFF" android:fillAlpha="0.07"/>
+    <path android:pathData="M54,90 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#FFFFFFFF" android:fillAlpha="0.07"/>
+    <path android:pathData="M90,90 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#FFFFFFFF" android:fillAlpha="0.07"/>
+</vector>

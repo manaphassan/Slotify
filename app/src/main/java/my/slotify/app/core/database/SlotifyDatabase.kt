@@ -10,9 +10,13 @@ import androidx.room.RoomDatabase
         StudentEntity::class,
         SchoolSessionEntity::class,
         TimetableSlotEntity::class,
-        LocationNodeEntity::class
+        LocationNodeEntity::class,
+        HomeworkTaskEntity::class,
+        ExamEntity::class,
+        CommitmentFeeEntity::class,
+        DailySpendingEntity::class
     ],
-    version = 1,
+    version = 4,
     exportSchema = false
 )
 abstract class SlotifyDatabase : RoomDatabase() {
@@ -28,7 +32,9 @@ abstract class SlotifyDatabase : RoomDatabase() {
                     context.applicationContext,
                     SlotifyDatabase::class.java,
                     "slotify_database.db"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }

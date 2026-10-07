@@ -27,11 +27,20 @@ enum class NeumorphicElevation {
     HIGH
 }
 
+@Composable
 fun Modifier.neumorphic(
     elevation: NeumorphicElevation = NeumorphicElevation.MEDIUM,
     cornerRadius: Dp = 16.dp,
-    lightColor: Color = SlotifyColors.LightHighlight.copy(alpha = 0.9f),
-    darkColor: Color = SlotifyColors.DarkShadow.copy(alpha = 0.8f),
+    lightColor: Color = when (LocalAppThemeMode.current) {
+        AppThemeMode.NORD -> NordColors.NordHighlight.copy(alpha = 0.6f)
+        AppThemeMode.DARK -> SlotifyColors.LightHighlightDark.copy(alpha = 0.5f)
+        AppThemeMode.LIGHT -> SlotifyColors.LightHighlightLight.copy(alpha = 0.9f)
+    },
+    darkColor: Color = when (LocalAppThemeMode.current) {
+        AppThemeMode.NORD -> NordColors.NordShadow.copy(alpha = 0.95f)
+        AppThemeMode.DARK -> SlotifyColors.DarkShadowDark.copy(alpha = 0.9f)
+        AppThemeMode.LIGHT -> SlotifyColors.LightDarkShadow.copy(alpha = 0.8f)
+    },
     isSunken: Boolean = false
 ): Modifier = this.drawBehind {
     val elevPx = when (elevation) {

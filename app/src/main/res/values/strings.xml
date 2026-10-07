@@ -8,6 +8,7 @@
     <string name="nav_logistics">Logistik &amp; Peta</string>
     <string name="nav_rewards">Ganjaran</string>
     <string name="nav_finance">Kewangan</string>
+    <string name="nav_profile">Profil Murid</string>
 
     <!-- Dashboard Widgets -->
     <string name="section_today_schedule">Jadual Waktu Hari Ini</string>

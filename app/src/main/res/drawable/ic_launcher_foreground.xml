@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Slotify Adaptive Icon Foreground Layer
+    Design: Lightning bolt (⚡) centred, with a 5-pointed star halo
+    Colors: Pure white with amber/gold accent
+    Safe zone: All art within the 72dp safe zone of the 108dp canvas
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- ── Outer halo ring (subtle glow) ── -->
+    <path
+        android:pathData="M54,54 m-26,0 a26,26 0 1,0 52,0 a26,26 0 1,0 -52,0"
+        android:fillColor="#FFFFFFFF"
+        android:fillAlpha="0.12" />
+
+    <!-- ── Inner halo ── -->
+    <path
+        android:pathData="M54,54 m-19,0 a19,19 0 1,0 38,0 a19,19 0 1,0 -38,0"
+        android:fillColor="#FFFFFFFF"
+        android:fillAlpha="0.10" />
+
+    <!-- ── Lightning bolt ── (centred at 54,54; full height ~42dp, width ~22dp) -->
+    <!-- Top-right segment: from (60,22) → (46,50) then right edge (52,50) -->
+    <path
+        android:pathData="
+            M60,22
+            L43,52
+            L51,52
+            L48,86
+            L65,56
+            L57,56
+            Z"
+        android:fillColor="#FFFFFFFF"
+        android:fillAlpha="0.97" />
+
+    <!-- ── Star accent (small, top-right of bolt) ── -->
+    <!--  4-pointed star at (67, 32), radius 5 -->
+    <path
+        android:pathData="
+            M67,27
+            L68.5,30.5
+            L72,32
+            L68.5,33.5
+            L67,37
+            L65.5,33.5
+            L62,32
+            L65.5,30.5
+            Z"
+        android:fillColor="#FFEBCB8B"
+        android:fillAlpha="1" />
+
+    <!-- ── Small dot accents ── -->
+    <path android:pathData="M40,33 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#FFFFFFFF" android:fillAlpha="0.4"/>
+    <path android:pathData="M72,52 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"
+        android:fillColor="#FFFFFFFF" android:fillAlpha="0.3"/>
+    <path android:pathData="M38,72 m-1.5,0 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0"
+        android:fillColor="#FFFFFFFF" android:fillAlpha="0.25"/>
+</vector>

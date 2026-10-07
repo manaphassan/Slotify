@@ -8,6 +8,7 @@
     <string name="nav_logistics">Logistics &amp; Map</string>
     <string name="nav_rewards">Rewards</string>
     <string name="nav_finance">Finance</string>
+    <string name="nav_profile">Profile</string>
 
     <!-- Dashboard Widgets -->
     <string name="section_today_schedule">Today\'s Timetable</string>
