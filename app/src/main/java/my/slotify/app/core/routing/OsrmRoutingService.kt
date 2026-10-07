@@ -75,12 +75,12 @@ class OsrmRoutingService {
 
     private fun fallbackEstimation(): OsrmRouteResponse {
         return OsrmRouteResponse(
-            totalDistanceKm = 14.5,
-            totalDurationMinutes = 28.0,
+            totalDistanceKm = 9.9,
+            totalDurationMinutes = 18.0,
             legs = listOf(
-                OsrmLeg(5200.0, 600.0, "Pejabat ➔ Tadika"),
-                OsrmLeg(3100.0, 480.0, "Tadika ➔ Taska"),
-                OsrmLeg(6200.0, 600.0, "Taska ➔ Rumah")
+                OsrmLeg(7200.0, 720.0, "Pejabat Bandar Contoh ➔ Tadika"),
+                OsrmLeg(1200.0, 180.0, "Tadika ➔ Taska"),
+                OsrmLeg(1500.0, 180.0, "Taska ➔ Rumah")
             )
         )
     }

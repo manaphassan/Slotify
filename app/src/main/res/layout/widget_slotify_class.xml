@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_widget_card"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <!-- Header Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_app_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SLOTIFY"
+                android:textColor="#0052CC"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_child_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Adam • 4 A (Pagi)"
+                android:textColor="#1E293B"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/widget_live_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_widget_live"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="3dp"
+            android:text="● LIVE"
+            android:textColor="#137333"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginVertical="6dp"
+        android:background="#E2E8F0" />
+
+    <!-- Current Ongoing Class -->
+    <TextView
+        android:id="@+id/widget_current_class"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="⏳ Matematik (08:00 - 09:00)"
+        android:textColor="#0F172A"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <!-- Next Class -->
+    <TextView
+        android:id="@+id/widget_next_class"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="⏩ Seterusnya: Sains (09:00 - 10:00)"
+        android:textColor="#475569"
+        android:textSize="11sp" />
+
+    <!-- Required Books -->
+    <TextView
+        android:id="@+id/widget_books"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="📚 Bawa: Buku Teks Sains Jilid 1"
+        android:textColor="#0052CC"
+        android:textSize="11sp" />
+
+    <!-- Attire & Action Footer -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_attire"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="👕 Uniform Penuh KPM"
+            android:textColor="#64748B"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Buka Slotify ➔"
+            android:textColor="#0052CC"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+</LinearLayout>
