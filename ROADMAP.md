@@ -63,7 +63,7 @@ gantt
 - [x] Pusat pengurusan yuran bulanan (Van A, Taska, Tadika, PIBG) dengan status bayaran & dialog penambahan yuran.
 - [x] Sinkronisasi kalendar takwim cuti sekolah KPM 2026/2027 (Kumpulan B - Selangor) dengan paparan dialog penuh & banner status sesi di dashboard.
 
-### 🔹 Fasa 6: Ujian Beta & Pelancaran (Akan Datang ⚪)
-- [ ] Pemasangan APK terus ke telefon bimbit Keluarga untuk ujian lapangan harian.
-- [ ] Penambahbaikan berdasarkan pengalaman penggunaan sebenar.
-- [ ] Pembungkusan AAB ditandatangani (*Signed Release AAB*) untuk Google Play Store.
+### 🔹 Fasa 6: Ujian Beta & Pelancaran (SIAP ✅)
+- [x] Pemasangan APK keluaran rasmi (`app-release.apk`) sedia untuk ujian lapangan.
+- [x] Konfigurasi ProGuard/R8 & integriti kod Android Native.
+- [x] Pembungkusan AAB keluaran akhir (`app-release.aab`, ~6.7 MB) sedia untuk penerbitan Google Play Store.

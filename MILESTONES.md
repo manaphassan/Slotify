@@ -13,7 +13,7 @@
 | **M3: OSM Logistics & Chained ETA** | `v1.0.0-beta01` | OpenStreetMap Map View, OSRM Route Calculator & Van Alerts | ✅ **SIAP** |
 | **M4: Reward Vault & Academics** | `v1.0.0-beta02` | Star Coins, Parent PIN Authorization & PBD/UASA Records | ✅ **SIAP** |
 | **M5: Finance, Takwim & Polish** | `v1.0.0-rc01` | Canteen Tracker, Fee Alerts & KPM Takwim 2026/2027 | ✅ **SIAP** |
-| **M6: Production Release** | `v1.0.0` | Signed AAB/APK, Google Play Store Publishing | ⚪ **Belum Mula** |
+| **M6: Production Release** | `v1.0.0` | Signed AAB/APK, Google Play Store Publishing | ✅ **SIAP** |
 
 ---
 
@@ -62,7 +62,7 @@
 
 ---
 
-### ⚪ M6: Production Release (`v1.0.0`)
-- [ ] Jana kunci tandatangan keluaran (*Release Signing Keystore*).
-- [ ] Uji binaan keluaran ProGuard / R8 minification.
-- [ ] Terbitkan fail APK / AAB keluaran akhir.
+### ✅ M6: Production Release (`v1.0.0`) — SIAP
+- [x] Jana kunci tandatangan keluaran (*Release Signing Keystore*) & konfigurasi `signingConfigs.release`.
+- [x] Uji binaan keluaran ProGuard / R8 minification (`app/proguard-rules.pro`).
+- [x] Terbitkan fail APK (`app-release.apk`, ~3.8 MB) dan AAB (`app-release.aab`, ~6.7 MB) keluaran akhir untuk Google Play Store.

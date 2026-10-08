@@ -22,9 +22,24 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val keystoreFile = file("slotify-release-key.jks")
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "slotify2026"
+                keyAlias = System.getenv("KEY_ALIAS") ?: "slotify"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "slotify2026"
+            } else {
+                initWith(getByName("debug"))
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
