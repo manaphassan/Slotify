@@ -18,7 +18,7 @@ class SlotifyApplication : Application() {
         
         // Seed initial family data (Adam, Aisyah, Danial)
         CoroutineScope(Dispatchers.IO).launch {
-            DatabaseSeeder.seedInitialData(database.slotifyDao())
+            DatabaseSeeder.seedInitialData(database.slotifyDao(), this@SlotifyApplication)
         }
     }
 }

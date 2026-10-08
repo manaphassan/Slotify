@@ -4,11 +4,11 @@ import java.util.UUID
 
 object DatabaseSeeder {
 
-    suspend fun seedInitialData(dao: SlotifyDao) {
+    suspend fun seedInitialData(dao: SlotifyDao, context: android.content.Context? = null) {
         val adamCheck = dao.getStudentById("student-adam-01")
         if (adamCheck != null && adamCheck.myKid.isNotBlank()) {
             seedSessionsIfMissing(dao) // Self-heal sessions on repeat installs
-            seedFullWeekSlotsIfMissing(dao) // Extend Mon-only slots to full week
+            seedFullWeekSlotsIfMissing(dao, context) // Extend Mon-only slots to full week
             seedHomeworkAndExamsIfMissing(dao)
             return
         }
@@ -62,24 +62,29 @@ object DatabaseSeeder {
         )
         dao.insertSessions(adamSessions)
 
-        // Seed sample timetable slots for Adam (Isnin)
-        val adamSlots = listOf(
-            // SRA Pagi (Isnin)
+        val sraMon = listOf(
             TimetableSlotEntity(sessionId = sraSessionId, dayOfWeek = 1, periodIndex = 1, startTime = "08:00", endTime = "08:30", subjectCode = "TAWHID", subjectName = "Tauhid / Aqidah", teacherName = "Ustazah"),
             TimetableSlotEntity(sessionId = sraSessionId, dayOfWeek = 1, periodIndex = 2, startTime = "08:30", endTime = "09:00", subjectCode = "JAWI", subjectName = "Jawi & Khat"),
             TimetableSlotEntity(sessionId = sraSessionId, dayOfWeek = 1, periodIndex = 3, startTime = "09:00", endTime = "09:30", subjectCode = "BA", subjectName = "Bahasa Arab"),
             TimetableSlotEntity(sessionId = sraSessionId, dayOfWeek = 1, periodIndex = 4, startTime = "09:30", endTime = "10:00", subjectCode = "TAHFIZ", subjectName = "Hafazan"),
             TimetableSlotEntity(sessionId = sraSessionId, dayOfWeek = 1, periodIndex = 5, startTime = "10:00", endTime = "10:20", subjectCode = "REHAT", subjectName = "Waktu Rehat SRA", isRehat = true),
-            TimetableSlotEntity(sessionId = sraSessionId, dayOfWeek = 1, periodIndex = 6, startTime = "10:20", endTime = "11:00", subjectCode = "SIRAH", subjectName = "Sirah Nabawiyyah"),
-
-            // SK Petang (Isnin)
-            TimetableSlotEntity(sessionId = skSessionId, dayOfWeek = 1, periodIndex = 1, startTime = "13:00", endTime = "14:00", subjectCode = "BM", subjectName = "Bahasa Melayu"),
-            TimetableSlotEntity(sessionId = skSessionId, dayOfWeek = 1, periodIndex = 2, startTime = "14:00", endTime = "14:50", subjectCode = "MT", subjectName = "Matematik"),
-            TimetableSlotEntity(sessionId = skSessionId, dayOfWeek = 1, periodIndex = 3, startTime = "14:50", endTime = "15:10", subjectCode = "REHAT", subjectName = "Waktu Rehat SK", isRehat = true),
-            TimetableSlotEntity(sessionId = skSessionId, dayOfWeek = 1, periodIndex = 4, startTime = "15:10", endTime = "16:10", subjectCode = "SN", subjectName = "Sains"),
-            TimetableSlotEntity(sessionId = skSessionId, dayOfWeek = 1, periodIndex = 5, startTime = "16:10", endTime = "17:10", subjectCode = "BI", subjectName = "Bahasa Inggeris"),
-            TimetableSlotEntity(sessionId = skSessionId, dayOfWeek = 1, periodIndex = 6, startTime = "17:10", endTime = "18:00", subjectCode = "SEJ", subjectName = "Sejarah")
+            TimetableSlotEntity(sessionId = sraSessionId, dayOfWeek = 1, periodIndex = 6, startTime = "10:20", endTime = "11:00", subjectCode = "SIRAH", subjectName = "Sirah Nabawiyyah")
         )
+        
+        val adamSlots = if (context != null) {
+            val stream = context.resources.openRawResource(my.slotify.app.R.raw.jadual_4a_2026)
+            sraMon + IcsParser.parse(stream, skSessionId)
+        } else {
+            val skMon = listOf(
+                TimetableSlotEntity(sessionId = skSessionId, dayOfWeek = 1, periodIndex = 1, startTime = "13:00", endTime = "14:00", subjectCode = "BM", subjectName = "Bahasa Melayu"),
+                TimetableSlotEntity(sessionId = skSessionId, dayOfWeek = 1, periodIndex = 2, startTime = "14:00", endTime = "14:50", subjectCode = "MT", subjectName = "Matematik"),
+                TimetableSlotEntity(sessionId = skSessionId, dayOfWeek = 1, periodIndex = 3, startTime = "14:50", endTime = "15:10", subjectCode = "REHAT", subjectName = "Waktu Rehat SK", isRehat = true),
+                TimetableSlotEntity(sessionId = skSessionId, dayOfWeek = 1, periodIndex = 4, startTime = "15:10", endTime = "16:10", subjectCode = "SN", subjectName = "Sains"),
+                TimetableSlotEntity(sessionId = skSessionId, dayOfWeek = 1, periodIndex = 5, startTime = "16:10", endTime = "17:10", subjectCode = "BI", subjectName = "Bahasa Inggeris"),
+                TimetableSlotEntity(sessionId = skSessionId, dayOfWeek = 1, periodIndex = 6, startTime = "17:10", endTime = "18:00", subjectCode = "SEJ", subjectName = "Sejarah")
+            )
+            sraMon + skMon
+        }
         dao.insertSlots(adamSlots)
 
         // 2. Aisyah (Darjah 2 · SRAI)
@@ -444,7 +449,7 @@ object DatabaseSeeder {
      * Only seeds if slot count for that day is 0 (idempotent via REPLACE).
      * Malaysian school week: Isnin=1, Selasa=2, Rabu=3, Khamis=4, Jumaat=5
      */
-    suspend fun seedFullWeekSlotsIfMissing(dao: SlotifyDao) {
+    suspend fun seedFullWeekSlotsIfMissing(dao: SlotifyDao, context: android.content.Context? = null) {
         val sraId = "session-sra-4b"
         val skId  = "session-sk-4a"
         val sraiId = "session-srai-2b"
@@ -513,11 +518,21 @@ object DatabaseSeeder {
         val weekSlots = mutableListOf<TimetableSlotEntity>()
         for (day in 2..5) {
             weekSlots += sraDay(day)
-            weekSlots += skDay(day)
+            if (context == null) weekSlots += skDay(day)
             weekSlots += sraiDay(day)
-            if (day in 2..5) weekSlots += tadikaDay(day)
+            weekSlots += tadikaDay(day)
         }
         dao.insertSlots(weekSlots)
+
+        if (context != null) {
+            try {
+                val stream = context.resources.openRawResource(my.slotify.app.R.raw.jadual_4a_2026)
+                val icsSlots = IcsParser.parse(stream, skId)
+                dao.insertSlots(icsSlots)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     /**

@@ -26,6 +26,8 @@ object KpmSubjectCatalog {
         "PSV" to SubjectMeta("PSV", "Pendidikan Seni Visual", "Visual Arts", SlotifyColors.SubjectIqra),
         "PJ" to SubjectMeta("PJ", "Pendidikan Jasmani", "Physical Education", SlotifyColors.SubjectSn),
         "PK" to SubjectMeta("PK", "Pendidikan Kesihatan", "Health Education", SlotifyColors.SubjectSn),
+        "PERHIMPUNAN" to SubjectMeta("PERHIMPUNAN", "Perhimpunan Rasmi", "School Assembly", SlotifyColors.SubjectSej, isCoreAcademic = false),
+        "TASMIK" to SubjectMeta("TASMIK", "Tasmik Al-Quran", "Tasmik", SlotifyColors.SubjectPi),
         "REHAT" to SubjectMeta("REHAT", "Waktu Rehat", "Recess", SlotifyColors.SubjectMt, isCoreAcademic = false, isRehat = true),
         
         // SRA Specific Subjects
