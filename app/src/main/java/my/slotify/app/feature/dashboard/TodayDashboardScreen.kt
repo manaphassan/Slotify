@@ -65,6 +65,7 @@ fun TodayDashboardScreen(
     var selectedFilter by remember { mutableStateOf(TaskFilter.ALL) }
     var showFocusDialog by remember { mutableStateOf(false) }
     var showTakwimDialog by remember { mutableStateOf(false) }
+    var showAddHomeworkDialog by remember { mutableStateOf(false) }
 
     // Fix 4.3: Guard null selectedStudent — return empty list rather than tasks with empty studentId
     val defaultTasks = remember(selectedStudent?.id) {
@@ -340,16 +341,33 @@ fun TodayDashboardScreen(
                         }
 
                         val pendingCount = tasks.count { !it.isCompleted }
-                        Surface(
-                            color = if (pendingCount > 0) SlotifyColors.ActionAmber.copy(alpha = 0.15f) else SlotifyColors.SuccessMint.copy(alpha = 0.15f),
-                            shape = SlotifyShapes.Small
-                        ) {
-                            Text(
-                                text = if (pendingCount > 0) "$pendingCount ${strings.pendingTasks}" else "Semua Siap! 🎉",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = if (pendingCount > 0) SlotifyColors.ActionAmber else SlotifyColors.SuccessMint,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            FilledTonalButton(
+                                onClick = { showAddHomeworkDialog = true },
+                                shape = SlotifyShapes.Small,
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = SlotifyColors.KpmSkyBlue.copy(alpha = 0.15f),
+                                    contentColor = SlotifyColors.KpmSkyBlue
+                                ),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(12.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Tugasan", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(Modifier.width(6.dp))
+                            Surface(
+                                color = if (pendingCount > 0) SlotifyColors.ActionAmber.copy(alpha = 0.15f) else SlotifyColors.SuccessMint.copy(alpha = 0.15f),
+                                shape = SlotifyShapes.Small
+                            ) {
+                                Text(
+                                    text = if (pendingCount > 0) "$pendingCount ${strings.pendingTasks}" else "Semua Siap! 🎉",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = if (pendingCount > 0) SlotifyColors.ActionAmber else SlotifyColors.SuccessMint,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
                         }
                     }
 
@@ -1053,6 +1071,20 @@ fun TodayDashboardScreen(
                 onDismissRequest = { showTakwimDialog = false }
             )
         }
+
+        if (showAddHomeworkDialog && selectedStudent != null) {
+            AddHomeworkTaskDialog(
+                studentId = selectedStudent.id,
+                onDismissRequest = { showAddHomeworkDialog = false },
+                onSaveTask = { newTask ->
+                    coroutineScope.launch {
+                        dao?.insertHomeworkTask(newTask)
+                        fallbackTasks = listOf(newTask) + fallbackTasks
+                        showAddHomeworkDialog = false
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -1503,3 +1535,174 @@ fun FocusTimerModalDialog(
         }
     }
 }
+
+@Composable
+fun AddHomeworkTaskDialog(
+    studentId: String,
+    onDismissRequest: () -> Unit,
+    onSaveTask: (HomeworkTaskEntity) -> Unit
+) {
+    var title by remember { mutableStateOf("") }
+    var selectedSubject by remember { mutableStateOf("MT") }
+    var dueDateDesc by remember { mutableStateOf("Hari Ini") }
+    var notes by remember { mutableStateOf("") }
+    var hasPhotoProof by remember { mutableStateOf(false) }
+
+    val subjects = listOf("BM", "MT", "SN", "BI", "PI", "BA", "SEJ", "RBT")
+    val dueDates = listOf("Hari Ini", "Esok", "Isnin", "Khamis")
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismissRequest) {
+        Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+            color = SlotifyColors.CanvasBase,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Tambah Tugasan & Kerja Rumah",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = SlotifyColors.TextPrimary
+                    )
+                    IconButton(onClick = onDismissRequest, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Tutup", tint = SlotifyColors.TextSecondary)
+                    }
+                }
+
+                // Subject Selector
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Subjek KPM:", style = MaterialTheme.typography.labelSmall, color = SlotifyColors.TextSecondary)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(subjects) { code ->
+                            FilterChip(
+                                selected = selectedSubject == code,
+                                onClick = { selectedSubject = code },
+                                label = { Text(code, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                            )
+                        }
+                    }
+                }
+
+                // Title input
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Nama Tugasan / Muka Surat") },
+                    placeholder = { Text("Contoh: Buku Aktiviti Jilid 1 M/S 30") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+                )
+
+                // Due date selector
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Tarikh Hantar:", style = MaterialTheme.typography.labelSmall, color = SlotifyColors.TextSecondary)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(dueDates) { due ->
+                            FilterChip(
+                                selected = dueDateDesc == due,
+                                onClick = { dueDateDesc = due },
+                                label = { Text(due, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+
+                // Worksheet Camera Capture Simulation Box
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                        .background(SlotifyColors.SurfaceCard)
+                        .clickable { hasPhotoProof = !hasPhotoProof }
+                        .padding(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                            Text(if (hasPhotoProof) "📸" else "📷", fontSize = 20.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = if (hasPhotoProof) "Gambar Lembaran Kerja Dilampirkan" else "Tangkap Gambar Lembaran Kerja",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                    color = if (hasPhotoProof) SlotifyColors.ScienceGreen else SlotifyColors.TextPrimary
+                                )
+                                Text(
+                                    text = if (hasPhotoProof) "lembaran_kerja_aktiviti.jpg (Disahkan)" else "Sentuh untuk simulasi kamera tangkapan",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = SlotifyColors.TextSecondary
+                                )
+                            }
+                        }
+
+                        if (hasPhotoProof) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = SlotifyColors.ScienceGreen,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Notes input
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Nota Tambahan (Pilihan)") },
+                    placeholder = { Text("Contoh: Semak bersama Ibu sebelum tidur") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+                )
+
+                // Actions
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismissRequest) {
+                        Text("Batal")
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (title.isNotBlank()) {
+                                val newTask = HomeworkTaskEntity(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    studentId = studentId,
+                                    subjectCode = selectedSubject,
+                                    subjectName = my.slotify.app.core.model.KpmSubjectCatalog.getSubject(selectedSubject).nameBm,
+                                    title = title.trim(),
+                                    dueDateDescription = dueDateDesc,
+                                    isCompleted = false,
+                                    rewardStars = 5,
+                                    notes = if (hasPhotoProof) "📸 [Foto Lembaran] $notes".trim() else notes.trim()
+                                )
+                                onSaveTask(newTask)
+                            }
+                        },
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue)
+                    ) {
+                        Text("Simpan Tugasan (+5 ⭐)", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+

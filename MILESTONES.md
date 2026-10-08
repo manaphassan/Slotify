@@ -11,7 +11,7 @@
 | **M1: Foundation & Seeding** | `v1.0.0-alpha01` | Architecture, Room Database, Neumorphic UI & Real Family Data | ✅ **SIAP** |
 | **M2: Dynamic Timetable & Bag Helper** | `v1.0.0-alpha02` | Multi-Session Grid, Attire Guide & Packing Assistant | ✅ **SIAP** |
 | **M3: OSM Logistics & Chained ETA** | `v1.0.0-beta01` | OpenStreetMap Map View, OSRM Route Calculator & Van Alerts | ✅ **SIAP** |
-| **M4: Reward Vault & Academics** | `v1.0.0-beta02` | Star Coins, Parent PIN Authorization & PBD/UASA Records | 🟡 **Dalam Proses (75%)** |
+| **M4: Reward Vault & Academics** | `v1.0.0-beta02` | Star Coins, Parent PIN Authorization & PBD/UASA Records | ✅ **SIAP** |
 | **M5: Finance, Takwim & Polish** | `v1.0.0-rc01` | Canteen Tracker, Fee Alerts & KPM Takwim 2026/2027 | ✅ **SIAP** |
 | **M6: Production Release** | `v1.0.0` | Signed AAB/APK, Google Play Store Publishing | ⚪ **Belum Mula** |
 
@@ -46,9 +46,9 @@
 
 ---
 
-### 🟡 M4: Reward Vault & Academics (`v1.0.0-beta02`) — DALAM PROSES
+### ✅ M4: Reward Vault & Academics (`v1.0.0-beta02`) — SIAP
 - [x] Tambah modal dialog kebenaran PIN ibu bapa sebelum menebus ganjaran (SHA-256 dan kunci 3-kali percubaan).
-- [ ] Cipta borang rekod kerja rumah dengan fungsi tangkapan gambar lembaran kerja.
+- [x] Cipta borang rekod kerja rumah dengan fungsi tangkapan gambar lembaran kerja (`AddHomeworkTaskDialog` dengan tangkapan foto lembaran kerja).
 - [x] Bina skrin rekod markah peperiksaan UASA dan Tahap Penguasaan PBD (TP1–TP6).
 - [x] Sambungkan ganjaran bintang automatik apabila slip PBD/UASA dimasukkan (+15 ⭐ untuk TP5/TP6, +5 ⭐ untuk pencapaian asas).
 

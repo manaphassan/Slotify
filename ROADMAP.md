@@ -52,11 +52,11 @@ gantt
 - [x] Pengiraan laluan berantai petang Abah (`Pejabat ➔ Tadika Danial ➔ Taska Aisyah ➔ Rumah`) berserta ETA masa pemanduan dan paparan garis jalan sebenar (GeoJSON).
 - [x] Paparan status geofens Van Sekolah A dan Van Sekolah B serta amaran radar jarak dekat.
 
-### 🔹 Fasa 4: Bank Ganjaran Bintang & Pentaksiran Akademik (Sedang Berjalan 🟡)
+### 🔹 Fasa 4: Bank Ganjaran Bintang & Pentaksiran Akademik (SIAP ✅)
 - [x] Pengumpulan syiling bintang secara automatik bila siap tugasan dan penilaian cemerlang.
 - [x] Katalog penebusan hadiah dengan pengesahan PIN ibu bapa (SHA-256 + 3 Percubaan).
 - [x] Modul rekod markah dan laporan PBD (Tahap Penguasaan TP1-TP6) berasaskan standard KPM.
-- [ ] Borang kerja rumah dengan fungsi tangkapan kamera bukti lembaran kerja.
+- [x] Borang kerja rumah dengan fungsi tangkapan kamera bukti lembaran kerja (`AddHomeworkTaskDialog`).
 
 ### 🔹 Fasa 5: Pengurusan Duit Poket, Yuran & Takwim KPM (SIAP ✅)
 - [x] Rekod belanja kantin harian & simpanan baki ke Tabung Maya dengan insentif +10 ⭐ Bintang.

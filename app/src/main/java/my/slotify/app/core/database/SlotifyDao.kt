@@ -70,6 +70,9 @@ interface SlotifyDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertHomeworkTasks(tasks: List<HomeworkTaskEntity>)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertHomeworkTask(task: HomeworkTaskEntity)
+
     @androidx.room.Update
     suspend fun updateHomeworkTask(task: HomeworkTaskEntity)
 
