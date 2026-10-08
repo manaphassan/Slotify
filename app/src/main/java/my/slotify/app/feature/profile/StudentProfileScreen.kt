@@ -23,12 +23,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import my.slotify.app.core.database.StudentEntity
+import my.slotify.app.core.database.PbdAssessmentEntity
+import my.slotify.app.core.database.SlotifyDao
+import my.slotify.app.core.model.KpmSubjectCatalog
 import my.slotify.app.core.designsystem.theme.NeumorphicElevation
 import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.designsystem.theme.SlotifyShapes
 import my.slotify.app.core.designsystem.theme.neumorphic
 import my.slotify.app.core.designsystem.theme.neumorphicClickable
 import my.slotify.app.core.designsystem.theme.strings
+import kotlinx.coroutines.launch
+import java.util.UUID
 
 // Fix 1.4: Mask child national ID — show only last 4 digits by default
 private fun String.maskMyKid(): String {
@@ -52,11 +57,22 @@ fun StudentProfileScreen(
     students: List<StudentEntity>,
     selectedStudent: StudentEntity?,
     onSelectStudent: (StudentEntity) -> Unit,
-    onSaveProfile: (StudentEntity) -> Unit
+    onSaveProfile: (StudentEntity) -> Unit,
+    dao: SlotifyDao? = null,
+    onRewardStars: ((Int) -> Unit)? = null
 ) {
     var showEditDialog by remember { mutableStateOf(false) }
+    var showAddPbdDialog by remember { mutableStateOf(false) }
+    var pbdCelebrationMessage by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
     // Fix 1.4: Show/hide toggle for MyKid number — hidden by default for privacy
     var showMyKid by remember { mutableStateOf(false) }
+
+    val assessments by remember(selectedStudent?.id) {
+        if (dao != null && selectedStudent != null) dao.getAssessmentsForStudent(selectedStudent.id)
+        else kotlinx.coroutines.flow.flowOf(emptyList())
+    }.collectAsState(initial = emptyList())
 
     LazyColumn(
         modifier = Modifier
@@ -405,6 +421,182 @@ fun StudentProfileScreen(
                     }
                 }
             }
+
+            // ── Pentaksiran Bilik Darjah (PBD) & Akademik Section ──
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = SlotifyShapes.LargeDp)
+                        .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
+                        .padding(14.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("🎓", fontSize = 22.sp)
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Pentaksiran Bilik Darjah (PBD)",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = SlotifyColors.TextPrimary
+                                    )
+                                    Text(
+                                        text = "Tahap Penguasaan TP1 – TP6 KPM",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = SlotifyColors.TextSecondary
+                                    )
+                                }
+                            }
+
+                            Button(
+                                onClick = { showAddPbdDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue),
+                                shape = SlotifyShapes.Small,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.height(30.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                                Spacer(Modifier.width(4.dp))
+                                Text("Rekod TP", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
+
+                        if (pbdCelebrationMessage != null) {
+                            Surface(
+                                shape = SlotifyShapes.Small,
+                                color = SlotifyColors.SuccessMint.copy(alpha = 0.15f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("⭐", fontSize = 16.sp)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = pbdCelebrationMessage!!,
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = SlotifyColors.SuccessMint
+                                    )
+                                }
+                            }
+                        }
+
+                        if (assessments.isEmpty()) {
+                            Text(
+                                text = "Belum ada rekod PBD untuk ${s.nickname}. Ketik 'Rekod TP' untuk memasukkan tahap penguasaan.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = SlotifyColors.TextSecondary
+                            )
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                assessments.forEach { assessment ->
+                                    val subjectColor = SlotifyColors.subjectColor(assessment.subjectCode)
+                                    val tpLabel = when (assessment.tahapPenguasaan) {
+                                        6 -> "TP 6 • Cemerlang"
+                                        5 -> "TP 5 • Terpuji"
+                                        4 -> "TP 4 • Baik"
+                                        3 -> "TP 3 • Memuaskan"
+                                        2 -> "TP 2 • Asas"
+                                        else -> "TP 1 • Permulaan"
+                                    }
+                                    val tpColor = when (assessment.tahapPenguasaan) {
+                                        6 -> Color(0xFF8B5CF6)
+                                        5 -> SlotifyColors.SuccessMint
+                                        4 -> SlotifyColors.KpmSkyBlue
+                                        3 -> SlotifyColors.ActionAmber
+                                        else -> Color(0xFFEF4444)
+                                    }
+
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = SlotifyShapes.Small,
+                                        color = SlotifyColors.CanvasBase
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(10.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Surface(
+                                                        shape = SlotifyShapes.XSmall,
+                                                        color = subjectColor.copy(alpha = 0.15f)
+                                                    ) {
+                                                        Text(
+                                                            text = assessment.subjectCode,
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = subjectColor,
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                        )
+                                                    }
+                                                    Spacer(Modifier.width(8.dp))
+                                                    Text(
+                                                        text = assessment.subjectName,
+                                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                                        color = SlotifyColors.TextPrimary
+                                                    )
+                                                }
+
+                                                Surface(
+                                                    shape = SlotifyShapes.XSmall,
+                                                    color = tpColor.copy(alpha = 0.15f)
+                                                ) {
+                                                    Text(
+                                                        text = tpLabel,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = tpColor,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+
+                                            // 6-segment TP Progress Bar
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                            ) {
+                                                for (step in 1..6) {
+                                                    val isAchieved = step <= assessment.tahapPenguasaan
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .height(5.dp)
+                                                            .clip(RoundedCornerShape(3.dp))
+                                                            .background(
+                                                                if (isAchieved) tpColor else SlotifyColors.TextSecondary.copy(alpha = 0.2f)
+                                                            )
+                                                    )
+                                                }
+                                            }
+
+                                            if (assessment.teacherComment.isNotBlank()) {
+                                                Text(
+                                                    text = "Ulasan: \"${assessment.teacherComment}\"",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = SlotifyColors.TextSecondary
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Clearance spacer for Speed Dial FAB
@@ -560,6 +752,163 @@ fun EditStudentProfileDialog(
                         colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue)
                     ) {
                         Text(strings.saveButton, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AddPbdAssessmentDialog(
+    student: StudentEntity,
+    onDismiss: () -> Unit,
+    onSave: (PbdAssessmentEntity) -> Unit
+) {
+    val subjects = listOf(
+        Pair("BM", "Bahasa Melayu"),
+        Pair("MT", "Matematik"),
+        Pair("SN", "Sains"),
+        Pair("BI", "Bahasa Inggeris"),
+        Pair("PI", "Pendidikan Islam"),
+        Pair("BA", "Bahasa Arab"),
+        Pair("SEJ", "Sejarah"),
+        Pair("RBT", "RBT"),
+        Pair("TAHFIZ", "Hafazan Al-Quran"),
+        Pair("IQRA", "Iqra' Asas")
+    )
+    var selectedSubject by remember { mutableStateOf(subjects.first()) }
+    var selectedTp by remember { mutableIntStateOf(5) }
+    var comment by remember { mutableStateOf("") }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = SlotifyShapes.XLargeDp)
+                .background(SlotifyColors.SurfaceCard, SlotifyShapes.XLarge)
+                .padding(18.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Rekod Tahap Penguasaan (PBD)",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = SlotifyColors.TextPrimary
+                )
+                Text(
+                    text = "Pilih subjek KPM dan Tahap Penguasaan (TP1-TP6) untuk ${student.nickname}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = SlotifyColors.TextSecondary
+                )
+
+                Text(
+                    text = "Subjek:",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = SlotifyColors.TextPrimary
+                )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(subjects) { subj ->
+                        val isSelected = subj.first == selectedSubject.first
+                        Box(
+                            modifier = Modifier
+                                .clip(SlotifyShapes.Small)
+                                .background(if (isSelected) SlotifyColors.KpmSkyBlue else SlotifyColors.CanvasBase)
+                                .clickable { selectedSubject = subj }
+                                .padding(horizontal = 8.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = subj.first,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) Color.White else SlotifyColors.TextPrimary
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    text = "Tahap Penguasaan (TP 1 - 6):",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = SlotifyColors.TextPrimary
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    for (tp in 1..6) {
+                        val isSel = selectedTp == tp
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(38.dp)
+                                .clip(SlotifyShapes.Small)
+                                .background(
+                                    if (isSel) {
+                                        if (tp >= 5) SlotifyColors.SuccessMint else SlotifyColors.KpmSkyBlue
+                                    } else SlotifyColors.CanvasBase
+                                )
+                                .clickable { selectedTp = tp },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "TP$tp",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSel) Color.White else SlotifyColors.TextPrimary
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = comment,
+                    onValueChange = { comment = it },
+                    label = { Text("Ulasan Guru / Catatan", style = MaterialTheme.typography.bodySmall) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = false,
+                    maxLines = 3
+                )
+
+                if (selectedTp >= 5) {
+                    Surface(
+                        shape = SlotifyShapes.Small,
+                        color = SlotifyColors.MathAmber.copy(alpha = 0.15f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "⭐ Ganjaran Bonus: Pencapaian TP$selectedTp melayakkan +15 Bintang!",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SlotifyColors.MathAmber,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Batal", color = SlotifyColors.TextSecondary)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            val newAssessment = PbdAssessmentEntity(
+                                id = UUID.randomUUID().toString(),
+                                studentId = student.id,
+                                subjectCode = selectedSubject.first,
+                                subjectName = selectedSubject.second,
+                                tahapPenguasaan = selectedTp,
+                                teacherComment = comment.ifBlank { "Penguasaan kemahiran subjek memuaskan." },
+                                assessedDate = "Okt 2026"
+                            )
+                            onSave(newAssessment)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue)
+                    ) {
+                        Text("Simpan TP", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }

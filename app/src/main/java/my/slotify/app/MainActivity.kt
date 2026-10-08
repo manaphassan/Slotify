@@ -341,6 +341,15 @@ class MainActivity : ComponentActivity() {
                                                 dao.updateStudent(updated)
                                                 selectedStudent = dao.getStudentById(updated.id)
                                             }
+                                        },
+                                        dao = dao,
+                                        onRewardStars = { delta ->
+                                            selectedStudent?.let { s ->
+                                                coroutineScope.launch {
+                                                    dao.updateStarCoins(s.id, delta)
+                                                    selectedStudent = dao.getStudentById(s.id)
+                                                }
+                                            }
                                         }
                                     )
                                 }

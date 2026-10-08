@@ -107,5 +107,19 @@ interface SlotifyDao {
     /** Save/update canteen spending (REPLACE updates existing row). */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertDailySpending(entry: DailySpendingEntity)
+
+    // ── Academic & PBD Assessments ───────────────────────────────────────────
+
+    @Query("SELECT * FROM pbd_assessments WHERE studentId = :studentId ORDER BY subjectCode ASC")
+    fun getAssessmentsForStudent(studentId: String): Flow<List<PbdAssessmentEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAssessments(assessments: List<PbdAssessmentEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAssessment(assessment: PbdAssessmentEntity)
+
+    @androidx.room.Delete
+    suspend fun deleteAssessment(assessment: PbdAssessmentEntity)
 }
 

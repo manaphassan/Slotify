@@ -182,4 +182,31 @@ data class DailySpendingEntity(
     val spentAmountRm: Double = 0.0
 )
 
+/**
+ * Malaysian KPM Pentaksiran Bilik Darjah (PBD) & Academics.
+ * Tracks Tahap Penguasaan (TP 1 to 6) per subject for each student.
+ */
+@Entity(
+    tableName = "pbd_assessments",
+    foreignKeys = [
+        ForeignKey(
+            entity = StudentEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["studentId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("studentId")]
+)
+data class PbdAssessmentEntity(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val studentId: String,
+    val subjectCode: String,            // "BM", "MT", "SN", "PI", "BI", "BA"
+    val subjectName: String,            // "Bahasa Melayu", "Matematik"
+    val tahapPenguasaan: Int,           // 1 to 6 (TP1 - TP6)
+    val assessmentPeriod: String = "Sesi 2026/2027", // "Pertengahan Sesi", "Akhir Sesi"
+    val teacherComment: String = "",    // "Penguasaan kosa kata dan lisan cemerlang"
+    val assessedDate: String = "Okt 2026"
+)
+
 

@@ -15,6 +15,9 @@ class SlotifyApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Initialize system notification channels
+        my.slotify.app.core.notification.SlotifyNotificationManager.createNotificationChannels(this)
         
         // Seed initial family data (Adam, Aisyah, Danial)
         CoroutineScope(Dispatchers.IO).launch {

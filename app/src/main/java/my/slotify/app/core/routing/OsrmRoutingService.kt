@@ -16,21 +16,25 @@ data class OsrmLeg(
 data class OsrmRouteResponse(
     val totalDistanceKm: Double,
     val totalDurationMinutes: Double,
-    val legs: List<OsrmLeg>
+    val legs: List<OsrmLeg>,
+    val geometryPoints: List<Pair<Double, Double>> = emptyList() // List of (latitude, longitude)
 )
 
 class OsrmRoutingService {
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
         .build()
 
     suspend fun getDrivingRoute(coordinatesLonLatSemicolonSeparated: String): OsrmRouteResponse = withContext(Dispatchers.IO) {
-        val url = "https://router.project-osrm.org/route/v1/driving/$coordinatesLonLatSemicolonSeparated?overview=false&steps=false"
+        val url = "https://router.project-osrm.org/route/v1/driving/$coordinatesLonLatSemicolonSeparated?overview=full&geometries=geojson&steps=false"
         
         try {
-            val request = Request.Builder().url(url).build()
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "SlotifyApp/1.0 (Android; Bandar Contoh/Klang Valley)")
+                .build()
             val response = client.newCall(request).execute()
             val responseBody = response.body?.string() ?: ""
 
@@ -63,10 +67,24 @@ class OsrmRoutingService {
                 }
             }
 
+            // Parse detailed road geometry (GeoJSON [lon, lat] -> (lat, lon))
+            val geomObj = route.optJSONObject("geometry")
+            val coordsArray = geomObj?.optJSONArray("coordinates")
+            val geomPoints = mutableListOf<Pair<Double, Double>>()
+            if (coordsArray != null) {
+                for (i in 0 until coordsArray.length()) {
+                    val coord = coordsArray.getJSONArray(i)
+                    val lon = coord.getDouble(0)
+                    val lat = coord.getDouble(1)
+                    geomPoints.add(Pair(lat, lon))
+                }
+            }
+
             OsrmRouteResponse(
                 totalDistanceKm = totalDistance,
                 totalDurationMinutes = totalDuration,
-                legs = legsList
+                legs = legsList,
+                geometryPoints = geomPoints
             )
         } catch (e: Exception) {
             fallbackEstimation()
@@ -78,9 +96,15 @@ class OsrmRoutingService {
             totalDistanceKm = 9.9,
             totalDurationMinutes = 18.0,
             legs = listOf(
-                OsrmLeg(7200.0, 720.0, "Pejabat Bandar Contoh ➔ Tadika"),
-                OsrmLeg(1200.0, 180.0, "Tadika ➔ Taska"),
-                OsrmLeg(1500.0, 180.0, "Taska ➔ Rumah")
+                OsrmLeg(7200.0, 720.0, "Pejabat Bandar Contoh ➔ Tadika Danial"),
+                OsrmLeg(1200.0, 180.0, "Tadika Danial ➔ Taska Ceria"),
+                OsrmLeg(1500.0, 180.0, "Taska Ceria ➔ Rumah")
+            ),
+            geometryPoints = listOf(
+                Pair(3.1390, 101.6869), // Pejabat
+                Pair(3.1390, 101.6869), // Tadika Danial
+                Pair(3.1390, 101.6869), // Taska Ceria
+                Pair(3.1390, 101.6869)  // Rumah
             )
         )
     }

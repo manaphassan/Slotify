@@ -31,6 +31,9 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
+import my.slotify.app.core.routing.OsrmRoutingService
+import my.slotify.app.core.routing.OsrmRouteResponse
+import my.slotify.app.core.notification.SlotifyNotificationManager
 import my.slotify.app.core.designsystem.theme.NeumorphicElevation
 import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.designsystem.theme.SlotifyShapes
@@ -81,6 +84,57 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
 
     // Persistent POI list loaded from storage
     var pois by remember { mutableStateOf(PoiStorage.loadPois(context)) }
+
+    // Live OSRM Driving Engine Integration
+    val osrmService = remember { OsrmRoutingService() }
+    var osrmRoute by remember { mutableStateOf<OsrmRouteResponse?>(null) }
+    var isOsrmLoading by remember { mutableStateOf(false) }
+    var osrmRefreshTrigger by remember { mutableIntStateOf(0) }
+
+    // Fetch OSRM route whenever selectedRoute changes or user triggers refresh
+    LaunchedEffect(selectedRoute, pois, osrmRefreshTrigger) {
+        isOsrmLoading = true
+        val coords = when (selectedRoute) {
+            RouteSelection.ABAH_PICKUP -> {
+                val office = pois.find { it.category == PoiCategory.PEJABAT } ?: PoiItem("def-pej", "Pejabat", PoiCategory.PEJABAT, "🏢", 3.1390, 101.6869, 0.0)
+                val tadika = pois.find { it.id == "poi-5" } ?: pois.find { it.category == PoiCategory.TRANSIT } ?: PoiItem("def-tad", "Tadika", PoiCategory.TRANSIT, "🏫", 3.1390, 101.6869, 0.0)
+                val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT && it.id != tadika.id } ?: PoiItem("def-tas", "Taska", PoiCategory.TRANSIT, "👶", 3.1390, 101.6869, 0.0)
+                val home = pois.find { it.category == PoiCategory.RUMAH } ?: PoiItem("def-hom", "Rumah", PoiCategory.RUMAH, "🏠", 3.1390, 101.6869, 0.0)
+                String.format(Locale.US, "%.4f,%.4f;%.4f,%.4f;%.4f,%.4f;%.4f,%.4f",
+                    office.lng, office.lat,
+                    tadika.lng, tadika.lat,
+                    taska.lng, taska.lat,
+                    home.lng, home.lat
+                )
+            }
+            RouteSelection.VAN_PRIMARY -> {
+                val home = pois.find { it.category == PoiCategory.RUMAH } ?: PoiItem("def-hom", "Rumah", PoiCategory.RUMAH, "🏠", 3.1390, 101.6869, 0.0)
+                val sra = pois.find { it.name.contains("SRA") } ?: PoiItem("def-sra", "SRA", PoiCategory.SEKOLAH, "🕌", 3.1390, 101.6869, 0.0)
+                val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT } ?: PoiItem("def-tas", "Taska", PoiCategory.TRANSIT, "👶", 3.1390, 101.6869, 0.0)
+                val sk = pois.find { it.name.contains("SK") } ?: PoiItem("def-sko", "SK", PoiCategory.SEKOLAH, "🏫", 3.1390, 101.6869, 0.0)
+                String.format(Locale.US, "%.4f,%.4f;%.4f,%.4f;%.4f,%.4f;%.4f,%.4f;%.4f,%.4f",
+                    home.lng, home.lat,
+                    sra.lng, sra.lat,
+                    taska.lng, taska.lat,
+                    sk.lng, sk.lat,
+                    home.lng, home.lat
+                )
+            }
+            RouteSelection.VAN_SECONDARY -> {
+                val home = pois.find { it.category == PoiCategory.RUMAH } ?: PoiItem("def-hom", "Rumah", PoiCategory.RUMAH, "🏠", 3.1390, 101.6869, 0.0)
+                val srai = pois.find { it.name.contains("Bukit Contoh") || it.name.contains("SRAI") } ?: PoiItem("def-srai", "SRAI", PoiCategory.SEKOLAH, "🕌", 3.1390, 101.6869, 0.0)
+                val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT } ?: PoiItem("def-tas", "Taska", PoiCategory.TRANSIT, "👶", 3.1390, 101.6869, 0.0)
+                String.format(Locale.US, "%.4f,%.4f;%.4f,%.4f;%.4f,%.4f;%.4f,%.4f",
+                    home.lng, home.lat,
+                    srai.lng, srai.lat,
+                    taska.lng, taska.lat,
+                    home.lng, home.lat
+                )
+            }
+        }
+        osrmRoute = osrmService.getDrivingRoute(coords)
+        isOsrmLoading = false
+    }
 
     // Dialog & Management states
     var editingPoi by remember { mutableStateOf<PoiItem?>(null) }
@@ -186,12 +240,12 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                             controller.setCenter(GeoPoint(3.1390, 101.6869))
 
                             // Initial overlay setup
-                            setupMapOverlays(this, pois, rfCenterGeoPoint, isRfPulseActive, pickedGeoPoint, handleMapTap)
+                            setupMapOverlays(this, pois, rfCenterGeoPoint, isRfPulseActive, pickedGeoPoint, selectedRoute, osrmRoute, handleMapTap)
                             mapViewRef = this
                         }
                     },
                     update = { mapView ->
-                        setupMapOverlays(mapView, pois, rfCenterGeoPoint, isRfPulseActive, pickedGeoPoint, handleMapTap)
+                        setupMapOverlays(mapView, pois, rfCenterGeoPoint, isRfPulseActive, pickedGeoPoint, selectedRoute, osrmRoute, handleMapTap)
                     }
                 )
 
@@ -531,48 +585,104 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = SlotifyColors.TextPrimary
                             )
+                            Spacer(Modifier.width(6.dp))
+                            Surface(
+                                shape = SlotifyShapes.Small,
+                                color = SlotifyColors.SuccessMint.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = if (isOsrmLoading) "OSRM..." else "OSRM Live",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = SlotifyColors.SuccessMint,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
                         }
 
-                        // Simulation button
-                        Button(
-                            onClick = {
-                                isSimulating = true
-                                simulationStep = (simulationStep + 1) % 4
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.ActionAmber),
-                            shape = SlotifyShapes.Small,
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = if (simulationStep == 0) strings.startSimulation else "${strings.stepSimulationPrefix} ${simulationStep}/3",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = Color.White
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { osrmRefreshTrigger++ },
+                                modifier = Modifier.size(30.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = "Kira Semula OSRM",
+                                    tint = SlotifyColors.KpmSkyBlue,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+
+                            // Simulation button with Geofence Alerts
+                            Button(
+                                onClick = {
+                                    isSimulating = true
+                                    simulationStep = (simulationStep + 1) % 4
+                                    if (simulationStep > 0) {
+                                        val vanName = when (selectedRoute) {
+                                            RouteSelection.ABAH_PICKUP -> "Kereta Abah"
+                                            RouteSelection.VAN_PRIMARY -> "Van Sekolah A"
+                                            RouteSelection.VAN_SECONDARY -> "Van Sekolah B"
+                                        }
+                                        val (radLabel, desc) = when (simulationStep) {
+                                            1 -> Pair("3,000m", "Geofens 3.0km dikesan • Bersedia!")
+                                            2 -> Pair("1,000m", "Geofens 1.0km • Van sedang menghampiri lokasi!")
+                                            3 -> Pair("300m", "Ketibaan dalam 300m • Sila ke pintu pagar!")
+                                            else -> Pair("", "")
+                                        }
+                                        if (radLabel.isNotEmpty()) {
+                                            SlotifyNotificationManager.showTransitAlert(
+                                                context = context,
+                                                childName = vanName,
+                                                transitMsg = "🚨 Radar $radLabel: $desc"
+                                            )
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.ActionAmber),
+                                shape = SlotifyShapes.Small,
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (simulationStep == 0) strings.startSimulation else "${strings.stepSimulationPrefix} ${simulationStep}/3",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White
+                                )
+                            }
                         }
                     }
 
-                    // 3 Route Tabs
+                    // 3 Route Tabs with dynamic OSRM ETA / KM
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        val abahSubtitle = if (isOsrmLoading && selectedRoute == RouteSelection.ABAH_PICKUP) "Mengira..."
+                            else if (osrmRoute != null && selectedRoute == RouteSelection.ABAH_PICKUP) "ETA ~${osrmRoute!!.totalDurationMinutes.toInt()} min (${String.format(Locale.US, "%.1f", osrmRoute!!.totalDistanceKm)} km)"
+                            else "ETA ~18 Minit"
                         RouteTabCard(
                             title = strings.routeAbah,
-                            subtitle = "ETA ~18 Minit",
+                            subtitle = abahSubtitle,
                             isSelected = selectedRoute == RouteSelection.ABAH_PICKUP,
                             modifier = Modifier.weight(1f)
                         ) { selectedRoute = RouteSelection.ABAH_PICKUP }
 
+                        val vanPrimarySubtitle = if (isOsrmLoading && selectedRoute == RouteSelection.VAN_PRIMARY) "Mengira..."
+                            else if (osrmRoute != null && selectedRoute == RouteSelection.VAN_PRIMARY) "ETA ~${osrmRoute!!.totalDurationMinutes.toInt()} min (${String.format(Locale.US, "%.1f", osrmRoute!!.totalDistanceKm)} km)"
+                            else "Adam (SK)"
                         RouteTabCard(
                             title = strings.routeVanPrimary,
-                            subtitle = "Adam (SK)",
+                            subtitle = vanPrimarySubtitle,
                             isSelected = selectedRoute == RouteSelection.VAN_PRIMARY,
                             modifier = Modifier.weight(1f)
                         ) { selectedRoute = RouteSelection.VAN_PRIMARY }
 
+                        val vanSecondarySubtitle = if (isOsrmLoading && selectedRoute == RouteSelection.VAN_SECONDARY) "Mengira..."
+                            else if (osrmRoute != null && selectedRoute == RouteSelection.VAN_SECONDARY) "ETA ~${osrmRoute!!.totalDurationMinutes.toInt()} min (${String.format(Locale.US, "%.1f", osrmRoute!!.totalDistanceKm)} km)"
+                            else "Aisyah (SRAI)"
                         RouteTabCard(
                             title = strings.routeVanSecondary,
-                            subtitle = "Aisyah (SRAI)",
+                            subtitle = vanSecondarySubtitle,
                             isSelected = selectedRoute == RouteSelection.VAN_SECONDARY,
                             modifier = Modifier.weight(1f)
                         ) { selectedRoute = RouteSelection.VAN_SECONDARY }
@@ -982,6 +1092,8 @@ private fun setupMapOverlays(
     rfCenter: GeoPoint?,
     isRfActive: Boolean,
     pickedPoint: GeoPoint?,
+    selectedRoute: RouteSelection,
+    osrmRoute: OsrmRouteResponse?,
     onMapTapped: (GeoPoint) -> Unit
 ) {
     // Keep tile overlays, clear custom Markers, Polylines and RfPulseOverlay
@@ -998,22 +1110,53 @@ private fun setupMapOverlays(
     )
     mapView.overlays.add(rfOverlay)
 
-    // 2. Route polyline: Office (or first Pejabat) → Tadika → Taska → Home
-    val officePoi = pois.find { it.category == PoiCategory.PEJABAT }
-    val tadikaPoi = pois.find { it.id == "poi-5" } ?: pois.find { it.category == PoiCategory.TRANSIT }
-    val taskaPoi = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT && it.id != tadikaPoi?.id }
-    val homePoi = pois.find { it.category == PoiCategory.RUMAH }
-
+    // 2. Route polyline from OSRM GeoJSON geometry or waypoints
     val routePoints = mutableListOf<GeoPoint>()
-    officePoi?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
-    tadikaPoi?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
-    taskaPoi?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
-    homePoi?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
+    if (osrmRoute != null && osrmRoute.geometryPoints.isNotEmpty()) {
+        routePoints.addAll(osrmRoute.geometryPoints.map { GeoPoint(it.first, it.second) })
+    } else {
+        when (selectedRoute) {
+            RouteSelection.ABAH_PICKUP -> {
+                val office = pois.find { it.category == PoiCategory.PEJABAT }
+                val tadika = pois.find { it.id == "poi-5" } ?: pois.find { it.category == PoiCategory.TRANSIT }
+                val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT && it.id != tadika?.id }
+                val home = pois.find { it.category == PoiCategory.RUMAH }
+                office?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
+                tadika?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
+                taska?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
+                home?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
+            }
+            RouteSelection.VAN_PRIMARY -> {
+                val home = pois.find { it.category == PoiCategory.RUMAH }
+                val sra = pois.find { it.name.contains("SRA") }
+                val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT }
+                val sk = pois.find { it.name.contains("SK") }
+                home?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
+                sra?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
+                taska?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
+                sk?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
+                home?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
+            }
+            RouteSelection.VAN_SECONDARY -> {
+                val home = pois.find { it.category == PoiCategory.RUMAH }
+                val srai = pois.find { it.name.contains("Bukit Contoh") || it.name.contains("SRAI") }
+                val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT }
+                home?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
+                srai?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
+                taska?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
+                home?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
+            }
+        }
+    }
 
     if (routePoints.size >= 2) {
         val polyline = Polyline().apply {
             setPoints(routePoints)
-            outlinePaint.color = android.graphics.Color.parseColor("#0284C7")
+            outlinePaint.color = when (selectedRoute) {
+                RouteSelection.ABAH_PICKUP -> android.graphics.Color.parseColor("#0284C7")
+                RouteSelection.VAN_PRIMARY -> android.graphics.Color.parseColor("#2563EB")
+                RouteSelection.VAN_SECONDARY -> android.graphics.Color.parseColor("#F59E0B")
+            }
             outlinePaint.strokeWidth = 10f
         }
         mapView.overlays.add(polyline)

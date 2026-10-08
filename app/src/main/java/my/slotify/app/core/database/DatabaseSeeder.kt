@@ -10,6 +10,8 @@ object DatabaseSeeder {
             seedSessionsIfMissing(dao) // Self-heal sessions on repeat installs
             seedFullWeekSlotsIfMissing(dao, context) // Extend Mon-only slots to full week
             seedHomeworkAndExamsIfMissing(dao)
+            seedCommitmentFeesIfMissing(dao)
+            seedPbdAssessmentsIfMissing(dao)
             return
         }
 
@@ -442,6 +444,7 @@ object DatabaseSeeder {
         )
         dao.insertExams(exams)
         seedCommitmentFeesIfMissing(dao)
+        seedPbdAssessmentsIfMissing(dao)
     }
 
     /**
@@ -599,6 +602,36 @@ object DatabaseSeeder {
             )
         )
         dao.upsertCommitmentFees(fees)
+    }
+
+    /**
+     * Seeds initial KPM Pentaksiran Bilik Darjah (PBD) assessments for Adam, Aisyah, and Danial.
+     */
+    suspend fun seedPbdAssessmentsIfMissing(dao: SlotifyDao) {
+        val adamId = "student-adam-01"
+        val aisyahId = "student-aisyah-02"
+        val danialId = "student-danial-03"
+
+        val assessments = listOf(
+            // Adam (Darjah 4)
+            PbdAssessmentEntity(id = "pbd-adam-bm", studentId = adamId, subjectCode = "BM", subjectName = "Bahasa Melayu", tahapPenguasaan = 5, teacherComment = "Kemahiran lisan dan penulisan karangan sangat memuaskan.", assessedDate = "Okt 2026"),
+            PbdAssessmentEntity(id = "pbd-adam-mt", studentId = adamId, subjectCode = "MT", subjectName = "Matematik", tahapPenguasaan = 5, teacherComment = "Cekap dalam operasi bergabung dan pecahan.", assessedDate = "Okt 2026"),
+            PbdAssessmentEntity(id = "pbd-adam-sn", studentId = adamId, subjectCode = "SN", subjectName = "Sains", tahapPenguasaan = 4, teacherComment = "Memahami konsep sains dan amali dengan baik.", assessedDate = "Okt 2026"),
+            PbdAssessmentEntity(id = "pbd-adam-bi", studentId = adamId, subjectCode = "BI", subjectName = "Bahasa Inggeris", tahapPenguasaan = 4, teacherComment = "Good vocabulary and comprehension skills.", assessedDate = "Okt 2026"),
+            PbdAssessmentEntity(id = "pbd-adam-pi", studentId = adamId, subjectCode = "PI", subjectName = "Pendidikan Islam", tahapPenguasaan = 6, teacherComment = "Hafazan surah cemerlang dan pengamalan solat terpuji.", assessedDate = "Okt 2026"),
+            PbdAssessmentEntity(id = "pbd-adam-sej", studentId = adamId, subjectCode = "SEJ", subjectName = "Sejarah", tahapPenguasaan = 5, teacherComment = "Faham kronologi sejarah negara dan aktif bersoal jawab.", assessedDate = "Okt 2026"),
+
+            // Aisyah (Darjah 2)
+            PbdAssessmentEntity(id = "pbd-aisyah-bm", studentId = aisyahId, subjectCode = "BM", subjectName = "Bahasa Melayu", tahapPenguasaan = 4, teacherComment = "Lancar membaca petikan dan membina ayat tunggal.", assessedDate = "Okt 2026"),
+            PbdAssessmentEntity(id = "pbd-aisyah-mt", studentId = aisyahId, subjectCode = "MT", subjectName = "Matematik", tahapPenguasaan = 5, teacherComment = "Pantas mengira sifir 2, 3, 5 dan operasi tambah.", assessedDate = "Okt 2026"),
+            PbdAssessmentEntity(id = "pbd-aisyah-ba", studentId = aisyahId, subjectCode = "BA", subjectName = "Bahasa Arab", tahapPenguasaan = 5, teacherComment = "Dapat menyebut kalimah bahasa Arab dengan sebutan fasih.", assessedDate = "Okt 2026"),
+            PbdAssessmentEntity(id = "pbd-aisyah-tahfiz", studentId = aisyahId, subjectCode = "TAHFIZ", subjectName = "Hafazan Al-Quran", tahapPenguasaan = 6, teacherComment = "Bacaan tajwid makhraj mantap dan tasmik lancar.", assessedDate = "Okt 2026"),
+
+            // Danial (Tadika 4Y)
+            PbdAssessmentEntity(id = "pbd-danial-iqra", studentId = danialId, subjectCode = "IQRA", subjectName = "Iqra' Asas", tahapPenguasaan = 5, teacherComment = "Mengenal huruf hijaiyyah berbaris satu dengan seronok.", assessedDate = "Okt 2026"),
+            PbdAssessmentEntity(id = "pbd-danial-bm", studentId = danialId, subjectCode = "BM", subjectName = "Bahasa Melayu Asas", tahapPenguasaan = 4, teacherComment = "Boleh mengeja suku kata terbuka dan menyanyi lagu ABC.", assessedDate = "Okt 2026")
+        )
+        dao.insertAssessments(assessments)
     }
 }
 

@@ -14,9 +14,10 @@ import androidx.room.RoomDatabase
         HomeworkTaskEntity::class,
         ExamEntity::class,
         CommitmentFeeEntity::class,
-        DailySpendingEntity::class
+        DailySpendingEntity::class,
+        PbdAssessmentEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class SlotifyDatabase : RoomDatabase() {

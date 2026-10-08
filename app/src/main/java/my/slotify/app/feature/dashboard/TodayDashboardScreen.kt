@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -849,10 +850,118 @@ fun TodayDashboardScreen(
             }
         }
 
-            // FAB Bottom Clearance
-            item {
-                Spacer(Modifier.height(70.dp))
+        // Routine Notification & Automation Card
+        item {
+            val context = LocalContext.current
+            var notifFeedback by remember { mutableStateOf<String?>(null) }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 16.dp)
+                    .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
+                    .padding(14.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("⏰", fontSize = 18.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Automasi & Notifikasi Rutin",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = SlotifyColors.TextPrimary
+                                )
+                                Text(
+                                    text = "Jadual harian penggera & peringatan telefon",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = SlotifyColors.TextSecondary
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = SlotifyShapes.Small,
+                            color = SlotifyColors.SuccessMint.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = "Aktif",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SlotifyColors.SuccessMint,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    if (notifFeedback != null) {
+                        Surface(
+                            shape = SlotifyShapes.Small,
+                            color = SlotifyColors.KpmSkyBlue.copy(alpha = 0.12f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = notifFeedback!!,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = SlotifyColors.KpmSkyBlue,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                my.slotify.app.core.notification.SlotifyNotificationManager.showTransitAlert(
+                                    context = context,
+                                    childName = selectedStudent?.nickname ?: "Adam & Adam",
+                                    transitMsg = "Hantar Beg Transit & Baju SK ke Taska Ceria!"
+                                )
+                                notifFeedback = "Notifikasi 07:00 AM telah dihantar ke bar notifikasi!"
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.ActionAmber),
+                            shape = SlotifyShapes.Small,
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
+                        ) {
+                            Text("🔔 Uji 07:00 AM\nBeg Transit", fontSize = 11.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                my.slotify.app.core.notification.SlotifyNotificationManager.showAttireReminder(
+                                    context = context,
+                                    childName = selectedStudent?.nickname ?: "Adam",
+                                    attire = "Baju T-Shirt Sukan SK / Seluar Track",
+                                    books = "Buku Teks Matematik, Sains, B. Melayu"
+                                )
+                                notifFeedback = "Notifikasi 08:30 PM pakaian esok telah dihantar!"
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue),
+                            shape = SlotifyShapes.Small,
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
+                        ) {
+                            Text("👕 Uji 08:30 PM\nUniform Esok", fontSize = 11.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
+        }
+
+        // FAB Bottom Clearance
+        item {
+            Spacer(Modifier.height(70.dp))
+        }
         }
 
         // ============================================================

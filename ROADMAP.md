@@ -41,21 +41,22 @@ gantt
 - [x] Skema pangkalan data Room (`StudentEntity`, `SchoolSessionEntity`, `TimetableSlotEntity`, `LocationNodeEntity`).
 - [x] Seeder data sebenar keluarga (Adam, Aisyah, Danial).
 
-### 🔹 Fasa 2: Pengurusan Jadual & Pembantu Beg Sekolah (Sedang Berjalan 🟡)
-- [ ] Paparan jadual penuh Isnin hingga Jumaat dengan penapis hari dan sesi.
-- [ ] Logik pertukaran sesi automatik Tahun 4 vs Tahun 5 (Pagi/Petang).
-- [ ] Ciri pintar "Buku Kena Bawa" berpandukan jadual hari esok berserta butang ganjaran `+5 ⭐`.
-- [ ] Panduan baju seragam harian (Isnin: Rasmi, Selasa: Sukan, Rabu: Koku, Khamis: Batik, Jumaat: Baju Melayu).
+### 🔹 Fasa 2: Pengurusan Jadual & Pembantu Beg Sekolah (SIAP ✅)
+- [x] Paparan jadual penuh Isnin hingga Jumaat dengan penapis hari dan sesi.
+- [x] Logik pertukaran sesi automatik Tahun 4 vs Tahun 5 (Pagi/Petang).
+- [x] Ciri pintar "Buku Kena Bawa" berpandukan jadual hari esok berserta butang ganjaran `+5 ⭐`.
+- [x] Panduan baju seragam harian (Isnin: Rasmi, Selasa: Sukan, Rabu: Koku, Khamis: Batik, Jumaat: Baju Melayu) dan sistem notifikasi berjadual.
 
-### 🔹 Fasa 3: Logistik, Peta OpenStreetMap & Pengesanan Van (Akan Datang ⚪)
-- [ ] Integrasi paparan peta OpenStreetMap (OSMDroid / MapLibre Native).
-- [ ] Pengiraan laluan berantai petang Abah (`Pejabat ➔ Tadika Danial ➔ Taska Aisyah ➔ Rumah`) berserta ETA masa pemanduan.
-- [ ] Paparan status geofens Van Sekolah A dan Van Sekolah B.
+### 🔹 Fasa 3: Logistik, Peta OpenStreetMap & Pengesanan Van (SIAP ✅)
+- [x] Integrasi paparan peta OpenStreetMap (OSMDroid / MapLibre Native).
+- [x] Pengiraan laluan berantai petang Abah (`Pejabat ➔ Tadika Danial ➔ Taska Aisyah ➔ Rumah`) berserta ETA masa pemanduan dan paparan garis jalan sebenar (GeoJSON).
+- [x] Paparan status geofens Van Sekolah A dan Van Sekolah B serta amaran radar jarak dekat.
 
-### 🔹 Fasa 4: Bank Ganjaran Bintang & Pentaksiran Akademik (Akan Datang ⚪)
-- [ ] Pengumpulan syiling bintang secara automatik bila siap kerja rumah.
-- [ ] Katalog penebusan hadiah dengan pengesahan PIN ibu bapa.
-- [ ] Modul rekod markah UASA (Gred A-E) dan laporan PBD (Tahap Penguasaan TP1-TP6).
+### 🔹 Fasa 4: Bank Ganjaran Bintang & Pentaksiran Akademik (Sedang Berjalan 🟡)
+- [x] Pengumpulan syiling bintang secara automatik bila siap tugasan dan penilaian cemerlang.
+- [x] Katalog penebusan hadiah dengan pengesahan PIN ibu bapa (SHA-256 + 3 Percubaan).
+- [x] Modul rekod markah dan laporan PBD (Tahap Penguasaan TP1-TP6) berasaskan standard KPM.
+- [ ] Borang kerja rumah dengan fungsi tangkapan kamera bukti lembaran kerja.
 
 ### 🔹 Fasa 5: Pengurusan Duit Poket, Yuran & Takwim KPM (Akan Datang ⚪)
 - [ ] Rekod belanja kantin harian & simpanan baki ke tabung maya.
