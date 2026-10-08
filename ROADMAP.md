@@ -58,10 +58,10 @@ gantt
 - [x] Modul rekod markah dan laporan PBD (Tahap Penguasaan TP1-TP6) berasaskan standard KPM.
 - [ ] Borang kerja rumah dengan fungsi tangkapan kamera bukti lembaran kerja.
 
-### 🔹 Fasa 5: Pengurusan Duit Poket, Yuran & Takwim KPM (Akan Datang ⚪)
-- [ ] Rekod belanja kantin harian & simpanan baki ke tabung maya.
-- [ ] Pusat peringatan tarikh akhir yuran bulanan dan tahunan PIBG.
-- [ ] Sinkronisasi kalendar takwim cuti sekolah KPM (Kumpulan B - Selangor).
+### 🔹 Fasa 5: Pengurusan Duit Poket, Yuran & Takwim KPM (SIAP ✅)
+- [x] Rekod belanja kantin harian & simpanan baki ke Tabung Maya dengan insentif +10 ⭐ Bintang.
+- [x] Pusat pengurusan yuran bulanan (Van A, Taska, Tadika, PIBG) dengan status bayaran & dialog penambahan yuran.
+- [x] Sinkronisasi kalendar takwim cuti sekolah KPM 2026/2027 (Kumpulan B - Selangor) dengan paparan dialog penuh & banner status sesi di dashboard.
 
 ### 🔹 Fasa 6: Ujian Beta & Pelancaran (Akan Datang ⚪)
 - [ ] Pemasangan APK terus ke telefon bimbit Keluarga untuk ujian lapangan harian.

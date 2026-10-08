@@ -330,7 +330,15 @@ class MainActivity : ComponentActivity() {
                                     )
                                     Screen.FINANCE -> FinanceScreen(
                                         selectedStudent = selectedStudent,
-                                        dao = dao
+                                        dao = dao,
+                                        onRewardStars = { delta ->
+                                            selectedStudent?.let { s ->
+                                                coroutineScope.launch {
+                                                    dao.updateStarCoins(s.id, delta)
+                                                    selectedStudent = dao.getStudentById(s.id)
+                                                }
+                                            }
+                                        }
                                     )
                                     Screen.PROFILES -> StudentProfileScreen(
                                         students = students,

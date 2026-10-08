@@ -64,6 +64,7 @@ fun TodayDashboardScreen(
     var bagPacked by remember { mutableStateOf(false) }
     var selectedFilter by remember { mutableStateOf(TaskFilter.ALL) }
     var showFocusDialog by remember { mutableStateOf(false) }
+    var showTakwimDialog by remember { mutableStateOf(false) }
 
     // Fix 4.3: Guard null selectedStudent — return empty list rather than tasks with empty studentId
     val defaultTasks = remember(selectedStudent?.id) {
@@ -226,6 +227,75 @@ fun TodayDashboardScreen(
                                 )
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        // ============================================================
+        // 🗓️ KPM 2026/2027 ACADEMIC CALENDAR & HOLIDAYS BANNER
+        // ============================================================
+        item {
+            val todayDate = remember { java.time.LocalDate.now() }
+            val currentHoliday = remember { my.slotify.app.core.takwim.KpmTakwimRepository.isHoliday(todayDate) }
+            val nextHoliday = remember { my.slotify.app.core.takwim.KpmTakwimRepository.getUpcomingHolidays(todayDate, limit = 1).firstOrNull() }
+            val currentTerm = remember { my.slotify.app.core.takwim.KpmTakwimRepository.getCurrentTerm(todayDate) }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = SlotifyShapes.LargeDp)
+                    .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
+                    .clickable { showTakwimDialog = true }
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = if (currentHoliday != null) currentHoliday.emoji else (nextHoliday?.emoji ?: "🗓️"),
+                            fontSize = 22.sp
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = if (currentHoliday != null) "Cuti: ${currentHoliday.titleBm}" else "Takwim KPM • ${currentTerm?.name ?: "Sesi 2026/2027"}",
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = if (currentHoliday != null) SlotifyColors.ScienceGreen else SlotifyColors.TextPrimary
+                                )
+                            }
+                            if (currentHoliday != null) {
+                                Text(
+                                    text = "Tiada sesi persekolahan hari ini • Selamat bercuti!",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = SlotifyColors.ScienceGreen
+                                )
+                            } else if (nextHoliday != null) {
+                                val days = nextHoliday.daysUntil(todayDate)
+                                val text = if (days <= 0) "Hari Ini!" else "lagi $days hari"
+                                Text(
+                                    text = "Cuti seterusnya: ${nextHoliday.titleBm} ($text)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = SlotifyColors.KpmBlue
+                                )
+                            }
+                        }
+                    }
+
+                    Surface(
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+                        color = SlotifyColors.KpmBlue.copy(alpha = 0.12f)
+                    ) {
+                        Text(
+                            text = "Kumpulan B",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = SlotifyColors.KpmBlue
+                        )
                     }
                 }
             }
@@ -975,6 +1045,12 @@ fun TodayDashboardScreen(
                     showFocusDialog = false
                     onRewardEarned(10)
                 }
+            )
+        }
+
+        if (showTakwimDialog) {
+            my.slotify.app.feature.takwim.TakwimCalendarDialog(
+                onDismissRequest = { showTakwimDialog = false }
             )
         }
     }

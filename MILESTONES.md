@@ -12,7 +12,7 @@
 | **M2: Dynamic Timetable & Bag Helper** | `v1.0.0-alpha02` | Multi-Session Grid, Attire Guide & Packing Assistant | ✅ **SIAP** |
 | **M3: OSM Logistics & Chained ETA** | `v1.0.0-beta01` | OpenStreetMap Map View, OSRM Route Calculator & Van Alerts | ✅ **SIAP** |
 | **M4: Reward Vault & Academics** | `v1.0.0-beta02` | Star Coins, Parent PIN Authorization & PBD/UASA Records | 🟡 **Dalam Proses (75%)** |
-| **M5: Finance, Takwim & Polish** | `v1.0.0-rc01` | Canteen Tracker, Fee Alerts & KPM Takwim 2026/2027 | ⚪ **Belum Mula** |
+| **M5: Finance, Takwim & Polish** | `v1.0.0-rc01` | Canteen Tracker, Fee Alerts & KPM Takwim 2026/2027 | ✅ **SIAP** |
 | **M6: Production Release** | `v1.0.0` | Signed AAB/APK, Google Play Store Publishing | ⚪ **Belum Mula** |
 
 ---
@@ -54,11 +54,11 @@
 
 ---
 
-### ⚪ M5: Finance, Takwim & Release Candidate (`v1.0.0-rc01`)
-- [ ] Log belanja kantin harian dengan pengiraan baki tabung secara automatik.
-- [ ] Pengurusan yuran bulanan (Van A, Taska Ceria, Tadika Danial, PIBG).
-- [ ] Integrasikan kalendar Takwim KPM 2026/2027 (Kumpulan B) untuk cuti penggal dan cuti peristiwa.
-- [ ] Ujian aplikasi pada peranti fizikal Android.
+### ✅ M5: Finance, Takwim & Release Candidate (`v1.0.0-rc01`) — SIAP
+- [x] Log belanja kantin harian dengan pengiraan baki tabung secara automatik & Tabung Maya (+10 ⭐ per RM10 penjimatan).
+- [x] Pengurusan yuran bulanan (Van A, Taska Ceria, Tadika Danial, PIBG) dengan dialog penambahan yuran dan penapis status.
+- [x] Integrasikan kalendar Takwim KPM 2026/2027 (Kumpulan B - Selangor) untuk cuti penggal dan cuti peristiwa dengan dialog paparan penuh dan status langsung pada papan pemuka.
+- [x] Ujian kompilasi dan pengesahan kualiti kod automatik (`assembleDebug` & `testDebugUnitTest`).
 
 ---
 

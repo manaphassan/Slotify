@@ -104,9 +104,17 @@ interface SlotifyDao {
     @Query("SELECT * FROM daily_spending WHERE studentId = :studentId AND dateKey = :dateKey LIMIT 1")
     fun getDailySpendingFlow(studentId: String, dateKey: String): Flow<DailySpendingEntity?>
 
+    /** Live stream of all daily spending entries for a student (for Tabung Maya cumulative savings calculation). */
+    @Query("SELECT * FROM daily_spending WHERE studentId = :studentId ORDER BY dateKey DESC")
+    fun getAllSpendingForStudent(studentId: String): Flow<List<DailySpendingEntity>>
+
     /** Save/update canteen spending (REPLACE updates existing row). */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertDailySpending(entry: DailySpendingEntity)
+
+    /** Delete a commitment fee. */
+    @androidx.room.Delete
+    suspend fun deleteCommitmentFee(fee: CommitmentFeeEntity)
 
     // ── Academic & PBD Assessments ───────────────────────────────────────────
 
