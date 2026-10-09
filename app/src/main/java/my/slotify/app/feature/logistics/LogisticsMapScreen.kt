@@ -7,6 +7,13 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -98,13 +105,206 @@ fun launchNavigationIntent(context: Context, lat: Double, lng: Double, label: St
     }
 }
 
+/**
+ * Real-time animated vehicle state for smooth polyline tracking
+ */
+data class VehicleSimState(
+    val point: GeoPoint,
+    val speedKmh: Int,
+    val distanceRemainingKm: Double,
+    val etaMinutes: Int,
+    val statusText: String,
+    val vehicleEmoji: String = "🚐"
+)
+
+data class DriverContact(
+    val name: String,
+    val role: String,
+    val phone: String,
+    val emoji: String,
+    val defaultMessage: String
+)
+
+fun launchWhatsAppIntent(context: Context, phone: String, message: String) {
+    try {
+        val cleanPhone = phone.replace(Regex("[^0-9+]"), "").let {
+            if (it.startsWith("0")) "+60" + it.substring(1) else it
+        }
+        val uri = Uri.parse("https://api.whatsapp.com/send?phone=$cleanPhone&text=${Uri.encode(message)}")
+        val intent = Intent(Intent.ACTION_VIEW, uri)
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        try {
+            val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+            context.startActivity(dialIntent)
+        } catch (_: Exception) {}
+    }
+}
+
+fun launchDialerIntent(context: Context, phone: String) {
+    try {
+        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+        context.startActivity(intent)
+    } catch (_: Exception) {}
+}
+
+/**
+ * Interpolates a polyline into a fixed target count of smooth intermediate coordinates
+ */
+fun interpolateRoutePoints(rawPoints: List<GeoPoint>, targetCount: Int = 36): List<GeoPoint> {
+    if (rawPoints.isEmpty()) return emptyList()
+    if (rawPoints.size == 1) return List(targetCount) { rawPoints[0] }
+    if (rawPoints.size >= targetCount) {
+        val step = (rawPoints.size - 1).toDouble() / (targetCount - 1)
+        return (0 until targetCount).map { i ->
+            val index = (i * step).toInt().coerceIn(0, rawPoints.lastIndex)
+            rawPoints[index]
+        }
+    }
+    val result = mutableListOf<GeoPoint>()
+    val segmentCount = rawPoints.size - 1
+    val pointsPerSegment = (targetCount - 1) / segmentCount
+    val remainder = (targetCount - 1) % segmentCount
+
+    for (i in 0 until segmentCount) {
+        val p1 = rawPoints[i]
+        val p2 = rawPoints[i + 1]
+        val count = pointsPerSegment + if (i < remainder) 1 else 0
+        for (j in 0 until count) {
+            val fraction = j.toDouble() / count
+            val lat = p1.latitude + fraction * (p2.latitude - p1.latitude)
+            val lng = p1.longitude + fraction * (p2.longitude - p1.longitude)
+            result.add(GeoPoint(lat, lng))
+        }
+    }
+    result.add(rawPoints.last())
+    return result
+}
+
+/**
+ * 1-Tap Driver WhatsApp Quick-Dispatch & Direct Dialer Card
+ */
+@Composable
+fun DriverContactCard(
+    selectedRoute: RouteSelection,
+    onWhatsAppClick: (phone: String, message: String) -> Unit,
+    onCallClick: (phone: String) -> Unit
+) {
+    val contact = when (selectedRoute) {
+        RouteSelection.ABAH_PICKUP -> DriverContact(
+            name = "Abah",
+            role = "Kereta Keluarga • Kenderaan Keluarga",
+            phone = "+60100000000",
+            emoji = "🚗",
+            defaultMessage = "Salam Abah, anak-anak dah bersedia untuk diambil. Lokasi semasa rumah sedia."
+        )
+        RouteSelection.VAN_PRIMARY -> DriverContact(
+            name = "Pemandu Van A",
+            role = "Pemandu Van SK & SRA Taman Contoh",
+            phone = "+60100000000",
+            emoji = "🚐",
+            defaultMessage = "Salam Pemandu Van A, Adam & Aisyah dah siap di pintu pagar. Van dah dekat ke?"
+        )
+        RouteSelection.VAN_SECONDARY -> DriverContact(
+            name = "Pemandu Van B",
+            role = "Pemandu Van SRAI Bukit Contoh",
+            phone = "+60100000000",
+            emoji = "🚐",
+            defaultMessage = "Salam Pemandu Van B, Aisyah dah sedia untuk transit petang. Terima kasih."
+        )
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = SlotifyShapes.Medium,
+        color = SlotifyColors.CanvasBase,
+        border = BorderStroke(1.dp, SlotifyColors.KpmSkyBlue.copy(alpha = 0.25f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .background(SlotifyColors.KpmSkyBlue.copy(alpha = 0.15f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(contact.emoji, fontSize = 20.sp)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = contact.name,
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = SlotifyColors.TextPrimary
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Surface(
+                            shape = SlotifyShapes.Small,
+                            color = SlotifyColors.SuccessMint.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = "Aktif",
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SlotifyColors.SuccessMint,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        text = contact.role,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SlotifyColors.TextSecondary
+                    )
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                // WhatsApp Button
+                Button(
+                    onClick = { onWhatsAppClick(contact.phone, contact.defaultMessage) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
+                    shape = SlotifyShapes.Small,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Text("💬 WhatsApp", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+
+                // Call Button
+                OutlinedButton(
+                    onClick = { onCallClick(contact.phone) },
+                    shape = SlotifyShapes.Small,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Icon(Icons.Default.Call, contentDescription = "Panggil", tint = SlotifyColors.KpmSkyBlue, modifier = Modifier.size(14.dp))
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun LogisticsMapScreen(locationGranted: Boolean = false) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     var selectedRoute by remember { mutableStateOf(RouteSelection.ABAH_PICKUP) }
     var selectedPoiCategory by remember { mutableStateOf(PoiCategory.ALL) }
     var simulationStep by remember { mutableIntStateOf(0) }
     var isSimulating by remember { mutableStateOf(false) }
+
+    // Live Vehicle Smooth Polyline Simulation States
+    var simulatedVehicleState by remember { mutableStateOf<VehicleSimState?>(null) }
+    var vehicleFollowCamera by remember { mutableStateOf(true) }
+    var mapViewRef by remember { mutableStateOf<MapView?>(null) }
 
     // Persistent POI list loaded from storage
     var pois by remember { mutableStateOf(PoiStorage.loadPois(context)) }
@@ -171,6 +371,137 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
         pois.find { it.category == PoiCategory.RUMAH }?.let { GeoPoint(it.lat, it.lng) } ?: GeoPoint(3.1390, 101.6869)
     }
 
+    // Realtime Smooth Vehicle Simulation Coroutine
+    LaunchedEffect(isSimulating, selectedRoute, osrmRoute) {
+        if (!isSimulating) {
+            simulatedVehicleState = null
+            return@LaunchedEffect
+        }
+
+        val (vehicleEmoji, vanName) = when (selectedRoute) {
+            RouteSelection.ABAH_PICKUP -> Pair("🚗", "Kereta Abah")
+            RouteSelection.VAN_PRIMARY -> Pair("🚐", "Van Sekolah A")
+            RouteSelection.VAN_SECONDARY -> Pair("🚐", "Van Sekolah B")
+        }
+
+        val rawPoints = if (osrmRoute != null && osrmRoute!!.geometryPoints.isNotEmpty()) {
+            osrmRoute!!.geometryPoints.map { GeoPoint(it.first, it.second) }
+        } else {
+            when (selectedRoute) {
+                RouteSelection.ABAH_PICKUP -> {
+                    val office = pois.find { it.category == PoiCategory.PEJABAT } ?: PoiItem("def-pej", "Pejabat", PoiCategory.PEJABAT, "🏢", 3.1390, 101.6869, 0.0)
+                    val tadika = pois.find { it.id == "poi-5" } ?: pois.find { it.category == PoiCategory.TRANSIT } ?: PoiItem("def-tad", "Tadika", PoiCategory.TRANSIT, "🏫", 3.1390, 101.6869, 0.0)
+                    val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT && it.id != tadika.id } ?: PoiItem("def-tas", "Taska", PoiCategory.TRANSIT, "👶", 3.1390, 101.6869, 0.0)
+                    listOf(GeoPoint(office.lat, office.lng), GeoPoint(tadika.lat, tadika.lng), GeoPoint(taska.lat, taska.lng), defaultHomeGeo)
+                }
+                RouteSelection.VAN_PRIMARY -> {
+                    val sra = pois.find { it.name.contains("SRA") } ?: PoiItem("def-sra", "SRA", PoiCategory.SEKOLAH, "🕌", 3.1390, 101.6869, 0.0)
+                    val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT } ?: PoiItem("def-tas", "Taska", PoiCategory.TRANSIT, "👶", 3.1390, 101.6869, 0.0)
+                    val sk = pois.find { it.name.contains("SK") } ?: PoiItem("def-sko", "SK", PoiCategory.SEKOLAH, "🏫", 3.1390, 101.6869, 0.0)
+                    listOf(defaultHomeGeo, GeoPoint(sra.lat, sra.lng), GeoPoint(taska.lat, taska.lng), GeoPoint(sk.lat, sk.lng), defaultHomeGeo)
+                }
+                RouteSelection.VAN_SECONDARY -> {
+                    val srai = pois.find { it.name.contains("Bukit Contoh") || it.name.contains("SRAI") } ?: PoiItem("def-srai", "SRAI", PoiCategory.SEKOLAH, "🕌", 3.1390, 101.6869, 0.0)
+                    val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT } ?: PoiItem("def-tas", "Taska", PoiCategory.TRANSIT, "👶", 3.1390, 101.6869, 0.0)
+                    listOf(defaultHomeGeo, GeoPoint(srai.lat, srai.lng), GeoPoint(taska.lat, taska.lng), defaultHomeGeo)
+                }
+            }
+        }
+
+        val animPoints = interpolateRoutePoints(rawPoints, targetCount = 36)
+        if (animPoints.isEmpty()) {
+            isSimulating = false
+            return@LaunchedEffect
+        }
+
+        var alerted3km = false
+        var alerted1km = false
+        var alerted300m = false
+        var alertedArrived = false
+
+        for (idx in animPoints.indices) {
+            if (!isSimulating) break
+            val pt = animPoints[idx]
+            val distToHomeKm = calculateDistanceKm(defaultHomeGeo.latitude, defaultHomeGeo.longitude, pt.latitude, pt.longitude)
+            val speed = 38 + (idx % 5) * 4
+            val etaMin = maxOf(1, ((distToHomeKm / 40.0) * 60).toInt())
+            val progressPercent = ((idx.toDouble() / (animPoints.size - 1)) * 100).toInt()
+
+            val status = when {
+                distToHomeKm <= 0.08 -> "Tiba di Rumah Kediaman"
+                distToHomeKm <= 0.35 -> "Menghampiri Pintu Pagar"
+                distToHomeKm <= 1.0 -> "Radius 1.0km Taman Contoh"
+                distToHomeKm <= 3.0 -> "Dalam Jarak 3.0km"
+                progressPercent < 30 -> "Mula Perjalanan: Menuju Taska"
+                else -> "Dalam Perjalanan ($progressPercent%)"
+            }
+
+            // Proximity alerts with haptic & real Android notification
+            if (distToHomeKm <= 3.0 && !alerted3km) {
+                alerted3km = true
+                simulationStep = 1
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                SlotifyNotificationManager.showTransitAlert(
+                    context = context,
+                    childName = vanName,
+                    transitMsg = "🚨 Radar 3,000m: Geofens 3.0km dikesan • Bersedia!"
+                )
+            }
+            if (distToHomeKm <= 1.0 && !alerted1km) {
+                alerted1km = true
+                simulationStep = 2
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                SlotifyNotificationManager.showTransitAlert(
+                    context = context,
+                    childName = vanName,
+                    transitMsg = "🚨 Radar 1,000m: $vanName sedang menghampiri lokasi!"
+                )
+            }
+            if (distToHomeKm <= 0.35 && !alerted300m) {
+                alerted300m = true
+                simulationStep = 3
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                SlotifyNotificationManager.showTransitAlert(
+                    context = context,
+                    childName = vanName,
+                    transitMsg = "🚨 Radar 300m: Ketibaan dalam 300m • Sila ke pintu pagar!"
+                )
+            }
+            if (idx == animPoints.lastIndex && !alertedArrived) {
+                alertedArrived = true
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                SlotifyNotificationManager.showTransitAlert(
+                    context = context,
+                    childName = vanName,
+                    transitMsg = "✅ Selamat Tiba: $vanName telah sampai ke destinasi!"
+                )
+            }
+
+            simulatedVehicleState = VehicleSimState(
+                point = pt,
+                speedKmh = speed,
+                distanceRemainingKm = distToHomeKm,
+                etaMinutes = etaMin,
+                statusText = status,
+                vehicleEmoji = vehicleEmoji
+            )
+
+            if (vehicleFollowCamera) {
+                mapViewRef?.controller?.apply {
+                    setZoom(16.5)
+                    animateTo(pt)
+                }
+            }
+
+            delay(450L)
+        }
+
+        delay(3000L)
+        isSimulating = false
+        simulatedVehicleState = null
+        simulationStep = 0
+    }
+
     // RF Range Pulse States (3.0 km)
     var isRfPulseActive by remember { mutableStateOf(false) }
     var rfCenterGeoPoint by remember { mutableStateOf<GeoPoint?>(defaultHomeGeo) }
@@ -197,9 +528,6 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
     var compassOverlayRef by remember { mutableStateOf<CompassOverlay?>(null) }
     var isOfflineTileDownloading by remember { mutableStateOf(false) }
     var isOfflineCached by remember { mutableStateOf(OfflineMapManager.isOfflineCacheReady(context)) }
-
-    // Reference to MapView for programmatic camera animations
-    var mapViewRef by remember { mutableStateOf<MapView?>(null) }
 
     val filteredPois = if (selectedPoiCategory == PoiCategory.ALL) pois else pois.filter { it.category == selectedPoiCategory }
 
@@ -418,6 +746,7 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                 selectedPoiId = selectedMapPoi?.id,
                                 selectedRoute = selectedRoute,
                                 osrmRoute = osrmRoute,
+                                simulatedVehicle = simulatedVehicleState,
                                 onMapTapped = handleMapTap,
                                 onPoiSelected = handlePoiSelected
                             )
@@ -477,6 +806,7 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                             selectedPoiId = selectedMapPoi?.id,
                             selectedRoute = selectedRoute,
                             osrmRoute = osrmRoute,
+                            simulatedVehicle = simulatedVehicleState,
                             onMapTapped = handleMapTap,
                             onPoiSelected = handlePoiSelected
                         )
@@ -524,6 +854,7 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                     // 0. Quick-Snap "Saya di Rumah" Button
                     SmallFloatingActionButton(
                         onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             val homePoi = pois.find { it.category == PoiCategory.RUMAH } ?: PoiItem("poi-1", "Rumah Kediaman", PoiCategory.RUMAH, "🏠", 3.1390, 101.6869, 0.0)
                             val homePoint = GeoPoint(homePoi.lat, homePoi.lng)
                             mapViewRef?.controller?.apply {
@@ -909,6 +1240,108 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                         }
                     }
                 }
+
+                // 3. Active Vehicle Simulation Floating HUD (Bottom-Center)
+                AnimatedVisibility(
+                    visible = simulatedVehicleState != null && selectedMapPoi == null && droppedMapPin == null,
+                    enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
+                    exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(8.dp)
+                ) {
+                    simulatedVehicleState?.let { sim ->
+                        Surface(
+                            shape = SlotifyShapes.Medium,
+                            color = SlotifyColors.SurfaceCard.copy(alpha = 0.97f),
+                            border = BorderStroke(1.dp, SlotifyColors.ActionAmber.copy(alpha = 0.6f)),
+                            shadowElevation = 8.dp
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .background(SlotifyColors.ActionAmber.copy(alpha = 0.18f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(sim.vehicleEmoji, fontSize = 20.sp)
+                                    }
+                                    Spacer(Modifier.width(10.dp))
+                                    Column {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = sim.statusText,
+                                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                                color = SlotifyColors.TextPrimary,
+                                                maxLines = 1
+                                            )
+                                            Spacer(Modifier.width(6.dp))
+                                            Surface(
+                                                shape = SlotifyShapes.Small,
+                                                color = SlotifyColors.ActionAmber.copy(alpha = 0.2f)
+                                            ) {
+                                                Text(
+                                                    text = "${sim.speedKmh} km/j",
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = SlotifyColors.ActionAmber,
+                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            text = "Baki ${String.format(Locale.US, "%.1f", sim.distanceRemainingKm)} km • ETA ~${sim.etaMinutes} min",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = SlotifyColors.SuccessMint,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            vehicleFollowCamera = !vehicleFollowCamera
+                                        },
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Icon(
+                                            if (vehicleFollowCamera) Icons.Default.Videocam else Icons.Default.VideocamOff,
+                                            contentDescription = "Ikut Kamera",
+                                            tint = if (vehicleFollowCamera) SlotifyColors.KpmSkyBlue else SlotifyColors.TextSecondary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            isSimulating = false
+                                            simulatedVehicleState = null
+                                            simulationStep = 0
+                                        },
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.StopCircle,
+                                            contentDescription = "Henti Simulasi",
+                                            tint = Color(0xFFEF4444),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -1156,38 +1589,24 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                 )
                             }
 
-                            // Simulation button with Geofence Alerts
+                            // Simulation button with Geofence Alerts & Smooth Animation
                             Button(
                                 onClick = {
-                                    isSimulating = true
-                                    simulationStep = (simulationStep + 1) % 4
-                                    if (simulationStep > 0) {
-                                        val vanName = when (selectedRoute) {
-                                            RouteSelection.ABAH_PICKUP -> "Kereta Abah"
-                                            RouteSelection.VAN_PRIMARY -> "Van Sekolah A"
-                                            RouteSelection.VAN_SECONDARY -> "Van Sekolah B"
-                                        }
-                                        val (radLabel, desc) = when (simulationStep) {
-                                            1 -> Pair("3,000m", "Geofens 3.0km dikesan • Bersedia!")
-                                            2 -> Pair("1,000m", "Geofens 1.0km • Van sedang menghampiri lokasi!")
-                                            3 -> Pair("300m", "Ketibaan dalam 300m • Sila ke pintu pagar!")
-                                            else -> Pair("", "")
-                                        }
-                                        if (radLabel.isNotEmpty()) {
-                                            SlotifyNotificationManager.showTransitAlert(
-                                                context = context,
-                                                childName = vanName,
-                                                transitMsg = "🚨 Radar $radLabel: $desc"
-                                            )
-                                        }
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    isSimulating = !isSimulating
+                                    if (!isSimulating) {
+                                        simulatedVehicleState = null
+                                        simulationStep = 0
                                     }
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.ActionAmber),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isSimulating) Color(0xFFEF4444) else SlotifyColors.ActionAmber
+                                ),
                                 shape = SlotifyShapes.Small,
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                             ) {
                                 Text(
-                                    text = if (simulationStep == 0) strings.startSimulation else "${strings.stepSimulationPrefix} ${simulationStep}/3",
+                                    text = if (isSimulating) "⏹️ Henti Simu" else "▶️ Mula Simu",
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                     color = Color.White
                                 )
@@ -1230,6 +1649,19 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                             modifier = Modifier.weight(1f)
                         ) { selectedRoute = RouteSelection.VAN_SECONDARY }
                     }
+
+                    // Driver WhatsApp & Direct Call Dispatch Card
+                    DriverContactCard(
+                        selectedRoute = selectedRoute,
+                        onWhatsAppClick = { phone, msg ->
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            launchWhatsAppIntent(context, phone, msg)
+                        },
+                        onCallClick = { phone ->
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            launchDialerIntent(context, phone)
+                        }
+                    )
                 }
             }
         }
@@ -1747,6 +2179,7 @@ private fun setupMapOverlays(
     selectedPoiId: String?,
     selectedRoute: RouteSelection,
     osrmRoute: OsrmRouteResponse?,
+    simulatedVehicle: VehicleSimState? = null,
     onMapTapped: (GeoPoint) -> Unit,
     onPoiSelected: (PoiItem) -> Unit
 ) {
@@ -1855,6 +2288,23 @@ private fun setupMapOverlays(
         }
         mapView.overlays.add(pickMarker)
         pickMarker.showInfoWindow()
+    }
+
+    // 5. Simulated Animated Vehicle Marker (Van / Car)
+    if (simulatedVehicle != null) {
+        val vehicleMarker = Marker(mapView).apply {
+            id = "simulated_vehicle_marker"
+            position = simulatedVehicle.point
+            title = when (selectedRoute) {
+                RouteSelection.ABAH_PICKUP -> "🚗 Kereta Abah"
+                RouteSelection.VAN_PRIMARY -> "🚐 Van Sekolah A"
+                RouteSelection.VAN_SECONDARY -> "🚐 Van Sekolah B"
+            }
+            snippet = "${simulatedVehicle.speedKmh} km/j • Baki ${String.format(Locale.US, "%.1f", simulatedVehicle.distanceRemainingKm)} km (~${simulatedVehicle.etaMinutes} min)"
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            icon = PoiMarkerHelper.getVehicleMarker(context, simulatedVehicle.vehicleEmoji)
+        }
+        mapView.overlays.add(vehicleMarker)
     }
 
     mapView.invalidate()

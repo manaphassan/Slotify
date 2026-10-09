@@ -62,6 +62,68 @@ object PoiMarkerHelper {
         return drawable
     }
 
+    /**
+     * Creates a high-visibility animated vehicle marker (Van / Car) with a golden pulsing halo
+     */
+    fun getVehicleMarker(
+        context: Context,
+        emoji: String = "🚐"
+    ): Drawable {
+        val cacheKey = "vehicle_pin_$emoji"
+        markerCache[cacheKey]?.let { return it }
+
+        val density = context.resources.displayMetrics.density
+        val size = (50 * density).toInt()
+
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val cx = size / 2f
+        val cy = size / 2f
+        val r = size * 0.36f
+
+        // 1. Soft drop shadow
+        val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(90, 0, 0, 0)
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(cx, cy + 3 * density, r + 2 * density, shadowPaint)
+
+        // 2. Amber pulsing halo
+        val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#F59E0B") // Amber 500
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(cx, cy, r + 3 * density, haloPaint)
+
+        // 3. Crisp white outer ring
+        val whiteRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 2.5f * density
+        }
+        canvas.drawCircle(cx, cy, r + 3 * density, whiteRing)
+
+        // 4. Inner disc
+        val innerDisc = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#FEF3C7") // Warm cream amber-50
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(cx, cy, r, innerDisc)
+
+        // 5. Vehicle Emoji in center
+        val emojiPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.CENTER
+            textSize = r * 1.35f
+        }
+        val fm = emojiPaint.fontMetrics
+        val textY = cy - (fm.ascent + fm.descent) / 2f
+        canvas.drawText(emoji, cx, textY, emojiPaint)
+
+        val drawable = BitmapDrawable(context.resources, bitmap)
+        markerCache[cacheKey] = drawable
+        return drawable
+    }
+
     private fun createPinDrawable(
         context: Context,
         emoji: String,

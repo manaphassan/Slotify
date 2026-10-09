@@ -25,6 +25,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -78,6 +80,7 @@ fun PreciseLocationPickerModal(
     onConfirmLocation: (lat: Double, lng: Double, address: String, distanceKm: Double) -> Unit
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
 
     var centerLat by remember { mutableDoubleStateOf(if (initialLat != 0.0) initialLat else homeLat) }
@@ -500,7 +503,10 @@ fun PreciseLocationPickerModal(
                                         modifier = Modifier
                                             .clip(SlotifyShapes.Small)
                                             .background(if (isSelected) SlotifyColors.KpmSkyBlue else Color.Transparent)
-                                            .clickable { selectedStep = step }
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                selectedStep = step
+                                            }
                                             .padding(horizontal = 6.dp, vertical = 3.dp)
                                     ) {
                                         Text(
@@ -527,6 +533,7 @@ fun PreciseLocationPickerModal(
                                 // Up (North)
                                 IconButton(
                                     onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         val newLat = centerLat + selectedStep.deltaDeg
                                         centerLat = newLat
                                         mapViewRef?.controller?.animateTo(GeoPoint(newLat, centerLng))
@@ -540,6 +547,7 @@ fun PreciseLocationPickerModal(
                                     // Left (West)
                                     IconButton(
                                         onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             val newLng = centerLng - selectedStep.deltaDeg
                                             centerLng = newLng
                                             mapViewRef?.controller?.animateTo(GeoPoint(centerLat, newLng))
@@ -562,6 +570,7 @@ fun PreciseLocationPickerModal(
                                     // Right (East)
                                     IconButton(
                                         onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             val newLng = centerLng + selectedStep.deltaDeg
                                             centerLng = newLng
                                             mapViewRef?.controller?.animateTo(GeoPoint(centerLat, newLng))
@@ -575,6 +584,7 @@ fun PreciseLocationPickerModal(
                                 // Down (South)
                                 IconButton(
                                     onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         val newLat = centerLat - selectedStep.deltaDeg
                                         centerLat = newLat
                                         mapViewRef?.controller?.animateTo(GeoPoint(newLat, centerLng))
