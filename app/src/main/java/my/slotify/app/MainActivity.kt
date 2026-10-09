@@ -66,6 +66,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
@@ -428,15 +429,15 @@ fun SlotifyTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 6.dp),
+                .padding(horizontal = 10.dp, vertical = 5.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Left: Hamburger Menu Button
             Box(
                 modifier = Modifier
-                    .size(38.dp)
-                    .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 19.dp)
+                    .size(36.dp)
+                    .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 18.dp)
                     .background(SlotifyColors.SurfaceCard, CircleShape)
                     .clip(CircleShape)
                     .clickable(onClick = onOpenDrawer),
@@ -446,45 +447,51 @@ fun SlotifyTopBar(
                     imageVector = Icons.Default.Menu,
                     contentDescription = strings.openMenu,
                     tint = SlotifyColors.TextPrimary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
 
             // Center: App / Screen Brand Title
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable(onClick = onOpenProfile)
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .clickable(onClick = onOpenProfile)
             ) {
                 Text(
                     text = stringResource(R.string.app_name),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = SlotifyColors.KpmSkyBlue
+                    fontSize = 17.sp,
+                    color = SlotifyColors.KpmSkyBlue,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 selectedStudent?.let { s ->
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(5.dp))
                     Box(
                         modifier = Modifier
                             .background(SlotifyColors.SurfaceCard, RoundedCornerShape(10.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = "${s.avatarEmoji} ${s.nickname}",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = SlotifyColors.TextPrimary
+                            color = SlotifyColors.TextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
             }
 
             // Right: Dark Mode Toggle, Star Balance & Profile Icon
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 // Theme Quick Button (Light -> Dark -> Nord -> Light)
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
-                        .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 18.dp)
+                        .size(34.dp)
+                        .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 17.dp)
                         .background(SlotifyColors.SurfaceCard, CircleShape)
                         .clip(CircleShape)
                         .clickable(onClick = onToggleTheme),
@@ -499,7 +506,7 @@ fun SlotifyTopBar(
                         imageVector = topBarIcon,
                         contentDescription = topBarDesc,
                         tint = topBarTint,
-                        modifier = Modifier.size(17.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
 
@@ -510,16 +517,16 @@ fun SlotifyTopBar(
                         .background(SlotifyColors.SurfaceCard, RoundedCornerShape(16.dp))
                         .clip(RoundedCornerShape(16.dp))
                         .clickable(onClick = onOpenRewards)
-                        .padding(horizontal = 7.dp, vertical = 5.dp)
+                        .padding(horizontal = 6.dp, vertical = 4.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Default.Star,
                             contentDescription = strings.stars,
                             tint = SlotifyColors.StarGold,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(14.dp)
                         )
-                        Spacer(Modifier.width(3.dp))
+                        Spacer(Modifier.width(2.dp))
                         Text(
                             text = "${selectedStudent?.starCoinsBalance ?: 0}",
                             fontSize = 11.sp,
@@ -532,8 +539,8 @@ fun SlotifyTopBar(
                 // Profile Shortcut Button
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
-                        .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 18.dp)
+                        .size(34.dp)
+                        .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 17.dp)
                         .background(
                             if (currentScreen == Screen.PROFILES) SlotifyColors.KpmSkyBlue else SlotifyColors.SurfaceCard,
                             CircleShape
@@ -546,7 +553,7 @@ fun SlotifyTopBar(
                         imageVector = Icons.Default.Person,
                         contentDescription = strings.profile,
                         tint = if (currentScreen == Screen.PROFILES) Color.White else SlotifyColors.TextPrimary,
-                        modifier = Modifier.size(19.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }

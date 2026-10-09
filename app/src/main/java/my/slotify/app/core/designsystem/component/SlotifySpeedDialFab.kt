@@ -78,9 +78,9 @@ fun SlotifySpeedDialFab(
     )
 
     Column(
-        modifier = modifier.padding(bottom = 8.dp, end = 4.dp),
+        modifier = modifier.padding(bottom = 6.dp, end = 6.dp),
         horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Speed dial menu items (revealed when expanded)
         AnimatedVisibility(
@@ -90,30 +90,9 @@ fun SlotifySpeedDialFab(
         ) {
             Column(
                 horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // 1. Language Toggle (BM <-> EN)
-                SpeedDialActionItem(
-                    label = if (appLanguage == AppLanguage.BM) "English (ENG)" else "Bahasa Melayu (BM)",
-                    icon = Icons.Default.Language,
-                    iconTint = SlotifyColors.KokuPurple,
-                    onClick = onToggleLanguage
-                )
-
-                // 2. Theme Toggle (Light -> Dark -> Nord -> Light)
-                val (themeLabel, themeIcon, themeTint) = when (appThemeMode) {
-                    AppThemeMode.LIGHT -> Triple(strings.darkMode, Icons.Default.DarkMode, SlotifyColors.ActionAmber)
-                    AppThemeMode.DARK -> Triple(strings.nordMode, Icons.Default.AcUnit, NordColors.Nord8)
-                    AppThemeMode.NORD -> Triple(strings.lightMode, Icons.Default.LightMode, SlotifyColors.ActionAmber)
-                }
-                SpeedDialActionItem(
-                    label = themeLabel,
-                    icon = themeIcon,
-                    iconTint = themeTint,
-                    onClick = onToggleTheme
-                )
-
-                // 3. Profile
+                // 1. Profile / Rewards
                 SpeedDialActionItem(
                     label = strings.profile,
                     icon = Icons.Default.Person,
@@ -122,7 +101,7 @@ fun SlotifySpeedDialFab(
                     onClick = { onNavigate(Screen.PROFILES) }
                 )
 
-                // 4. Logistics & Map
+                // 2. Logistics & Map
                 SpeedDialActionItem(
                     label = strings.logisticsMap,
                     icon = Icons.Default.DirectionsBus,
@@ -131,7 +110,7 @@ fun SlotifySpeedDialFab(
                     onClick = { onNavigate(Screen.LOGISTICS) }
                 )
 
-                // 5. Timetable
+                // 3. Timetable
                 SpeedDialActionItem(
                     label = strings.timetable,
                     icon = Icons.Default.CalendarToday,
@@ -140,7 +119,7 @@ fun SlotifySpeedDialFab(
                     onClick = { onNavigate(Screen.TIMETABLE) }
                 )
 
-                // 6. Today
+                // 4. Today
                 SpeedDialActionItem(
                     label = strings.today,
                     icon = Icons.Default.Home,
@@ -154,10 +133,10 @@ fun SlotifySpeedDialFab(
         // Main Primary Floating Action Button
         Box(
             modifier = Modifier
-                .size(54.dp)
+                .size(50.dp)
                 .neumorphic(
                     elevation = if (isExpanded) NeumorphicElevation.LOW else NeumorphicElevation.HIGH,
-                    cornerRadius = 27.dp
+                    cornerRadius = 25.dp
                 )
                 .background(
                     if (isExpanded) SlotifyColors.ActionAmber else SlotifyColors.KpmSkyBlue,
@@ -172,7 +151,7 @@ fun SlotifySpeedDialFab(
                 contentDescription = "Menu Tindakan Pantas",
                 tint = Color.White,
                 modifier = Modifier
-                    .size(26.dp)
+                    .size(24.dp)
                     .rotate(rotation)
             )
         }

@@ -108,8 +108,8 @@ fun TimetableScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(SlotifyColors.CanvasBase)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Header
             item {
@@ -254,20 +254,20 @@ fun TimetableScreen(
                     // Days Filter Tabs (Isnin - Jumaat)
                     item {
                         LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.padding(vertical = 2.dp)
                         ) {
                             items(days) { (dayName, dayIndex) ->
                                 val isSelected = selectedDay == dayIndex
                                 Box(
                                     modifier = Modifier
-                                        .defaultMinSize(minHeight = 48.dp)
+                                        .defaultMinSize(minHeight = 44.dp)
                                         .clip(SlotifyShapes.Medium)
                                         .background(
                                             if (isSelected) SlotifyColors.KpmSkyBlue else SlotifyColors.SurfaceCard
                                         )
                                         .clickable { selectedDay = dayIndex }
-                                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(

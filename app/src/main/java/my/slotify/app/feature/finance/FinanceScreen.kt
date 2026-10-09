@@ -131,8 +131,8 @@ fun FinanceScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(SlotifyColors.CanvasBase)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Header
         item {
@@ -208,9 +208,9 @@ fun FinanceScreen(
                     .fillMaxWidth()
                     .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = SlotifyShapes.LargeDp)
                     .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                    .padding(16.dp)
+                    .padding(12.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -334,9 +334,9 @@ fun FinanceScreen(
                     .fillMaxWidth()
                     .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = SlotifyShapes.LargeDp)
                     .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                    .padding(16.dp)
+                    .padding(12.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,

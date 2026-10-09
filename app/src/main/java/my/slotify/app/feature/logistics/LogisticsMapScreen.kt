@@ -671,8 +671,8 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
         modifier = Modifier
             .fillMaxSize()
             .background(SlotifyColors.CanvasBase)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Permission banner if location is not granted
         if (!hasLocationPermission) {
@@ -681,7 +681,7 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(SlotifyColors.ActionAmber.copy(alpha = 0.12f), SlotifyShapes.Medium)
-                        .padding(12.dp),
+                        .padding(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -735,7 +735,7 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(330.dp)
+                    .height(280.dp)
                     .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = SlotifyShapes.LargeDp)
                     .clip(SlotifyShapes.Large)
             ) {

@@ -193,13 +193,13 @@ fun TodayDashboardScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
         // Child Profile Switcher Tabs (30% Secondary Structure)
         item {
             LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.padding(vertical = 2.dp)
             ) {
                 items(students) { student ->
@@ -211,15 +211,15 @@ fun TodayDashboardScreen(
                                 if (isSelected) SlotifyColors.KpmSkyBlue.copy(alpha = 0.15f) else SlotifyColors.SurfaceCard,
                                 SlotifyShapes.Large
                             )
-                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = student.avatarEmoji, fontSize = 20.sp)
-                            Spacer(Modifier.width(6.dp))
+                            Text(text = student.avatarEmoji, fontSize = 18.sp)
+                            Spacer(Modifier.width(5.dp))
                             Column {
                                 Text(
                                     text = student.nickname,
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = MaterialTheme.typography.titleSmall,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     color = if (isSelected) SlotifyColors.KpmSkyBlue else SlotifyColors.TextPrimary
                                 )
@@ -250,7 +250,7 @@ fun TodayDashboardScreen(
                     .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = SlotifyShapes.LargeDp)
                     .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
                     .clickable { showTakwimDialog = true }
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(horizontal = 11.dp, vertical = 8.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -314,7 +314,7 @@ fun TodayDashboardScreen(
                     .fillMaxWidth()
                     .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = SlotifyShapes.LargeDp)
                     .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(horizontal = 11.dp, vertical = 8.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(
@@ -443,7 +443,7 @@ fun TodayDashboardScreen(
                         SlotifyShapes.Large
                     )
                     .clickable { showSchoolBagDialog = true }
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(horizontal = 11.dp, vertical = 8.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -491,9 +491,9 @@ fun TodayDashboardScreen(
                     .fillMaxWidth()
                     .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = SlotifyShapes.LargeDp)
                     .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                    .padding(14.dp)
+                    .padding(12.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     // Header with Task Count
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -714,9 +714,9 @@ fun TodayDashboardScreen(
                     .fillMaxWidth()
                     .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = SlotifyShapes.LargeDp)
                     .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                    .padding(14.dp)
+                    .padding(12.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -864,7 +864,7 @@ fun TodayDashboardScreen(
                     .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
                     .clip(SlotifyShapes.Large)
                     .clickable { showFocusDialog = true }
-                    .padding(14.dp)
+                    .padding(12.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1308,9 +1308,9 @@ fun InHomeRealtimeClassWidget(
             .fillMaxWidth()
             .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = SlotifyShapes.LargeDp)
             .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-            .padding(14.dp)
+            .padding(12.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             // Widget Title & Live Indicator
             Row(
                 modifier = Modifier.fillMaxWidth(),

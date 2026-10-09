@@ -136,14 +136,14 @@ fun SchoolBagPackDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .wrapContentHeight(),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(20.dp),
             color = surfaceCardColor,
             shadowElevation = 8.dp
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp)
+                    .padding(14.dp)
             ) {
                 // Header
                 Row(
@@ -154,14 +154,14 @@ fun SchoolBagPackDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
                                 .background(skyBlueColor.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("🎒", fontSize = 20.sp)
+                            Text("🎒", fontSize = 18.sp)
                         }
-                        Spacer(Modifier.width(10.dp))
+                        Spacer(Modifier.width(8.dp))
                         Column {
                             Text(
                                 text = "Kemas Beg Sekolah",
@@ -176,25 +176,25 @@ fun SchoolBagPackDialog(
                         }
                     }
 
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(30.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "Tutup", tint = textSecondaryColor)
                     }
                 }
 
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(10.dp))
 
                 // Progress Bar
                 LinearProgressIndicator(
                     progress = { if (totalCount > 0) checkedCount.toFloat() / totalCount else 0f },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(8.dp)
+                        .height(7.dp)
                         .clip(RoundedCornerShape(4.dp)),
                     color = if (isAllChecked) successColor else skyBlueColor,
                     trackColor = canvasBaseColor
                 )
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -208,7 +208,7 @@ fun SchoolBagPackDialog(
                     )
                     if (isAllChecked) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Star, contentDescription = null, tint = starColor, modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.Star, contentDescription = null, tint = starColor, modifier = Modifier.size(13.dp))
                             Spacer(Modifier.width(2.dp))
                             Text(
                                 text = "+2 Bintang Diperoleh!",
@@ -219,47 +219,47 @@ fun SchoolBagPackDialog(
                     }
                 }
 
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(10.dp))
 
                 // Checklist Items
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 280.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .heightIn(max = 220.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     itemsIndexed(bagItems) { _, item ->
                         val isChecked = checkedStates[item.id] == true
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(10.dp))
                                 .background(if (isChecked) successColor.copy(alpha = 0.1f) else canvasBaseColor)
                                 .clickable {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     checkedStates[item.id] = !isChecked
                                 }
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                .padding(horizontal = 10.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(24.dp)
+                                    .size(22.dp)
                                     .clip(CircleShape)
                                     .background(if (isChecked) successColor else Color.Transparent)
                                     .border(
-                                        width = 2.dp,
+                                        width = 1.8.dp,
                                         color = if (isChecked) successColor else textSecondaryColor.copy(alpha = 0.5f),
                                         shape = CircleShape
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (isChecked) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
                                 }
                             }
 
-                            Spacer(Modifier.width(12.dp))
+                            Spacer(Modifier.width(10.dp))
 
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
@@ -280,18 +280,18 @@ fun SchoolBagPackDialog(
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
 
                 // Done Button
                 Button(
                     onClick = onDismiss,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
+                        .height(44.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isAllChecked) successColor else skyBlueColor
                     ),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
                         text = if (isAllChecked) "Selesai Mengemas ✓" else "Simpan & Tutup",
