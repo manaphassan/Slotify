@@ -93,18 +93,18 @@ class OsrmRoutingService {
 
     private fun fallbackEstimation(): OsrmRouteResponse {
         return OsrmRouteResponse(
-            totalDistanceKm = 9.9,
+            totalDistanceKm = 11.2,
             totalDurationMinutes = 18.0,
             legs = listOf(
-                OsrmLeg(7200.0, 720.0, "Pejabat Bandar Contoh ➔ Tadika Danial"),
-                OsrmLeg(1200.0, 180.0, "Tadika Danial ➔ Taska Ceria"),
-                OsrmLeg(1500.0, 180.0, "Taska Ceria ➔ Rumah")
+                OsrmLeg(7500.0, 720.0, "Pejabat Bandar Contoh ➔ Tadika Ceria"),
+                OsrmLeg(500.0, 120.0, "Tadika Ceria ➔ Taska Ceria"),
+                OsrmLeg(600.0, 120.0, "Taska Ceria ➔ Rumah")
             ),
             geometryPoints = listOf(
-                Pair(3.1390, 101.6869), // Pejabat
-                Pair(3.1390, 101.6869), // Tadika Danial
+                Pair(3.1390, 101.6869), // Pejabat Abah (Bandar Contoh)
+                Pair(3.1390, 101.6869), // Tadika Ceria
                 Pair(3.1390, 101.6869), // Taska Ceria
-                Pair(3.1390, 101.6869)  // Rumah
+                Pair(3.1390, 101.6869)  // Rumah (Taman Contoh)
             )
         )
     }

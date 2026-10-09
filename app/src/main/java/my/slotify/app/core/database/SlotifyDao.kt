@@ -36,6 +36,13 @@ interface SlotifyDao {
     @Query("SELECT * FROM location_nodes WHERE studentId = :studentId")
     fun getLocationNodesForStudent(studentId: String): Flow<List<LocationNodeEntity>>
 
+    /** One-shot read for WidgetUpdateWorker. */
+    @Query("SELECT * FROM location_nodes WHERE studentId = :studentId")
+    suspend fun getLocationNodesOnce(studentId: String): List<LocationNodeEntity>
+
+    @Query("SELECT * FROM location_nodes")
+    suspend fun getAllLocationsOnce(): List<LocationNodeEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertStudent(student: StudentEntity)
 

@@ -18,6 +18,9 @@ class SlotifyApplication : Application() {
 
         // Initialize system notification channels
         my.slotify.app.core.notification.SlotifyNotificationManager.createNotificationChannels(this)
+
+        // Initialize background geofence proximity monitor
+        my.slotify.app.feature.logistics.GeofenceManager.scheduleBackgroundMonitoring(this)
         
         // Seed initial family data (Adam, Aisyah, Danial)
         CoroutineScope(Dispatchers.IO).launch {

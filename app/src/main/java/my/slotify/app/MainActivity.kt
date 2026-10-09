@@ -1,6 +1,7 @@
 package my.slotify.app
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -66,9 +67,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
+import android.widget.Toast
 import kotlinx.coroutines.launch
+import my.slotify.app.core.widget.SlotifyAppWidgetProvider
 import my.slotify.app.core.database.StudentEntity
 import my.slotify.app.core.database.TimetableSlotEntity
 import my.slotify.app.core.designsystem.component.SlotifySpeedDialFab
@@ -109,6 +115,26 @@ fun Screen.localizedTitle(): String = when (this) {
 }
 
 class MainActivity : ComponentActivity() {
+
+    private val pendingScreenRoute = mutableStateOf<Screen?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val target = intent.getStringExtra("EXTRA_SCREEN") ?: intent.getStringExtra("TARGET_SCREEN")
+        target?.let { parseScreenTarget(it)?.let { s -> pendingScreenRoute.value = s } }
+    }
+
+    private fun parseScreenTarget(target: String): Screen? = when (target.uppercase()) {
+        "LOGISTICS" -> Screen.LOGISTICS
+        "TIMETABLE" -> Screen.TIMETABLE
+        "REWARDS" -> Screen.REWARDS
+        "FINANCE" -> Screen.FINANCE
+        "PROFILES" -> Screen.PROFILES
+        "DASHBOARD" -> Screen.DASHBOARD
+        else -> null
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -166,7 +192,18 @@ class MainActivity : ComponentActivity() {
                 SlotifyTheme(themeMode = appThemeMode) {
                     val coroutineScope = rememberCoroutineScope()
                     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-                    var currentScreen by remember { mutableStateOf(Screen.DASHBOARD) }
+
+                    val initialTarget = intent?.getStringExtra("EXTRA_SCREEN") ?: intent?.getStringExtra("TARGET_SCREEN")
+                    val initialScreen = initialTarget?.let { parseScreenTarget(it) } ?: Screen.DASHBOARD
+                    var currentScreen by remember { mutableStateOf(initialScreen) }
+
+                    LaunchedEffect(pendingScreenRoute.value) {
+                        pendingScreenRoute.value?.let { screen ->
+                            currentScreen = screen
+                            pendingScreenRoute.value = null
+                        }
+                    }
+
                     var fabExpanded by remember { mutableStateOf(false) }
 
                     val students by dao.getAllStudents().collectAsState(initial = emptyList())
@@ -756,6 +793,42 @@ fun SlotifyDrawerSheet(
                         }
                     }
                 }
+
+                HorizontalDivider(color = SlotifyColors.BorderSubtle, thickness = 0.8.dp)
+
+                // Quick Widget Installation Button
+                val context = LocalContext.current
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(SlotifyColors.KpmSkyBlue.copy(alpha = 0.15f))
+                        .clickable {
+                            val appWidgetManager = AppWidgetManager.getInstance(context)
+                            val myProvider = ComponentName(context, SlotifyAppWidgetProvider::class.java)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && appWidgetManager.isRequestPinAppWidgetSupported) {
+                                appWidgetManager.requestPinAppWidget(myProvider, null, null)
+                                Toast.makeText(context, "Membuka pengesahan widget skrin utama...", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Sila tekan lama pada skrin utama dan pilih Widgets ➔ Slotify", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                        .padding(vertical = 8.dp, horizontal = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text("📱", fontSize = 13.sp)
+                        Text(
+                            text = "Pasang Widget Skrin Utama",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SlotifyColors.KpmSkyBlue
+                        )
+                    }
+                }
             }
 
             // Drawer Footer
@@ -763,7 +836,7 @@ fun SlotifyDrawerSheet(
                 HorizontalDivider(color = SlotifyColors.BorderSubtle, thickness = 0.8.dp)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "Slotify v1.0.0 • Xperia Edition",
+                    text = "Slotify v1.1.0 • Xperia Edition",
                     fontSize = 9.5.sp,
                     color = SlotifyColors.TextTertiary
                 )

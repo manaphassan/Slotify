@@ -1,6 +1,13 @@
 package my.slotify.app.feature.logistics
 
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -25,12 +33,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import org.osmdroid.views.overlay.compass.CompassOverlay
+import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
 import my.slotify.app.core.routing.OsrmRoutingService
 import my.slotify.app.core.routing.OsrmRouteResponse
 import my.slotify.app.core.notification.SlotifyNotificationManager
@@ -72,6 +85,17 @@ enum class RouteSelection {
     ABAH_PICKUP,
     VAN_PRIMARY,
     VAN_SECONDARY
+}
+
+fun launchNavigationIntent(context: Context, lat: Double, lng: Double, label: String) {
+    try {
+        val uri = Uri.parse("geo:$lat,$lng?q=$lat,$lng(${Uri.encode(label)})")
+        val intent = Intent(Intent.ACTION_VIEW, uri)
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        val webUri = Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng")
+        context.startActivity(Intent(Intent.ACTION_VIEW, webUri))
+    }
 }
 
 @Composable
@@ -142,30 +166,155 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
     var poiToDelete by remember { mutableStateOf<PoiItem?>(null) }
     var showResetConfirm by remember { mutableStateOf(false) }
 
+    // Dynamic ground-truth home reference
+    val defaultHomeGeo = remember(pois) {
+        pois.find { it.category == PoiCategory.RUMAH }?.let { GeoPoint(it.lat, it.lng) } ?: GeoPoint(3.1390, 101.6869)
+    }
+
     // RF Range Pulse States (3.0 km)
     var isRfPulseActive by remember { mutableStateOf(false) }
-    var rfCenterGeoPoint by remember { mutableStateOf<GeoPoint?>(GeoPoint(3.1390, 101.6869)) } // Default: Taman Contoh
-    var rfCenterLabel by remember { mutableStateOf("Rumah (Taman Contoh)") }
+    var rfCenterGeoPoint by remember { mutableStateOf<GeoPoint?>(defaultHomeGeo) }
+    var rfCenterLabel by remember { mutableStateOf("Rumah Kediaman") }
 
-    // Map Coordinate Picker Mode
-    var isMapPickerMode by remember { mutableStateOf(false) }
-    var pickedGeoPoint by remember { mutableStateOf<GeoPoint?>(null) }
+    // Interactive Map Selected POI & Dropped Pin States
+    var selectedMapPoi by remember { mutableStateOf<PoiItem?>(null) }
+    var droppedMapPin by remember { mutableStateOf<GeoPoint?>(null) }
+
+    // Dedicated Fullscreen Precision Location Picker Modal
+    var showPrecisePicker by remember { mutableStateOf(false) }
+    var precisePickerTarget by remember { mutableStateOf<GeoPoint?>(null) }
+    var precisePickerPoi by remember { mutableStateOf<PoiItem?>(null) }
     var pendingPoiDraft by remember { mutableStateOf<PoiItem?>(null) }
+
+    val coroutineScope = rememberCoroutineScope()
+
+    // Real Hardware GPS Location States
+    var hasLocationPermission by remember { mutableStateOf(locationGranted || GpsLocationHelper.hasLocationPermission(context)) }
+    var isGpsLocating by remember { mutableStateOf(false) }
+    var userGpsFix by remember { mutableStateOf<GpsFixResult?>(null) }
+    var gpsStatusMessage by remember { mutableStateOf<String?>(null) }
+    var locationOverlayRef by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
+    var compassOverlayRef by remember { mutableStateOf<CompassOverlay?>(null) }
+    var isOfflineTileDownloading by remember { mutableStateOf(false) }
+    var isOfflineCached by remember { mutableStateOf(OfflineMapManager.isOfflineCacheReady(context)) }
 
     // Reference to MapView for programmatic camera animations
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
 
     val filteredPois = if (selectedPoiCategory == PoiCategory.ALL) pois else pois.filter { it.category == selectedPoiCategory }
 
-    // Map tap handler for selecting coordinates or relocating RF transmitter
-    val handleMapTap: (GeoPoint) -> Unit = { geo ->
-        if (isMapPickerMode) {
-            pickedGeoPoint = geo
+    // Function to fetch high-precision hardware GPS fix and center map
+    val locateUserWithGps: suspend () -> Unit = {
+        if (!GpsLocationHelper.hasLocationPermission(context)) {
+            hasLocationPermission = false
+            gpsStatusMessage = "Kebenaran GPS diperlukan"
+        } else if (!GpsLocationHelper.isLocationServiceEnabled(context)) {
+            gpsStatusMessage = "Sila aktifkan perkhidmatan GPS dalam tetapan peranti"
+            GpsLocationHelper.openLocationSettings(context)
         } else {
-            rfCenterGeoPoint = geo
-            rfCenterLabel = "Titik Peta (${String.format(Locale.US, "%.4f, %.4f", geo.latitude, geo.longitude)})"
-            isRfPulseActive = true
+            isGpsLocating = true
+            gpsStatusMessage = "Mendapatkan isyarat satelit GPS..."
+            val fix = GpsLocationHelper.getAccurateLocation(context, timeoutMs = 8000L)
+            isGpsLocating = false
+
+            if (fix != null) {
+                userGpsFix = fix
+
+                // Real-time Geofence Proximity Check
+                val proximityEvents = GeofenceManager.evaluateProximity(context, fix.latitude, fix.longitude)
+                val targetEvent = proximityEvents.firstOrNull { it.eventType == GeofenceEventType.ENTERED || it.eventType == GeofenceEventType.APPROACHING }
+
+                if (targetEvent != null) {
+                    val statusText = if (targetEvent.eventType == GeofenceEventType.ENTERED) "Tiba di ${targetEvent.target.name}" else "Menghampiri ${targetEvent.target.name} (${targetEvent.distanceMeters.toInt()}m)"
+                    gpsStatusMessage = "${targetEvent.target.iconEmoji} $statusText • ±${String.format(Locale.US, "%.1f", fix.accuracyMeters)}m"
+                } else {
+                    gpsStatusMessage = "${fix.quality.badgeEmoji} GPS: ±${String.format(Locale.US, "%.1f", fix.accuracyMeters)}m (${fix.quality.label})"
+                }
+
+                mapViewRef?.controller?.apply {
+                    setZoom(16.5)
+                    animateTo(GeoPoint(fix.latitude, fix.longitude))
+                }
+            } else {
+                gpsStatusMessage = "Isyarat GPS lemah. Memusatkan pada Rumah Kediaman."
+                mapViewRef?.controller?.apply {
+                    setZoom(16.5)
+                    animateTo(defaultHomeGeo)
+                }
+            }
         }
+    }
+
+    // Continuous Realtime Location Tracking
+    LaunchedEffect(hasLocationPermission) {
+        if (hasLocationPermission) {
+            GpsLocationHelper.observeLocationUpdates(context, minTimeMs = 2500L, minDistanceM = 3.0f)
+                .collect { fix ->
+                    userGpsFix = fix
+                    val proximityEvents = GeofenceManager.evaluateProximity(context, fix.latitude, fix.longitude)
+                    val targetEvent = proximityEvents.firstOrNull { it.eventType == GeofenceEventType.ENTERED || it.eventType == GeofenceEventType.APPROACHING }
+                    if (targetEvent != null) {
+                        val statusText = if (targetEvent.eventType == GeofenceEventType.ENTERED) "Tiba di ${targetEvent.target.name}" else "Menghampiri ${targetEvent.target.name} (${targetEvent.distanceMeters.toInt()}m)"
+                        gpsStatusMessage = "${targetEvent.target.iconEmoji} $statusText • ±${String.format(Locale.US, "%.1f", fix.accuracyMeters)}m"
+                    } else {
+                        gpsStatusMessage = "${fix.quality.badgeEmoji} GPS: ±${String.format(Locale.US, "%.1f", fix.accuracyMeters)}m (${fix.quality.label})"
+                    }
+                }
+        }
+    }
+
+    // Auto-locate user on initial screen display
+    LaunchedEffect(Unit) {
+        if (hasLocationPermission) {
+            locateUserWithGps()
+        }
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val coarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (fineGranted || coarseGranted) {
+            hasLocationPermission = true
+            mapViewRef?.let { mv ->
+                if (locationOverlayRef == null) {
+                    val provider = GpsMyLocationProvider(context).apply {
+                        addLocationSource(android.location.LocationManager.NETWORK_PROVIDER)
+                    }
+                    val overlay = MyLocationNewOverlay(provider, mv).apply {
+                        enableMyLocation()
+                        setDrawAccuracyEnabled(true)
+                    }
+                    locationOverlayRef = overlay
+                    mv.overlays.add(overlay)
+                    mv.invalidate()
+                }
+            }
+            coroutineScope.launch {
+                locateUserWithGps()
+            }
+        } else {
+            gpsStatusMessage = "Kebenaran GPS diperlukan untuk menentukan lokasi semasa"
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            locationOverlayRef?.disableMyLocation()
+            compassOverlayRef?.disableCompass()
+        }
+    }
+
+    // Map tap handler for dropping a pin or selecting a node
+    val handleMapTap: (GeoPoint) -> Unit = { geo ->
+        selectedMapPoi = null
+        droppedMapPin = geo
+    }
+
+    val handlePoiSelected: (PoiItem) -> Unit = { poi ->
+        droppedMapPin = null
+        selectedMapPoi = poi
     }
 
     LazyColumn(
@@ -176,22 +325,41 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Permission banner if location is not granted
-        if (!locationGranted) {
+        if (!hasLocationPermission) {
             item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(SlotifyColors.ActionAmber.copy(alpha = 0.12f), SlotifyShapes.Medium)
                         .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("⚠️", fontSize = 18.sp)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "Slotify perlukan kebenaran lokasi untuk tunjukkan kedudukan sebenar dalam peta. Sila buka Tetapan > Kebenaran > Lokasi.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = SlotifyColors.TextSecondary
-                    )
+                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                        Text("⚠️", fontSize = 18.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Kebenaran GPS diperlukan untuk paparan lokasi tepat pada peta.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = SlotifyColors.TextSecondary
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            locationPermissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.ActionAmber),
+                        shape = SlotifyShapes.Small,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.height(30.dp)
+                    ) {
+                        Text("Beri", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -217,7 +385,7 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(280.dp)
+                    .height(330.dp)
                     .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = SlotifyShapes.LargeDp)
                     .clip(SlotifyShapes.Large)
             ) {
@@ -236,18 +404,115 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                             }
 
                             // Adjust zoom and center to fit all markers (Bandar Contoh Office to Taman Contoh)
-                            controller.setZoom(12.6)
-                            controller.setCenter(GeoPoint(3.1390, 101.6869))
+                            controller.setZoom(13.5)
+                            controller.setCenter(defaultHomeGeo)
 
                             // Initial overlay setup
-                            setupMapOverlays(this, pois, rfCenterGeoPoint, isRfPulseActive, pickedGeoPoint, selectedRoute, osrmRoute, handleMapTap)
+                            setupMapOverlays(
+                                context = ctx,
+                                mapView = this,
+                                pois = filteredPois,
+                                rfCenter = rfCenterGeoPoint,
+                                isRfActive = isRfPulseActive,
+                                pickedPoint = droppedMapPin,
+                                selectedPoiId = selectedMapPoi?.id,
+                                selectedRoute = selectedRoute,
+                                osrmRoute = osrmRoute,
+                                onMapTapped = handleMapTap,
+                                onPoiSelected = handlePoiSelected
+                            )
+
+                            // Live Hardware GPS location overlay with real-time accuracy circle (GPS + Network for indoors)
+                            if (hasLocationPermission && locationOverlayRef == null) {
+                                val provider = GpsMyLocationProvider(ctx).apply {
+                                    addLocationSource(android.location.LocationManager.NETWORK_PROVIDER)
+                                }
+                                val overlay = MyLocationNewOverlay(provider, this).apply {
+                                    enableMyLocation()
+                                    setDrawAccuracyEnabled(true)
+                                }
+                                locationOverlayRef = overlay
+                                overlays.add(overlay)
+                            }
+
+                            // Live Magnetic Compass Overlay
+                            if (compassOverlayRef == null) {
+                                val compass = CompassOverlay(ctx, InternalCompassOrientationProvider(ctx), this).apply {
+                                    enableCompass()
+                                    setCompassCenter(28f, 28f)
+                                }
+                                compassOverlayRef = compass
+                                overlays.add(compass)
+                            }
+
                             mapViewRef = this
                         }
                     },
                     update = { mapView ->
-                        setupMapOverlays(mapView, pois, rfCenterGeoPoint, isRfPulseActive, pickedGeoPoint, selectedRoute, osrmRoute, handleMapTap)
+                        if (hasLocationPermission && locationOverlayRef == null) {
+                            val overlay = MyLocationNewOverlay(GpsMyLocationProvider(context), mapView).apply {
+                                enableMyLocation()
+                                setDrawAccuracyEnabled(true)
+                            }
+                            locationOverlayRef = overlay
+                            mapView.overlays.add(overlay)
+                        }
+
+                        if (compassOverlayRef == null) {
+                            val compass = CompassOverlay(context, InternalCompassOrientationProvider(context), mapView).apply {
+                                enableCompass()
+                                setCompassCenter(28f, 28f)
+                            }
+                            compassOverlayRef = compass
+                            mapView.overlays.add(compass)
+                        }
+
+                        setupMapOverlays(
+                            context = context,
+                            mapView = mapView,
+                            pois = filteredPois,
+                            rfCenter = rfCenterGeoPoint,
+                            isRfActive = isRfPulseActive,
+                            pickedPoint = droppedMapPin,
+                            selectedPoiId = selectedMapPoi?.id,
+                            selectedRoute = selectedRoute,
+                            osrmRoute = osrmRoute,
+                            onMapTapped = handleMapTap,
+                            onPoiSelected = handlePoiSelected
+                        )
                     }
                 )
+
+                // GPS Status / Accuracy Notification Pill
+                if (gpsStatusMessage != null) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 10.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        color = SlotifyColors.SurfaceCard.copy(alpha = 0.96f),
+                        shadowElevation = 6.dp
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = gpsStatusMessage!!,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SlotifyColors.TextPrimary
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            IconButton(
+                                onClick = { gpsStatusMessage = null },
+                                modifier = Modifier.size(20.dp)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Tutup", tint = SlotifyColors.TextSecondary, modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    }
+                }
 
                 // Floating Action Buttons on Map (Top-Right)
                 Column(
@@ -256,29 +521,68 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                         .padding(10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // 1. Recenter Map Button
+                    // 0. Quick-Snap "Saya di Rumah" Button
                     SmallFloatingActionButton(
                         onClick = {
+                            val homePoi = pois.find { it.category == PoiCategory.RUMAH } ?: PoiItem("poi-1", "Rumah Kediaman", PoiCategory.RUMAH, "🏠", 3.1390, 101.6869, 0.0)
+                            val homePoint = GeoPoint(homePoi.lat, homePoi.lng)
                             mapViewRef?.controller?.apply {
-                                setZoom(12.6)
-                                animateTo(GeoPoint(3.1390, 101.6869))
+                                setZoom(17.5)
+                                animateTo(homePoint)
                             }
+                            rfCenterGeoPoint = homePoint
+                            rfCenterLabel = homePoi.name
+                            gpsStatusMessage = "🏠 Dipusatkan ke ${homePoi.name} (Mod Rumah)"
                         },
                         modifier = Modifier.size(36.dp),
                         containerColor = SlotifyColors.SurfaceCard.copy(alpha = 0.94f),
-                        contentColor = SlotifyColors.KpmSkyBlue,
+                        contentColor = SlotifyColors.ParentGreen,
                         shape = CircleShape
                     ) {
-                        Icon(Icons.Default.MyLocation, contentDescription = "Pusatkan Peta", modifier = Modifier.size(18.dp))
+                        Text("🏠", fontSize = 16.sp)
                     }
 
-                    // 2. RF Range 3.0 km Radar Pulse Toggle
+                    // 1. Hardware GPS Recenter / Lock Button
+                    SmallFloatingActionButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                locateUserWithGps()
+                            }
+                        },
+                        modifier = Modifier.size(36.dp),
+                        containerColor = if (isGpsLocating) SlotifyColors.ActionAmber else SlotifyColors.SurfaceCard.copy(alpha = 0.94f),
+                        contentColor = if (isGpsLocating) Color.White else SlotifyColors.KpmSkyBlue,
+                        shape = CircleShape
+                    ) {
+                        if (isGpsLocating) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                        } else {
+                            Icon(Icons.Default.MyLocation, contentDescription = "Kunci Lokasi GPS", modifier = Modifier.size(18.dp))
+                        }
+                    }
+
+                    // 2. High Precision Location Picker Button
+                    SmallFloatingActionButton(
+                        onClick = {
+                            precisePickerTarget = userGpsFix?.let { GeoPoint(it.latitude, it.longitude) } ?: defaultHomeGeo
+                            precisePickerPoi = null
+                            showPrecisePicker = true
+                        },
+                        modifier = Modifier.size(36.dp),
+                        containerColor = SlotifyColors.SurfaceCard.copy(alpha = 0.94f),
+                        contentColor = SlotifyColors.ActionAmber,
+                        shape = CircleShape
+                    ) {
+                        Icon(Icons.Default.PinDrop, contentDescription = "Pilih Lokasi Tepat", modifier = Modifier.size(18.dp))
+                    }
+
+                    // 3. RF Range 3.0 km Radar Pulse Toggle
                     SmallFloatingActionButton(
                         onClick = {
                             isRfPulseActive = !isRfPulseActive
                             if (isRfPulseActive && rfCenterGeoPoint == null) {
-                                rfCenterGeoPoint = GeoPoint(3.1390, 101.6869)
-                                rfCenterLabel = "Rumah (Taman Contoh)"
+                                rfCenterGeoPoint = userGpsFix?.let { GeoPoint(it.latitude, it.longitude) } ?: defaultHomeGeo
+                                rfCenterLabel = if (userGpsFix != null) "GPS Semasa" else "Rumah Kediaman"
                             }
                         },
                         modifier = Modifier.size(36.dp),
@@ -288,84 +592,318 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                     ) {
                         Text("📡", fontSize = 16.sp)
                     }
+
+                    // 4. Compass / North Heading Reset
+                    SmallFloatingActionButton(
+                        onClick = {
+                            mapViewRef?.let { mv ->
+                                if (mv.mapOrientation != 0f) {
+                                    mv.mapOrientation = 0f
+                                    gpsStatusMessage = "🧭 Peta Dilaras ke Arah Utara"
+                                } else {
+                                    compassOverlayRef?.let { comp ->
+                                        if (!comp.isCompassEnabled) {
+                                            comp.enableCompass()
+                                            gpsStatusMessage = "🧭 Kompas Sensor Diaktifkan"
+                                        } else {
+                                            gpsStatusMessage = "🧭 Arah Utara Dikunci (0°)"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.size(36.dp),
+                        containerColor = SlotifyColors.SurfaceCard.copy(alpha = 0.94f),
+                        contentColor = SlotifyColors.KpmSkyBlue,
+                        shape = CircleShape
+                    ) {
+                        Icon(Icons.Default.Explore, contentDescription = "Kompas & Orientasi", modifier = Modifier.size(18.dp))
+                    }
+
+                    // 5. Offline Tile Pre-Cache Button (Bandar Contoh Corridor)
+                    SmallFloatingActionButton(
+                        onClick = {
+                            mapViewRef?.let { mv ->
+                                if (!isOfflineTileDownloading) {
+                                    isOfflineTileDownloading = true
+                                    gpsStatusMessage = "⬇️ Memuat turun jubin peta luar talian (Bandar Contoh)..."
+                                    OfflineMapManager.downloadFamilyCorridorTiles(
+                                        context = context,
+                                        mapView = mv,
+                                        minZoom = 12,
+                                        maxZoom = 16,
+                                        onProgress = { cur, tot ->
+                                            gpsStatusMessage = "⬇️ Menyimpan peta luar talian ($cur/$tot)..."
+                                        },
+                                        onComplete = { tot ->
+                                            isOfflineTileDownloading = false
+                                            isOfflineCached = true
+                                            gpsStatusMessage = "✅ Peta Luar Talian Sedia ($tot jubin)!"
+                                        },
+                                        onError = { err ->
+                                            isOfflineTileDownloading = false
+                                            gpsStatusMessage = "⚠️ $err"
+                                        }
+                                    )
+                                }
+                            }
+                        },
+                        modifier = Modifier.size(36.dp),
+                        containerColor = if (isOfflineCached) SlotifyColors.ParentGreen.copy(alpha = 0.18f) else SlotifyColors.SurfaceCard.copy(alpha = 0.94f),
+                        contentColor = if (isOfflineCached) SlotifyColors.ParentGreen else SlotifyColors.TextSecondary,
+                        shape = CircleShape
+                    ) {
+                        if (isOfflineTileDownloading) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = SlotifyColors.KpmSkyBlue)
+                        } else {
+                            Icon(if (isOfflineCached) Icons.Default.CloudDone else Icons.Default.CloudDownload, contentDescription = "Simpan Peta Luar Talian", modifier = Modifier.size(18.dp))
+                        }
+                    }
                 }
 
-                // Interactive Map Picker Banner (Bottom-Center of Map)
-                if (isMapPickerMode) {
+                // 1. Selected POI Preview Bottom Card
+                selectedMapPoi?.let { selPoi ->
                     Surface(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .padding(8.dp),
                         shape = SlotifyShapes.Medium,
-                        color = SlotifyColors.SurfaceCard.copy(alpha = 0.96f),
+                        color = SlotifyColors.SurfaceCard.copy(alpha = 0.97f),
                         shadowElevation = 8.dp
                     ) {
                         Column(
                             modifier = Modifier.padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("🎯", fontSize = 16.sp)
-                                Spacer(Modifier.width(6.dp))
-                                Column {
-                                    Text(
-                                        text = "Mod Pilih Lokasi di Atas Peta",
-                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = SlotifyColors.TextPrimary
-                                    )
-                                    Text(
-                                        text = pickedGeoPoint?.let { "Koordinat: ${String.format(Locale.US, "%.4f, %.4f", it.latitude, it.longitude)}" }
-                                            ?: "Sentuh mana-mana titik pada peta untuk pilih...",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (pickedGeoPoint != null) SlotifyColors.KpmSkyBlue else SlotifyColors.TextSecondary
-                                    )
-                                }
-                            }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End,
+                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                TextButton(
-                                    onClick = {
-                                        isMapPickerMode = false
-                                        pickedGeoPoint = null
-                                        if (pendingPoiDraft != null) {
-                                            editingPoi = pendingPoiDraft
-                                            showEditDialog = true
-                                        }
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    val pColor = poiCategoryColor(selPoi.category)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .background(pColor.copy(alpha = 0.18f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(selPoi.iconEmoji, fontSize = 20.sp)
                                     }
-                                ) {
-                                    Text("Batal", color = SlotifyColors.TextSecondary, fontSize = 12.sp)
+                                    Spacer(Modifier.width(10.dp))
+                                    Column {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = selPoi.name,
+                                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                                color = SlotifyColors.TextPrimary,
+                                                maxLines = 1
+                                            )
+                                            Spacer(Modifier.width(6.dp))
+                                            Surface(
+                                                shape = SlotifyShapes.Small,
+                                                color = pColor.copy(alpha = 0.15f)
+                                            ) {
+                                                Text(
+                                                    text = selPoi.category.name,
+                                                    fontSize = 8.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = pColor,
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                )
+                                            }
+                                        }
+                                        if (selPoi.address.isNotBlank()) {
+                                            Text(
+                                                text = selPoi.address,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = SlotifyColors.TextSecondary,
+                                                maxLines = 1,
+                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                            )
+                                        }
+                                        Text(
+                                            text = String.format(Locale.US, "%.5f° U, %.5f° T • %.1f km dari Rumah", selPoi.lat, selPoi.lng, selPoi.distanceKm),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = SlotifyColors.KpmSkyBlue
+                                        )
+                                    }
                                 }
-                                Spacer(Modifier.width(8.dp))
+
+                                IconButton(
+                                    onClick = { selectedMapPoi = null },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Tutup", tint = SlotifyColors.TextSecondary, modifier = Modifier.size(16.dp))
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                                 Button(
                                     onClick = {
-                                        pickedGeoPoint?.let { pt ->
-                                            if (pendingPoiDraft != null) {
-                                                val home = pois.find { it.category == PoiCategory.RUMAH }
-                                                val dist = if (home != null) {
-                                                    calculateDistanceKm(home.lat, home.lng, pt.latitude, pt.longitude)
-                                                } else 0.0
-                                                editingPoi = pendingPoiDraft?.copy(
-                                                    lat = pt.latitude,
-                                                    lng = pt.longitude,
-                                                    distanceKm = dist
-                                                )
-                                                showEditDialog = true
-                                            }
-                                            rfCenterGeoPoint = pt
-                                            rfCenterLabel = "Titik Peta (${String.format(Locale.US, "%.4f, %.4f", pt.latitude, pt.longitude)})"
-                                        }
-                                        isMapPickerMode = false
+                                        launchNavigationIntent(context, selPoi.lat, selPoi.lng, selPoi.name)
                                     },
-                                    enabled = pickedGeoPoint != null,
+                                    modifier = Modifier.weight(1f),
                                     colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue),
                                     shape = SlotifyShapes.Small,
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
                                 ) {
-                                    Text("✅ Gunakan Koordinat", color = Color.White, fontSize = 12.sp)
+                                    Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Arah", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        rfCenterGeoPoint = GeoPoint(selPoi.lat, selPoi.lng)
+                                        rfCenterLabel = "${selPoi.iconEmoji} ${selPoi.name}"
+                                        isRfPulseActive = true
+                                    },
+                                    modifier = Modifier.weight(1.1f),
+                                    shape = SlotifyShapes.Small,
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                                ) {
+                                    Text("📡 Pusat RF", fontSize = 11.sp, color = SlotifyColors.KpmSkyBlue, fontWeight = FontWeight.Bold)
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        precisePickerTarget = GeoPoint(selPoi.lat, selPoi.lng)
+                                        precisePickerPoi = selPoi
+                                        showPrecisePicker = true
+                                    },
+                                    modifier = Modifier.weight(1.1f),
+                                    shape = SlotifyShapes.Small,
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                                ) {
+                                    Text("🎯 Laras", fontSize = 11.sp, color = SlotifyColors.TextPrimary, fontWeight = FontWeight.Bold)
+                                }
+
+                                IconButton(
+                                    onClick = {
+                                        editingPoi = selPoi
+                                        showEditDialog = true
+                                    },
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .background(SlotifyColors.KpmSkyBlue.copy(alpha = 0.12f), CircleShape)
+                                ) {
+                                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = SlotifyColors.KpmSkyBlue, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2. Dropped Map Pin Floating Card (on empty map tap)
+                if (selectedMapPoi == null && droppedMapPin != null) {
+                    val dropPt = droppedMapPin!!
+                    val home = pois.find { it.category == PoiCategory.RUMAH }
+                    val dist = if (home != null) calculateDistanceKm(home.lat, home.lng, dropPt.latitude, dropPt.longitude) else 0.0
+
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        shape = SlotifyShapes.Medium,
+                        color = SlotifyColors.SurfaceCard.copy(alpha = 0.97f),
+                        shadowElevation = 8.dp
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("📍", fontSize = 20.sp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = "Nod Ditandakan Pada Peta",
+                                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = SlotifyColors.TextPrimary
+                                        )
+                                        Text(
+                                            text = String.format(Locale.US, "%.5f° U, %.5f° T • %.1f km dari Rumah", dropPt.latitude, dropPt.longitude, dist),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = SlotifyColors.KpmSkyBlue
+                                        )
+                                    }
+                                }
+
+                                IconButton(
+                                    onClick = { droppedMapPin = null },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Tutup", tint = SlotifyColors.TextSecondary, modifier = Modifier.size(16.dp))
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            val addr = LocationAddressHelper.resolveAddress(context, dropPt.latitude, dropPt.longitude)
+                                            editingPoi = PoiItem(
+                                                id = "poi-${UUID.randomUUID().toString().take(8)}",
+                                                name = "",
+                                                category = PoiCategory.SEKOLAH,
+                                                iconEmoji = "📍",
+                                                lat = dropPt.latitude,
+                                                lng = dropPt.longitude,
+                                                distanceKm = dist,
+                                                address = addr
+                                            )
+                                            showEditDialog = true
+                                            droppedMapPin = null
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1.3f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue),
+                                    shape = SlotifyShapes.Small,
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(Icons.Default.AddLocationAlt, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Simpan POI", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        precisePickerTarget = dropPt
+                                        precisePickerPoi = null
+                                        showPrecisePicker = true
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = SlotifyShapes.Small,
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                                ) {
+                                    Text("🎯 Laras", fontSize = 11.sp, color = SlotifyColors.TextPrimary, fontWeight = FontWeight.Bold)
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        rfCenterGeoPoint = dropPt
+                                        rfCenterLabel = "Titik Peta (${String.format(Locale.US, "%.4f, %.4f", dropPt.latitude, dropPt.longitude)})"
+                                        isRfPulseActive = true
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = SlotifyShapes.Small,
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                                ) {
+                                    Text("📡 RF", fontSize = 11.sp, color = SlotifyColors.KpmSkyBlue, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -458,15 +996,18 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                             color = SlotifyColors.KpmSkyBlue
                         )
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            val quickBases = listOf(
-                                Triple("🏠 Rumah", GeoPoint(3.1390, 101.6869), "Rumah (Taman Contoh)"),
+                            val quickBases = listOfNotNull(
+                                Triple("🏠 Rumah", defaultHomeGeo, "Rumah Kediaman"),
                                 Triple("🏢 Pejabat", GeoPoint(3.1390, 101.6869), "Pejabat Abah (Bandar Contoh)"),
                                 Triple("🏫 SK", GeoPoint(3.1390, 101.6869), "SK Taman Contoh"),
+                                userGpsFix?.let { fix ->
+                                    Triple("📡 GPS", GeoPoint(fix.latitude, fix.longitude), "Lokasi GPS (${fix.quality.label})")
+                                },
                                 Triple("🎯 Pilih Peta", null, "Sentuh mana-mana pada peta")
                             )
                             items(quickBases) { (btnLabel, geo, name) ->
                                 val isSelected = if (geo == null) {
-                                    isMapPickerMode
+                                    showPrecisePicker
                                 } else {
                                     rfCenterGeoPoint?.let { abs(it.latitude - geo.latitude) < 0.0001 && abs(it.longitude - geo.longitude) < 0.0001 } == true
                                 }
@@ -480,7 +1021,9 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                                 rfCenterLabel = name
                                                 mapViewRef?.controller?.animateTo(geo)
                                             } else {
-                                                isMapPickerMode = true
+                                                precisePickerTarget = rfCenterGeoPoint ?: defaultHomeGeo
+                                                precisePickerPoi = null
+                                                showPrecisePicker = true
                                             }
                                         }
                                         .padding(horizontal = 10.dp, vertical = 6.dp)
@@ -843,11 +1386,20 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                 }
 
                 filteredPois.forEach { poi ->
+                    val isSelected = selectedMapPoi?.id == poi.id
+                    val poiColor = poiCategoryColor(poi.category)
+
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 14.dp)
-                            .background(SlotifyColors.SurfaceCard, SlotifyShapes.Medium)
+                            .neumorphic(
+                                elevation = if (isSelected) NeumorphicElevation.MEDIUM else NeumorphicElevation.LOW,
+                                cornerRadius = 14.dp
+                            )
+                            .background(
+                                if (isSelected) SlotifyColors.KpmSkyBlue.copy(alpha = 0.08f) else SlotifyColors.SurfaceCard,
+                                SlotifyShapes.Medium
+                            )
                             .padding(horizontal = 10.dp, vertical = 8.dp)
                     ) {
                         Row(
@@ -855,29 +1407,52 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Left clickable area to focus map & open infowindow
+                            // Left clickable area to focus map & open bottom preview
                             Row(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(SlotifyShapes.Small)
                                     .clickable {
+                                        selectedMapPoi = poi
+                                        droppedMapPin = null
                                         mapViewRef?.let { mv ->
                                             mv.controller.animateTo(GeoPoint(poi.lat, poi.lng))
-                                            mv.controller.setZoom(14.5)
-                                            mv.overlays.filterIsInstance<Marker>().find { it.id == poi.id }?.showInfoWindow()
+                                            mv.controller.setZoom(15.5)
                                         }
                                     }
                                     .padding(vertical = 4.dp, horizontal = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(poi.iconEmoji, fontSize = 22.sp)
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .background(poiColor.copy(alpha = 0.16f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(poi.iconEmoji, fontSize = 20.sp)
+                                }
                                 Spacer(Modifier.width(10.dp))
                                 Column {
-                                    Text(
-                                        text = poi.name,
-                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = SlotifyColors.TextPrimary
-                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = poi.name,
+                                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = SlotifyColors.TextPrimary
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Surface(
+                                            shape = SlotifyShapes.Small,
+                                            color = poiColor.copy(alpha = 0.15f)
+                                        ) {
+                                            Text(
+                                                text = poi.category.name,
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = poiColor,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                        }
+                                    }
                                     if (poi.address.isNotBlank()) {
                                         Text(
                                             text = poi.address,
@@ -888,63 +1463,86 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                         )
                                     }
                                     Text(
-                                        text = "Koordinat: ${String.format("%.4f, %.4f", poi.lat, poi.lng)}",
+                                        text = String.format(Locale.US, "%.5f° U, %.5f° T • %s", poi.lat, poi.lng, if (poi.distanceKm > 0) "${poi.distanceKm} km" else "Pusat"),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = SlotifyColors.TextSecondary
+                                        color = SlotifyColors.KpmSkyBlue
                                     )
                                 }
                             }
 
-                            // Right action buttons with distinct touch targets
+                            // Right action buttons
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                val poiColor = poiCategoryColor(poi.category)
-                                Box(
+                                // 1. Navigation Button
+                                IconButton(
+                                    onClick = {
+                                        launchNavigationIntent(context, poi.lat, poi.lng, poi.name)
+                                    },
                                     modifier = Modifier
-                                        .background(poiColor.copy(alpha = 0.15f), SlotifyShapes.XSmall)
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        .size(32.dp)
+                                        .background(SlotifyColors.KpmSkyBlue.copy(alpha = 0.12f), CircleShape)
                                 ) {
-                                    Text(
-                                        text = if (poi.distanceKm > 0) "${poi.distanceKm} km" else "Pusat",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = poiColor
+                                    Icon(
+                                        Icons.Default.Navigation,
+                                        contentDescription = "Navigasi",
+                                        tint = SlotifyColors.KpmSkyBlue,
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
 
-                                // Edit POI button
+                                // 2. Laras Tepat Button
+                                IconButton(
+                                    onClick = {
+                                        precisePickerTarget = GeoPoint(poi.lat, poi.lng)
+                                        precisePickerPoi = poi
+                                        showPrecisePicker = true
+                                    },
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .background(SlotifyColors.ActionAmber.copy(alpha = 0.12f), CircleShape)
+                                ) {
+                                    Icon(
+                                        Icons.Default.PinDrop,
+                                        contentDescription = "Laras Tepat",
+                                        tint = SlotifyColors.ActionAmber,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+
+                                // 3. Edit POI button
                                 IconButton(
                                     onClick = {
                                         editingPoi = poi
                                         showEditDialog = true
                                     },
                                     modifier = Modifier
-                                        .size(34.dp)
+                                        .size(32.dp)
                                         .background(SlotifyColors.KpmSkyBlue.copy(alpha = 0.12f), CircleShape)
                                 ) {
                                     Icon(
                                         Icons.Default.Edit,
                                         contentDescription = "Edit POI",
                                         tint = SlotifyColors.KpmSkyBlue,
-                                        modifier = Modifier.size(17.dp)
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
 
-                                // Delete POI button
+                                // 4. Delete POI button
                                 IconButton(
                                     onClick = {
                                         poiToDelete = poi
                                     },
                                     modifier = Modifier
-                                        .size(34.dp)
+                                        .size(32.dp)
                                         .background(Color(0xFFEF4444).copy(alpha = 0.12f), CircleShape)
                                 ) {
                                     Icon(
                                         Icons.Default.DeleteOutline,
                                         contentDescription = "Padam POI",
                                         tint = Color(0xFFEF4444),
-                                        modifier = Modifier.size(17.dp)
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
                             }
@@ -964,6 +1562,7 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
     if (showEditDialog) {
         PoiEditDialog(
             poi = editingPoi,
+            userGpsFix = userGpsFix,
             onDismiss = {
                 showEditDialog = false
                 editingPoi = null
@@ -972,12 +1571,9 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
             onPickFromMap = { draft ->
                 pendingPoiDraft = draft
                 showEditDialog = false
-                isMapPickerMode = true
-                pickedGeoPoint = GeoPoint(draft.lat, draft.lng)
-                mapViewRef?.controller?.apply {
-                    setZoom(13.5)
-                    animateTo(GeoPoint(draft.lat, draft.lng))
-                }
+                precisePickerTarget = GeoPoint(draft.lat, draft.lng)
+                precisePickerPoi = null
+                showPrecisePicker = true
             },
             onSave = { savedPoi ->
                 val updated = if (editingPoi != null && pois.any { it.id == savedPoi.id }) {
@@ -990,6 +1586,61 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                 showEditDialog = false
                 editingPoi = null
                 pendingPoiDraft = null
+            }
+        )
+    }
+
+    // Dedicated Fullscreen Precision Location Picker Modal
+    if (showPrecisePicker) {
+        val home = pois.find { it.category == PoiCategory.RUMAH }
+        PreciseLocationPickerModal(
+            initialLat = precisePickerTarget?.latitude ?: (editingPoi?.lat ?: (home?.lat ?: 3.1390)),
+            initialLng = precisePickerTarget?.longitude ?: (editingPoi?.lng ?: (home?.lng ?: 101.6869)),
+            title = if (precisePickerPoi != null) "Laras Lokasi: ${precisePickerPoi!!.name}" else "Pilih Lokasi Tepat di Peta",
+            homeLat = home?.lat ?: 3.1390,
+            homeLng = home?.lng ?: 101.6869,
+            onDismiss = {
+                showPrecisePicker = false
+                if (pendingPoiDraft != null) {
+                    editingPoi = pendingPoiDraft
+                    showEditDialog = true
+                    pendingPoiDraft = null
+                }
+                precisePickerPoi = null
+            },
+            onConfirmLocation = { confirmedLat, confirmedLng, confirmedAddress, confirmedDist ->
+                if (pendingPoiDraft != null) {
+                    editingPoi = pendingPoiDraft!!.copy(
+                        lat = confirmedLat,
+                        lng = confirmedLng,
+                        distanceKm = confirmedDist,
+                        address = if (pendingPoiDraft!!.address.isBlank()) confirmedAddress else pendingPoiDraft!!.address
+                    )
+                    showEditDialog = true
+                    pendingPoiDraft = null
+                } else if (precisePickerPoi != null) {
+                    val updatedPoi = precisePickerPoi!!.copy(
+                        lat = confirmedLat,
+                        lng = confirmedLng,
+                        distanceKm = confirmedDist,
+                        address = if (precisePickerPoi!!.address.isBlank()) confirmedAddress else precisePickerPoi!!.address
+                    )
+                    val updatedList = pois.map { if (it.id == updatedPoi.id) updatedPoi else it }
+                    pois = updatedList
+                    PoiStorage.savePois(context, updatedList)
+                    selectedMapPoi = updatedPoi
+                    precisePickerPoi = null
+                } else {
+                    droppedMapPin = GeoPoint(confirmedLat, confirmedLng)
+                }
+
+                rfCenterGeoPoint = GeoPoint(confirmedLat, confirmedLng)
+                rfCenterLabel = "Titik Dipilih (${String.format(Locale.US, "%.4f, %.4f", confirmedLat, confirmedLng)})"
+                mapViewRef?.controller?.apply {
+                    setZoom(15.5)
+                    animateTo(GeoPoint(confirmedLat, confirmedLng))
+                }
+                showPrecisePicker = false
             }
         )
     }
@@ -1087,14 +1738,17 @@ fun calculateDistanceKm(lat1: Double, lng1: Double, lat2: Double, lng2: Double):
  * Renders Route polyline, POI markers, RF Pulse 3km overlay, and picked point onto MapView
  */
 private fun setupMapOverlays(
+    context: Context,
     mapView: MapView,
     pois: List<PoiItem>,
     rfCenter: GeoPoint?,
     isRfActive: Boolean,
     pickedPoint: GeoPoint?,
+    selectedPoiId: String?,
     selectedRoute: RouteSelection,
     osrmRoute: OsrmRouteResponse?,
-    onMapTapped: (GeoPoint) -> Unit
+    onMapTapped: (GeoPoint) -> Unit,
+    onPoiSelected: (PoiItem) -> Unit
 ) {
     // Keep tile overlays, clear custom Markers, Polylines and RfPulseOverlay
     mapView.overlays.removeAll { it is Marker || it is Polyline || it is RfPulseOverlay }
@@ -1162,15 +1816,9 @@ private fun setupMapOverlays(
         mapView.overlays.add(polyline)
     }
 
-    // 3. POI Markers
-    val markerColors = mapOf(
-        PoiCategory.RUMAH    to android.graphics.Color.parseColor("#22C55E"),
-        PoiCategory.SEKOLAH  to android.graphics.Color.parseColor("#0284C7"),
-        PoiCategory.TRANSIT  to android.graphics.Color.parseColor("#F59E0B"),
-        PoiCategory.PEJABAT  to android.graphics.Color.parseColor("#64748B")
-    )
-
+    // 3. POI Markers with Custom Teardrop Pin and Embedded Emoji Badge
     pois.forEach { poi ->
+        val isSelected = poi.id == selectedPoiId
         val marker = Marker(mapView).apply {
             id = poi.id
             position = GeoPoint(poi.lat, poi.lng)
@@ -1180,30 +1828,29 @@ private fun setupMapOverlays(
             } else {
                 "${poi.iconEmoji} • ${if (poi.distanceKm > 0) "${poi.distanceKm} km" else "Pusat"}"
             }
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-            icon = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(markerColors[poi.category] ?: android.graphics.Color.GRAY)
-                setStroke(4, android.graphics.Color.WHITE)
-                setSize(48, 48)
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+            icon = PoiMarkerHelper.getPoiMarker(context, poi, isSelected)
+            setOnMarkerClickListener { _, mv ->
+                onPoiSelected(poi)
+                mv.controller.animateTo(GeoPoint(poi.lat, poi.lng))
+                true
             }
         }
         mapView.overlays.add(marker)
     }
 
-    // 4. Temporary Marker for picked coordinate on map
+    // 4. Temporary Marker for dropped / picked coordinate on map
     if (pickedPoint != null) {
         val pickMarker = Marker(mapView).apply {
             id = "temp_picked_pin"
             position = pickedPoint
-            title = "📍 Lokasi Dipilih di Peta"
-            snippet = String.format(Locale.US, "%.4f, %.4f", pickedPoint.latitude, pickedPoint.longitude)
+            title = "📍 Titik Dipilih Pada Peta"
+            snippet = String.format(Locale.US, "%.5f, %.5f", pickedPoint.latitude, pickedPoint.longitude)
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            icon = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(android.graphics.Color.parseColor("#EF4444")) // Crimson Red
-                setStroke(4, android.graphics.Color.WHITE)
-                setSize(52, 52)
+            icon = PoiMarkerHelper.getTargetPin(context, "🎯")
+            setOnMarkerClickListener { _, _ ->
+                onMapTapped(pickedPoint)
+                true
             }
         }
         mapView.overlays.add(pickMarker)
@@ -1219,17 +1866,20 @@ private fun setupMapOverlays(
 @Composable
 private fun PoiEditDialog(
     poi: PoiItem?,
+    userGpsFix: GpsFixResult? = null,
     onDismiss: () -> Unit,
     onPickFromMap: (PoiItem) -> Unit,
     onSave: (PoiItem) -> Unit
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val isEdit = poi != null
     var name by remember { mutableStateOf(poi?.name ?: "") }
     var category by remember { mutableStateOf(poi?.category ?: PoiCategory.SEKOLAH) }
     var iconEmoji by remember { mutableStateOf(poi?.iconEmoji ?: "🏢") }
     var address by remember { mutableStateOf(poi?.address ?: "") }
-    var latText by remember { mutableStateOf(if (poi != null) String.format(Locale.US, "%.4f", poi.lat) else "3.1390") }
-    var lngText by remember { mutableStateOf(if (poi != null) String.format(Locale.US, "%.4f", poi.lng) else "101.6869") }
+    var latText by remember { mutableStateOf(if (poi != null) String.format(Locale.US, "%.5f", poi.lat) else "3.1390") }
+    var lngText by remember { mutableStateOf(if (poi != null) String.format(Locale.US, "%.5f", poi.lng) else "101.6869") }
     var distanceText by remember { mutableStateOf(if (poi != null) String.format(Locale.US, "%.1f", poi.distanceKm) else "5.0") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -1355,59 +2005,87 @@ private fun PoiEditDialog(
                     )
                 }
 
-                // Map Picker button & Presets
+                // High Precision Location Picker Button
+                OutlinedButton(
+                    onClick = {
+                        val currentDraft = PoiItem(
+                            id = poi?.id ?: "poi-${UUID.randomUUID().toString().take(8)}",
+                            name = name.trim(),
+                            category = category,
+                            iconEmoji = iconEmoji,
+                            lat = latText.toDoubleOrNull() ?: 3.1390,
+                            lng = lngText.toDoubleOrNull() ?: 101.6869,
+                            distanceKm = distanceText.toDoubleOrNull() ?: 0.0,
+                            address = address.trim()
+                        )
+                        onPickFromMap(currentDraft)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = SlotifyShapes.Medium,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = SlotifyColors.KpmSkyBlue.copy(alpha = 0.08f),
+                        contentColor = SlotifyColors.KpmSkyBlue
+                    )
+                ) {
+                    Text("🎯 Pilih Tepat di Peta (Grab-Style Reticle)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+
+                // Preset Quick Chips (including live GPS if available)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    if (userGpsFix != null) {
+                        FilledTonalButton(
+                            onClick = {
+                                latText = String.format(Locale.US, "%.5f", userGpsFix.latitude)
+                                lngText = String.format(Locale.US, "%.5f", userGpsFix.longitude)
+                                coroutineScope.launch {
+                                    val resolved = LocationAddressHelper.resolveAddress(context, userGpsFix.latitude, userGpsFix.longitude)
+                                    if (address.isBlank() && resolved.isNotBlank()) {
+                                        address = resolved
+                                    }
+                                }
+                            },
+                            shape = SlotifyShapes.Small,
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                            modifier = Modifier
+                                .weight(1.1f)
+                                .height(28.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(containerColor = SlotifyColors.ActionAmber.copy(alpha = 0.2f))
+                        ) {
+                            Text("📡 GPS (${userGpsFix.quality.label})", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = SlotifyColors.ActionAmber)
+                        }
+                    }
+
                     FilledTonalButton(
                         onClick = {
-                            val currentDraft = PoiItem(
-                                id = poi?.id ?: "poi-${UUID.randomUUID().toString().take(8)}",
-                                name = name.trim(),
-                                category = category,
-                                iconEmoji = iconEmoji,
-                                lat = latText.toDoubleOrNull() ?: 3.1390,
-                                lng = lngText.toDoubleOrNull() ?: 101.6869,
-                                distanceKm = distanceText.toDoubleOrNull() ?: 0.0,
-                                address = address.trim()
-                            )
-                            onPickFromMap(currentDraft)
+                            latText = "3.1390"
+                            lngText = "101.6869"
+                            if (address.isBlank()) address = "Pusat Bandar Contoh, Bandar Contoh, Selangor"
                         },
                         shape = SlotifyShapes.Small,
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                        modifier = Modifier.height(28.dp)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(28.dp)
                     ) {
-                        Text("🗺️ Pilih di Peta", fontSize = 10.sp, color = SlotifyColors.KpmSkyBlue, fontWeight = FontWeight.Bold)
+                        Text("📍 Bandar Contoh", fontSize = 10.sp)
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        FilledTonalButton(
-                            onClick = {
-                                latText = "3.1390"
-                                lngText = "101.6869"
-                                if (address.isBlank()) address = "Pusat Bandar Contoh, Bandar Contoh, Selangor"
-                            },
-                            shape = SlotifyShapes.Small,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                            modifier = Modifier.height(28.dp)
-                        ) {
-                            Text("📍 Bandar Contoh", fontSize = 10.sp)
-                        }
-
-                        FilledTonalButton(
-                            onClick = {
-                                latText = "3.1390"
-                                lngText = "101.6869"
-                                if (address.isBlank()) address = "Taman Contoh, Bandar Contoh"
-                            },
-                            shape = SlotifyShapes.Small,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                            modifier = Modifier.height(28.dp)
-                        ) {
-                            Text("📍 Taman Contoh", fontSize = 10.sp)
-                        }
+                    FilledTonalButton(
+                        onClick = {
+                            latText = "3.1390"
+                            lngText = "101.6869"
+                            if (address.isBlank()) address = "Taman Contoh, Bandar Contoh"
+                        },
+                        shape = SlotifyShapes.Small,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(28.dp)
+                    ) {
+                        Text("📍 Taman Contoh", fontSize = 10.sp)
                     }
                 }
 

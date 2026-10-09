@@ -138,6 +138,48 @@ object SlotifyNotificationManager {
         }
     }
 
+    /**
+     * Dispatches a high-priority heads-up chime notification when entering or nearing a geofence zone
+     */
+    fun showGeofenceProximityAlert(
+        context: Context,
+        locationName: String,
+        distanceMeters: Double,
+        eventType: String
+    ) {
+        createNotificationChannels(context)
+
+        val pendingIntent = getLaunchPendingIntent(context)
+        val title = when (eventType) {
+            "ENTERED" -> "📍 Ketibaan di Zon: $locationName"
+            "APPROACHING" -> "🔔 Menghampiri: $locationName"
+            else -> "📡 Zon Logistik: $locationName"
+        }
+
+        val message = when (eventType) {
+            "ENTERED" -> "Kenderaan / anak kini telah tiba dalam radius ${distanceMeters.toInt()}m $locationName."
+            "APPROACHING" -> "Kenderaan sedang menghampiri $locationName (~${distanceMeters.toInt()}m lagi)."
+            else -> "Status logistik dikemaskini untuk $locationName."
+        }
+
+        val notificationId = 3000 + (locationName.hashCode() and 0x7FFF) % 1000
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_TRANSIT)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+
+        try {
+            NotificationManagerCompat.from(context).notify(notificationId, builder.build())
+        } catch (e: Exception) {
+            Log.e("SlotifyNotification", "Failed to send geofence alert", e)
+        }
+    }
+
     fun scheduleDailyReminders(context: Context) {
         createNotificationChannels(context)
 
