@@ -743,7 +743,7 @@ fun FinanceScreen(
 
         // FAB clearance spacer
         item {
-            Spacer(Modifier.height(70.dp))
+            Spacer(Modifier.height(115.dp))
         }
     }
 

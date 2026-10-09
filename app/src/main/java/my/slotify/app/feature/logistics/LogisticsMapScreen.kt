@@ -306,6 +306,16 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
     var vehicleFollowCamera by remember { mutableStateOf(true) }
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
 
+    // Voice Announcement & Audio Chime Helper
+    val voiceHelper = remember(context) { VoiceAnnouncementHelper(context) }
+    var isVoiceMuted by remember { mutableStateOf(false) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            voiceHelper.shutdown()
+        }
+    }
+
     // Persistent POI list loaded from storage
     var pois by remember { mutableStateOf(PoiStorage.loadPois(context)) }
 
@@ -436,7 +446,7 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                 else -> "Dalam Perjalanan ($progressPercent%)"
             }
 
-            // Proximity alerts with haptic & real Android notification
+            // Proximity alerts with haptic, Malay voice TTS, & real Android notification
             if (distToHomeKm <= 3.0 && !alerted3km) {
                 alerted3km = true
                 simulationStep = 1
@@ -446,6 +456,9 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                     childName = vanName,
                     transitMsg = "🚨 Radar 3,000m: Geofens 3.0km dikesan • Bersedia!"
                 )
+                if (!isVoiceMuted) {
+                    voiceHelper.speak("Perhatian: $vanName kini berada tiga kilometer dari rumah. Sila bersedia.")
+                }
             }
             if (distToHomeKm <= 1.0 && !alerted1km) {
                 alerted1km = true
@@ -456,6 +469,9 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                     childName = vanName,
                     transitMsg = "🚨 Radar 1,000m: $vanName sedang menghampiri lokasi!"
                 )
+                if (!isVoiceMuted) {
+                    voiceHelper.speak("Perhatian: $vanName kini berada satu kilometer dari rumah. Sila bersedia di pintu pagar.")
+                }
             }
             if (distToHomeKm <= 0.35 && !alerted300m) {
                 alerted300m = true
@@ -466,6 +482,9 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                     childName = vanName,
                     transitMsg = "🚨 Radar 300m: Ketibaan dalam 300m • Sila ke pintu pagar!"
                 )
+                if (!isVoiceMuted) {
+                    voiceHelper.speak("Perhatian: $vanName menghampiri pintu pagar rumah. Baki tiga ratus meter.")
+                }
             }
             if (idx == animPoints.lastIndex && !alertedArrived) {
                 alertedArrived = true
@@ -475,6 +494,9 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                     childName = vanName,
                     transitMsg = "✅ Selamat Tiba: $vanName telah sampai ke destinasi!"
                 )
+                if (!isVoiceMuted) {
+                    voiceHelper.speak("Alhamdulillah, $vanName telah selamat tiba di hadapan rumah kediaman.")
+                }
             }
 
             simulatedVehicleState = VehicleSimState(
@@ -1310,6 +1332,21 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                     IconButton(
                                         onClick = {
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            isVoiceMuted = !isVoiceMuted
+                                            if (isVoiceMuted) voiceHelper.stop()
+                                        },
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Icon(
+                                            if (isVoiceMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                                            contentDescription = if (isVoiceMuted) "Buka Suara" else "Senyapkan Suara",
+                                            tint = if (isVoiceMuted) SlotifyColors.TextSecondary else SlotifyColors.SuccessMint,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             vehicleFollowCamera = !vehicleFollowCamera
                                         },
                                         modifier = Modifier.size(30.dp)
@@ -1324,6 +1361,7 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                     IconButton(
                                         onClick = {
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            voiceHelper.stop()
                                             isSimulating = false
                                             simulatedVehicleState = null
                                             simulationStep = 0
@@ -1595,6 +1633,7 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     isSimulating = !isSimulating
                                     if (!isSimulating) {
+                                        voiceHelper.stop()
                                         simulatedVehicleState = null
                                         simulationStep = 0
                                     }
@@ -1986,7 +2025,7 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
 
         // Clearance spacer for Speed Dial FAB
         item {
-            Spacer(Modifier.height(70.dp))
+            Spacer(Modifier.height(115.dp))
         }
     }
 

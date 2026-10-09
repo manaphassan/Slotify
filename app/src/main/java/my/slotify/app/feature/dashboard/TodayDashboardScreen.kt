@@ -2,6 +2,7 @@ package my.slotify.app.feature.dashboard
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -66,6 +67,7 @@ fun TodayDashboardScreen(
     var showFocusDialog by remember { mutableStateOf(false) }
     var showTakwimDialog by remember { mutableStateOf(false) }
     var showAddHomeworkDialog by remember { mutableStateOf(false) }
+    var showSchoolBagDialog by remember { mutableStateOf(false) }
 
     // Fix 4.3: Guard null selectedStudent — return empty list rather than tasks with empty studentId
     val defaultTasks = remember(selectedStudent?.id) {
@@ -303,6 +305,112 @@ fun TodayDashboardScreen(
         }
 
         // ============================================================
+        // 🕌 WAKTU SOLAT JAKIM ZON SGR01 (KUALA LANGAT / SEPANG)
+        // ============================================================
+        item {
+            val prayerSchedule = remember { my.slotify.app.core.takwim.JakimPrayerTimeHelper.getSchedule() }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = SlotifyShapes.LargeDp)
+                    .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("🕌", fontSize = 16.sp)
+                            Spacer(Modifier.width(6.dp))
+                            Column {
+                                Text(
+                                    text = "Waktu Solat • Zon SGR01",
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = SlotifyColors.TextPrimary
+                                )
+                                Text(
+                                    text = "Daerah Contoh, Bandar Contoh & Sepang",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = SlotifyColors.TextSecondary
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = SlotifyShapes.Small,
+                            color = SlotifyColors.SuccessMint.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = "${prayerSchedule.nextPrayerName}: ${prayerSchedule.countdownText}",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = SlotifyColors.SuccessMint,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    // 5 Prayer Times Horizontal Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        listOf(
+                            "Subuh" to prayerSchedule.subuh,
+                            "Zohor" to prayerSchedule.zohor,
+                            "Asar" to prayerSchedule.asar,
+                            "Maghrib" to prayerSchedule.maghrib,
+                            "Isyak" to prayerSchedule.isyak
+                        ).forEach { (name, time) ->
+                            val isCurrent = prayerSchedule.currentPrayer == name
+                            Surface(
+                                shape = SlotifyShapes.Small,
+                                color = if (isCurrent) SlotifyColors.KpmSkyBlue.copy(alpha = 0.18f) else SlotifyColors.CanvasBase,
+                                border = if (isCurrent) BorderStroke(1.dp, SlotifyColors.KpmSkyBlue.copy(alpha = 0.6f)) else null,
+                                modifier = Modifier.weight(1f).padding(horizontal = 2.dp)
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(vertical = 4.dp, horizontal = 2.dp)
+                                ) {
+                                    Text(
+                                        text = name,
+                                        fontSize = 9.sp,
+                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isCurrent) SlotifyColors.KpmSkyBlue else SlotifyColors.TextSecondary
+                                    )
+                                    Text(
+                                        text = time.replace(" AM", "").replace(" PM", ""),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isCurrent) SlotifyColors.TextPrimary else SlotifyColors.TextPrimary.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Transit Note
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 2.dp)
+                    ) {
+                        Text("🕒", fontSize = 11.sp)
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = prayerSchedule.transitNote,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SlotifyColors.ActionAmber,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+
+        // ============================================================
         // 🌟 PILLAR 1: MYSTUDYLIFE REALTIME CLASS & TIMELINE PROGRESS
         // ============================================================
         item {
@@ -310,6 +418,68 @@ fun TodayDashboardScreen(
                 selectedStudent = selectedStudent,
                 todaySlots = todaySlots
             )
+        }
+
+        // ============================================================
+        // 🎒 SMART SCHOOL BAG PACK CHECKLIST
+        // ============================================================
+        item {
+            val context = LocalContext.current
+            val isPacked = remember(selectedStudent?.id) {
+                if (selectedStudent != null) SchoolBagHelper.isBagPackedToday(context, selectedStudent.id) else false
+            }
+            val successColor = SlotifyColors.SuccessMint
+            val surfaceColor = SlotifyColors.SurfaceCard
+            val skyBlueColor = SlotifyColors.KpmSkyBlue
+            val primaryTextColor = SlotifyColors.TextPrimary
+            val secondaryTextColor = SlotifyColors.TextSecondary
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = SlotifyShapes.LargeDp)
+                    .background(
+                        if (isPacked) successColor.copy(alpha = 0.1f) else surfaceColor,
+                        SlotifyShapes.Large
+                    )
+                    .clickable { showSchoolBagDialog = true }
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = if (isPacked) "🎒" else "📚", fontSize = 22.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = if (isPacked) "Beg Sekolah Siap Dikemas! ✨" else "Kemas Beg Sekolah Esok",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = if (isPacked) successColor else primaryTextColor
+                            )
+                            Text(
+                                text = if (isPacked) "Semua buku & kelengkapan telah dimasukkan" else "Semak jadual & masukkan buku mengikut subjek",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = secondaryTextColor
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = SlotifyShapes.Small,
+                        color = if (isPacked) successColor.copy(alpha = 0.2f) else skyBlueColor.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = if (isPacked) "Lengkap ✓" else "Kemas ➔",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = if (isPacked) successColor else skyBlueColor
+                        )
+                    }
+                }
+            }
         }
 
         // ============================================================
@@ -1048,7 +1218,7 @@ fun TodayDashboardScreen(
 
         // FAB Bottom Clearance
         item {
-            Spacer(Modifier.height(70.dp))
+            Spacer(Modifier.height(115.dp))
         }
         }
 
@@ -1083,6 +1253,15 @@ fun TodayDashboardScreen(
                         showAddHomeworkDialog = false
                     }
                 }
+            )
+        }
+
+        if (showSchoolBagDialog && selectedStudent != null) {
+            SchoolBagPackDialog(
+                student = selectedStudent,
+                tomorrowSlots = todaySlots,
+                onRewardEarned = onRewardEarned,
+                onDismiss = { showSchoolBagDialog = false }
             )
         }
     }

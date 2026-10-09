@@ -293,14 +293,19 @@ class WidgetUpdateWorker(
 
             // Weekend state
             if (isWeekend) {
+                val prayerSchedule = my.slotify.app.core.takwim.JakimPrayerTimeHelper.getSchedule(now)
+                val isBagPacked = my.slotify.app.feature.dashboard.SchoolBagHelper.isBagPackedToday(context, student.id)
+                val booksText = if (isBagPacked) "🎒 Beg Siap Dikemas ✓" else "📚 Semak beg untuk Isnin"
+                val attireText = "👕 Santai • 🕌 ${prayerSchedule.nextPrayerName} (${prayerSchedule.countdownText})"
+
                 SlotifyAppWidgetProvider.pushUpdate(
                     context = context,
                     childName = "${student.avatarEmoji} ${student.nickname}",
                     sessionLabel = sessionLabel(session.sessionTimeType),
                     currentClass = "🎉 Hujung Minggu! Rehat & Enjoy",
                     nextClass = "⏩ Sekolah semula Isnin depan",
-                    books = "📚 Semak beg untuk Isnin",
-                    attire = attireForDay(calDay),
+                    books = booksText,
+                    attire = attireText,
                     locationZone = zoneText,
                     siblingsSummary = siblingsSummary
                 )
@@ -333,7 +338,10 @@ class WidgetUpdateWorker(
                 "⏩ Tamat sesi hari ini ✓"
             }
 
-            val booksText = bookHintForSubject(currentSlot?.subjectCode ?: nextSlot?.subjectCode)
+            val prayerSchedule = my.slotify.app.core.takwim.JakimPrayerTimeHelper.getSchedule(now)
+            val isBagPacked = my.slotify.app.feature.dashboard.SchoolBagHelper.isBagPackedToday(context, student.id)
+            val booksText = if (isBagPacked) "🎒 Beg Siap Dikemas ✓" else bookHintForSubject(currentSlot?.subjectCode ?: nextSlot?.subjectCode)
+            val attireText = "${attireForDay(calDay)} • 🕌 ${prayerSchedule.nextPrayerName} (${prayerSchedule.countdownText})"
 
             // 7. Push to widget
             SlotifyAppWidgetProvider.pushUpdate(
@@ -343,7 +351,7 @@ class WidgetUpdateWorker(
                 currentClass = currentText,
                 nextClass    = nextText,
                 books        = booksText,
-                attire       = attireForDay(calDay),
+                attire       = attireText,
                 locationZone = zoneText,
                 siblingsSummary = siblingsSummary
             )
