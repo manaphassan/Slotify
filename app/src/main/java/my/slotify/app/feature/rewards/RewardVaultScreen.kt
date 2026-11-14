@@ -31,13 +31,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import my.slotify.app.core.security.PinResult
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
-import my.slotify.app.core.database.SlotifyDao
 import my.slotify.app.core.database.StudentEntity
-import my.slotify.app.core.rewards.RewardKeys
-import my.slotify.app.core.rewards.StarRewards
-import java.time.LocalDate
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import my.slotify.app.core.di.SlotifyViewModelFactory
+import my.slotify.app.core.time.rememberNow
 import my.slotify.app.core.designsystem.theme.NeumorphicElevation
 import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.designsystem.theme.SlotifyShapes
@@ -54,16 +53,15 @@ data class RewardCatalogItem(
 
 @Composable
 fun RewardVaultScreen(
-    selectedStudent: StudentEntity?,
-    dao: SlotifyDao
+    viewModel: RewardsViewModel = viewModel(factory = SlotifyViewModelFactory)
 ) {
-    val scope = rememberCoroutineScope()
-    val today = remember { LocalDate.now() }
-    val chestKey = selectedStudent?.let { RewardKeys.dailyChest(it.id, today) }
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val event by viewModel.event.collectAsStateWithLifecycle()
+    val selectedStudent = state.student
     // Persisted claim: reopening the tab or restarting the app cannot re-open the chest.
-    val chestOpened by remember(chestKey) {
-        if (chestKey == null) flowOf(true) else dao.isClaimed(chestKey)
-    }.collectAsState(initial = true)
+    val chestOpened = state.chestClaimed
+    val now by rememberNow()
+    LaunchedEffect(now.toLocalDate()) { viewModel.setToday(now.toLocalDate()) }
     var showChestDialog by remember { mutableStateOf(false) }
 
     var pendingRewardToRedeem by remember { mutableStateOf<RewardCatalogItem?>(null) }
@@ -71,6 +69,16 @@ fun RewardVaultScreen(
     var showChangePinDialog by remember { mutableStateOf(false) }
     var redeemFailedMessage by remember { mutableStateOf<String?>(null) }
     var showSuccessDialog by remember { mutableStateOf<RewardCatalogItem?>(null) }
+
+    LaunchedEffect(event) {
+        when (val e = event) {
+            RewardsEvent.ChestOpened -> showChestDialog = true
+            is RewardsEvent.Redeemed -> showSuccessDialog = e.item
+            is RewardsEvent.RedeemFailed -> redeemFailedMessage = "Bintang tidak mencukupi untuk ${e.item.title}."
+            null -> Unit
+        }
+        if (event != null) viewModel.consumeEvent()
+    }
 
     val rewardItems = remember {
         listOf(
@@ -156,20 +164,7 @@ fun RewardVaultScreen(
                     .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = SlotifyShapes.LargeDp)
                     .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
                     .clip(SlotifyShapes.Large)
-                    .clickable(enabled = !chestOpened && selectedStudent != null) {
-                        val s = selectedStudent ?: return@clickable
-                        scope.launch {
-                            if (StarRewards.claimOnce(
-                                    dao,
-                                    s.id,
-                                    RewardKeys.dailyChest(s.id, today),
-                                    StarRewards.DAILY_CHEST_STARS
-                                )
-                            ) {
-                                showChestDialog = true
-                            }
-                        }
-                    }
+                    .clickable(enabled = !chestOpened && selectedStudent != null) { viewModel.openChest() }
                     .padding(16.dp)
             ) {
                 Row(
@@ -409,17 +404,7 @@ fun RewardVaultScreen(
                 val reward = pendingRewardToRedeem
                 showPinDialog = false
                 pendingRewardToRedeem = null
-                val s = selectedStudent
-                if (reward != null && s != null) {
-                    scope.launch {
-                        // Atomic conditional spend: success dialog only if the balance covered it.
-                        if (StarRewards.spend(dao, s.id, reward.pointsCost)) {
-                            showSuccessDialog = reward
-                        } else {
-                            redeemFailedMessage = "Bintang tidak mencukupi untuk ${reward.title}."
-                        }
-                    }
-                }
+                if (reward != null) viewModel.redeem(reward)
             }
         )
     }

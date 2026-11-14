@@ -26,7 +26,7 @@ object StarRewards {
     const val DAILY_CHEST_STARS = 15
     const val FOCUS_SESSION_STARS = 10
     const val SAVINGS_CONVERSION_STARS = 10
-    const val SAVINGS_CONVERSION_RM = 10.0
+    const val SAVINGS_CONVERSION_SEN = 1_000L // RM 10.00
     const val PBD_HIGH_STARS = 15   // TP5 / TP6
     const val PBD_BASE_STARS = 5    // TP1 – TP4
 
@@ -45,18 +45,18 @@ object StarRewards {
     }
 
     /**
-     * Converts RM 10 of canteen savings into stars. [availableSavingsRm] must already have
-     * previous conversions deducted (see [tabungBalance]).
+     * Converts RM 10 of canteen savings into stars. [availableSavingsSen] must already have
+     * previous conversions deducted (see [tabungBalanceSen]).
      */
-    suspend fun convertSavings(dao: SlotifyDao, studentId: String, availableSavingsRm: Double): Boolean {
-        if (availableSavingsRm + 1e-9 < SAVINGS_CONVERSION_RM) return false
+    suspend fun convertSavings(dao: SlotifyDao, studentId: String, availableSavingsSen: Long): Boolean {
+        if (availableSavingsSen < SAVINGS_CONVERSION_SEN) return false
         val next = dao.countClaimsWithPrefixOnce(studentId, RewardKeys.SAVINGS_PREFIX) + 1
         return claimOnce(dao, studentId, RewardKeys.savingsConversion(studentId, next), SAVINGS_CONVERSION_STARS)
     }
 
-    /** Tabung Maya balance: Σ max(0, budget − spent) − RM 10 × conversions. */
-    fun tabungBalance(dailyBudgetRm: Double, spentPerDayRm: List<Double>, conversions: Int): Double {
-        val saved = spentPerDayRm.sumOf { (dailyBudgetRm - it).coerceAtLeast(0.0) }
-        return (saved - conversions * SAVINGS_CONVERSION_RM).coerceAtLeast(0.0)
+    /** Tabung Maya balance in sen: Σ max(0, budget − spent) − RM 10 × conversions. */
+    fun tabungBalanceSen(dailyBudgetSen: Long, spentPerDaySen: List<Long>, conversions: Int): Long {
+        val saved = spentPerDaySen.sumOf { (dailyBudgetSen - it).coerceAtLeast(0L) }
+        return (saved - conversions * SAVINGS_CONVERSION_SEN).coerceAtLeast(0L)
     }
 }

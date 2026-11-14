@@ -75,6 +75,6 @@ Pelan penuh dan status terperinci: [MASTER_DOCUMENTATION.md §13](MASTER_DOCUMEN
 - [x] P1 — Data keluarga dipindahkan ke profil peribadi (git-ignored); PIN PBKDF2 tanpa PIN lalai; ganjaran bintang idempoten.
 - [x] P2 — Skema Room dieksport, `MIGRATION_5_6`, tiada lagi `REPLACE` pada jadual induk; 0 ralat lint.
 - [x] P3 — Pembetulan hari sekolah/hujung minggu, yuran berulang, geofens, OSRM luar talian, kitar hayat peta.
-- [ ] P1-1 — Bersihkan sejarah git sebelum `push` seterusnya.
-- [ ] P4 — ViewModel + NavHost.
+- [x] P1-1 — Sejarah git dibersihkan & di-force-push.
+- [x] P4 — ViewModel + NavHost, wang dalam sen (migrasi 6→7), tetapan DataStore.
 - [ ] P5 — Penyatuan bahasa, aksesibiliti, CI.

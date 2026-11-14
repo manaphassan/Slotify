@@ -23,10 +23,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import my.slotify.app.core.database.StudentEntity
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import my.slotify.app.core.di.SlotifyViewModelFactory
 import my.slotify.app.core.database.PbdAssessmentEntity
-import my.slotify.app.core.database.SlotifyDao
-import my.slotify.app.core.rewards.RewardKeys
-import my.slotify.app.core.rewards.StarRewards
 import my.slotify.app.core.model.KpmSubjectCatalog
 import my.slotify.app.core.designsystem.theme.NeumorphicElevation
 import my.slotify.app.core.designsystem.theme.SlotifyColors
@@ -57,11 +57,12 @@ private fun String.toSessionTypeLabel(): String = when (this) {
 @Composable
 fun StudentProfileScreen(
     students: List<StudentEntity>,
-    selectedStudent: StudentEntity?,
     onSelectStudent: (StudentEntity) -> Unit,
-    onSaveProfile: (StudentEntity) -> Unit,
-    dao: SlotifyDao? = null
+    viewModel: ProfileViewModel = viewModel(factory = SlotifyViewModelFactory)
 ) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val vmMessage by viewModel.message.collectAsStateWithLifecycle()
+    val selectedStudent = state.student
     var showEditDialog by remember { mutableStateOf(false) }
     var showAddPbdDialog by remember { mutableStateOf(false) }
     var pbdCelebrationMessage by remember { mutableStateOf<String?>(null) }
@@ -70,10 +71,10 @@ fun StudentProfileScreen(
     // Fix 1.4: Show/hide toggle for MyKid number — hidden by default for privacy
     var showMyKid by remember { mutableStateOf(false) }
 
-    val assessments by remember(selectedStudent?.id) {
-        if (dao != null && selectedStudent != null) dao.getAssessmentsForStudent(selectedStudent.id)
-        else kotlinx.coroutines.flow.flowOf(emptyList())
-    }.collectAsState(initial = emptyList())
+    val assessments = state.assessments
+    LaunchedEffect(vmMessage) {
+        vmMessage?.let { pbdCelebrationMessage = it; viewModel.consumeMessage() }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -622,34 +623,19 @@ fun StudentProfileScreen(
             student = selectedStudent,
             onDismiss = { showEditDialog = false },
             onConfirm = { updated ->
-                onSaveProfile(updated)
+                viewModel.saveProfile(updated)
                 showEditDialog = false
             }
         )
     }
 
-    if (showAddPbdDialog && selectedStudent != null && dao != null) {
+    if (showAddPbdDialog && selectedStudent != null) {
         AddPbdAssessmentDialog(
             student = selectedStudent,
             onDismiss = { showAddPbdDialog = false },
             onSave = { assessment ->
                 showAddPbdDialog = false
-                coroutineScope.launch {
-                    dao.upsertAssessment(assessment)
-                    // One award per subject per assessment period, however often it is re-recorded.
-                    val stars = StarRewards.pbdStars(assessment.tahapPenguasaan)
-                    val paid = StarRewards.claimOnce(
-                        dao,
-                        assessment.studentId,
-                        RewardKeys.pbd(assessment.studentId, assessment.subjectCode, assessment.assessmentPeriod),
-                        stars
-                    )
-                    pbdCelebrationMessage = if (paid) {
-                        "🎉 TP${assessment.tahapPenguasaan} ${assessment.subjectName} direkodkan! +$stars ⭐"
-                    } else {
-                        "TP${assessment.tahapPenguasaan} ${assessment.subjectName} dikemas kini."
-                    }
-                }
+                viewModel.recordAssessment(assessment)
             }
         )
     }

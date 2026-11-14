@@ -72,6 +72,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.activity.compose.BackHandler
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import my.slotify.app.core.di.SlotifyViewModelFactory
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.widget.Toast
@@ -118,47 +126,37 @@ fun Screen.localizedTitle(): String = when (this) {
 
 class MainActivity : ComponentActivity() {
 
+    /** Deep-link target from the widget / notifications (EXTRA_SCREEN), consumed by the NavHost. */
     private val pendingScreenRoute = mutableStateOf<Screen?>(null)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        val target = intent.getStringExtra("EXTRA_SCREEN") ?: intent.getStringExtra("TARGET_SCREEN")
-        target?.let { parseScreenTarget(it)?.let { s -> pendingScreenRoute.value = s } }
+        screenFromIntent(intent)?.let { pendingScreenRoute.value = it }
     }
 
-    private fun parseScreenTarget(target: String): Screen? = when (target.uppercase()) {
-        "LOGISTICS" -> Screen.LOGISTICS
-        "TIMETABLE" -> Screen.TIMETABLE
-        "REWARDS" -> Screen.REWARDS
-        "FINANCE" -> Screen.FINANCE
-        "PROFILES" -> Screen.PROFILES
-        "DASHBOARD" -> Screen.DASHBOARD
-        else -> null
+    private fun screenFromIntent(intent: Intent?): Screen? {
+        val target = intent?.getStringExtra("EXTRA_SCREEN") ?: intent?.getStringExtra("TARGET_SCREEN") ?: return null
+        return Screen.entries.firstOrNull { it.name.equals(target, ignoreCase = true) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Fix 1.2: Only schedule alarms if notification permission is already granted.
-        // The runtime request is issued inside setContent via rememberLauncherForActivityResult.
+        // Only schedule alarms if notification permission is already granted; the runtime
+        // request is issued inside setContent.
         SlotifyNotificationManager.createNotificationChannels(this)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-            == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         ) {
             SlotifyNotificationManager.scheduleDailyReminders(this)
         }
-
-        val database = (application as SlotifyApplication).database
-        val dao = database.slotifyDao()
+        if (savedInstanceState == null) pendingScreenRoute.value = screenFromIntent(intent)
 
         setContent {
-            var appThemeMode by rememberSaveable { mutableStateOf(AppThemeMode.LIGHT) }
-            val isDarkMode = appThemeMode != AppThemeMode.LIGHT
-            var appLanguage by rememberSaveable { mutableStateOf(AppLanguage.BM) }
+            val mainViewModel: MainViewModel = viewModel(factory = SlotifyViewModelFactory)
+            val ui by mainViewModel.uiState.collectAsStateWithLifecycle()
 
-            // Fix 1.2: Runtime notification permission request (Android 13+ / API 33+)
             val notifPermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestPermission()
             ) { granted ->
@@ -173,17 +171,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Location permission for LogisticsMapScreen. FINE must be requested together with
-            // COARSE on Android 12+; either grant is enough to show the user's position.
+            // FINE must be requested together with COARSE on Android 12+; either grant is enough.
             fun hasLocationPermission(): Boolean =
-                ContextCompat.checkSelfPermission(
-                    this@MainActivity,
-                    Manifest.permission.ACCESS_FINE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED ||
-                        ContextCompat.checkSelfPermission(
-                            this@MainActivity,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED
+                ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                    ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
             var locationGranted by remember { mutableStateOf(hasLocationPermission()) }
             val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -195,78 +186,53 @@ class MainActivity : ComponentActivity() {
                 onPauseOrDispose { }
             }
 
-            val cycleTheme: () -> Unit = {
-                appThemeMode = when (appThemeMode) {
-                    AppThemeMode.LIGHT -> AppThemeMode.DARK
-                    AppThemeMode.DARK -> AppThemeMode.NORD
-                    AppThemeMode.NORD -> AppThemeMode.LIGHT
-                }
-            }
-
-            CompositionLocalProvider(LocalAppLanguage provides appLanguage) {
-                SlotifyTheme(themeMode = appThemeMode) {
+            CompositionLocalProvider(LocalAppLanguage provides ui.language) {
+                SlotifyTheme(themeMode = ui.themeMode) {
                     val coroutineScope = rememberCoroutineScope()
                     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+                    val navController = rememberNavController()
+                    val backStackEntry by navController.currentBackStackEntryAsState()
+                    val currentScreen = backStackEntry?.destination?.route
+                        ?.let { route -> Screen.entries.firstOrNull { it.name == route } } ?: Screen.DASHBOARD
+                    var fabExpanded by rememberSaveable { mutableStateOf(false) }
 
-                    val initialTarget =
-                        intent?.getStringExtra("EXTRA_SCREEN") ?: intent?.getStringExtra("TARGET_SCREEN")
-                    val initialScreen = initialTarget?.let { parseScreenTarget(it) } ?: Screen.DASHBOARD
-                    var currentScreen by rememberSaveable { mutableStateOf(initialScreen) }
+                    // Top-level navigation: one entry per tab on top of Dashboard, so Back from any
+                    // tab returns to Dashboard and Back on Dashboard exits.
+                    val navigateTo: (Screen) -> Unit = { screen ->
+                        fabExpanded = false
+                        if (screen != currentScreen) {
+                            navController.navigate(screen.name) {
+                                popUpTo(Screen.DASHBOARD.name) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    }
 
                     LaunchedEffect(pendingScreenRoute.value) {
                         pendingScreenRoute.value?.let { screen ->
-                            currentScreen = screen
+                            navigateTo(screen)
                             pendingScreenRoute.value = null
                         }
                     }
 
-                    var fabExpanded by remember { mutableStateOf(false) }
-
-                    val students by dao.getAllStudents().collectAsState(initial = emptyList())
-                    // Track the selection by id and derive the entity from the live students Flow,
-                    // so balance updates appear immediately and async reloads can't switch child.
-                    var selectedStudentId by rememberSaveable { mutableStateOf<String?>(null) }
-                    val selectedStudent: StudentEntity? =
-                        students.find { it.id == selectedStudentId } ?: students.firstOrNull()
-                    val selectStudent: (StudentEntity) -> Unit = { selectedStudentId = it.id }
-
-                    // Wire sessions + slots to real DB with dual-session cycling support
-                    val studentSessions by remember(selectedStudent?.id) {
-                        if (selectedStudent != null)
-                            dao.getSessionsForStudent(selectedStudent!!.id)
-                        else
-                            kotlinx.coroutines.flow.flowOf(emptyList())
-                    }.collectAsState(initial = emptyList())
-
-                    // Track which session is currently shown — reset to 0 when student changes
-                    var activeSessionIndex by rememberSaveable(selectedStudent?.id) { mutableStateOf(0) }
-                    val activeSession = studentSessions.getOrNull(
-                        activeSessionIndex.coerceIn(0, (studentSessions.size - 1).coerceAtLeast(0))
-                    )
-
-                    val slots by remember(activeSession) {
-                        if (activeSession != null)
-                            dao.getAllSlotsForSession(activeSession.id)
-                        else
-                            kotlinx.coroutines.flow.flowOf(emptyList())
-                    }.collectAsState(initial = emptyList())
-
+                    val isDarkMode = ui.themeMode != AppThemeMode.LIGHT
                     ModalNavigationDrawer(
                         drawerState = drawerState,
                         drawerContent = {
                             SlotifyDrawerSheet(
                                 currentScreen = currentScreen,
-                                students = students,
-                                selectedStudent = selectedStudent,
+                                students = ui.students,
+                                selectedStudent = ui.selectedStudent,
                                 isDarkMode = isDarkMode,
-                                appThemeMode = appThemeMode,
-                                appLanguage = appLanguage,
-                                onToggleTheme = cycleTheme,
-                                onSelectTheme = { appThemeMode = it },
-                                onSelectLanguage = { appLanguage = it },
-                                onSelectStudent = selectStudent,
+                                appThemeMode = ui.themeMode,
+                                appLanguage = ui.language,
+                                onToggleTheme = mainViewModel::cycleTheme,
+                                onSelectTheme = mainViewModel::setTheme,
+                                onSelectLanguage = mainViewModel::setLanguage,
+                                onSelectStudent = mainViewModel::selectStudent,
                                 onSelectScreen = { screen ->
-                                    currentScreen = screen
+                                    navigateTo(screen)
                                     coroutineScope.launch { drawerState.close() }
                                 }
                             )
@@ -276,19 +242,13 @@ class MainActivity : ComponentActivity() {
                             topBar = {
                                 SlotifyTopBar(
                                     currentScreen = currentScreen,
-                                    selectedStudent = selectedStudent,
+                                    selectedStudent = ui.selectedStudent,
                                     isDarkMode = isDarkMode,
-                                    appThemeMode = appThemeMode,
-                                    onToggleTheme = cycleTheme,
-                                    onOpenDrawer = {
-                                        coroutineScope.launch { drawerState.open() }
-                                    },
-                                    onOpenProfile = {
-                                        currentScreen = Screen.PROFILES
-                                    },
-                                    onOpenRewards = {
-                                        currentScreen = Screen.REWARDS
-                                    }
+                                    appThemeMode = ui.themeMode,
+                                    onToggleTheme = mainViewModel::cycleTheme,
+                                    onOpenDrawer = { coroutineScope.launch { drawerState.open() } },
+                                    onOpenProfile = { navigateTo(Screen.PROFILES) },
+                                    onOpenRewards = { navigateTo(Screen.REWARDS) }
                                 )
                             },
                             floatingActionButton = {
@@ -296,86 +256,58 @@ class MainActivity : ComponentActivity() {
                                     isExpanded = fabExpanded,
                                     onToggleExpand = { fabExpanded = !fabExpanded },
                                     currentScreen = currentScreen,
-                                    onNavigate = { screen ->
-                                        currentScreen = screen
-                                        fabExpanded = false
-                                    },
-                                    onToggleTheme = cycleTheme,
-                                    onToggleLanguage = {
-                                        appLanguage =
-                                            if (appLanguage == AppLanguage.BM) AppLanguage.EN else AppLanguage.BM
-                                    },
+                                    onNavigate = navigateTo,
+                                    onToggleTheme = mainViewModel::cycleTheme,
+                                    onToggleLanguage = mainViewModel::toggleLanguage,
                                     isDarkMode = isDarkMode,
-                                    appThemeMode = appThemeMode,
-                                    appLanguage = appLanguage
+                                    appThemeMode = ui.themeMode,
+                                    appLanguage = ui.language
                                 )
                             },
                             floatingActionButtonPosition = FabPosition.End
                         ) { innerPadding ->
-                            Box(
+                            NavHost(
+                                navController = navController,
+                                startDestination = Screen.DASHBOARD.name,
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .padding(innerPadding)
                             ) {
-                                when (currentScreen) {
-                                    Screen.DASHBOARD -> TodayDashboardScreen(
-                                        students = students,
-                                        selectedStudent = selectedStudent,
-                                        dao = dao,
-                                        onSelectStudent = selectStudent
+                                composable(Screen.DASHBOARD.name) {
+                                    TodayDashboardScreen(
+                                        students = ui.students,
+                                        onSelectStudent = mainViewModel::selectStudent
                                     )
-
-                                    Screen.TIMETABLE -> TimetableScreen(
-                                        selectedStudent = selectedStudent,
-                                        slots = slots,
-                                        sessions = studentSessions,
-                                        activeSessionIndex = activeSessionIndex,
-                                        onToggleYearInversion = {
-                                            if (studentSessions.size > 1) {
-                                                activeSessionIndex = (activeSessionIndex + 1) % studentSessions.size
-                                            }
-                                        },
-                                        dao = dao,
-                                        session = activeSession
-                                    )
-                                    // Fix 1.3: Request location on first visit to the Logistics tab
-                                    Screen.LOGISTICS -> {
-                                        LaunchedEffect(Unit) {
-                                            if (!locationGranted) {
-                                                locationPermissionLauncher.launch(
-                                                    arrayOf(
-                                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                                    )
+                                }
+                                composable(Screen.TIMETABLE.name) { TimetableScreen() }
+                                composable(Screen.LOGISTICS.name) {
+                                    // Request location on first visit to the Logistics tab
+                                    LaunchedEffect(Unit) {
+                                        if (!locationGranted) {
+                                            locationPermissionLauncher.launch(
+                                                arrayOf(
+                                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                                    Manifest.permission.ACCESS_COARSE_LOCATION
                                                 )
-                                            }
+                                            )
                                         }
-                                        LogisticsMapScreen(locationGranted = locationGranted)
                                     }
-
-                                    Screen.REWARDS -> RewardVaultScreen(
-                                        selectedStudent = selectedStudent,
-                                        dao = dao
-                                    )
-
-                                    Screen.FINANCE -> FinanceScreen(
-                                        selectedStudent = selectedStudent,
-                                        dao = dao
-                                    )
-
-                                    Screen.PROFILES -> StudentProfileScreen(
-                                        students = students,
-                                        selectedStudent = selectedStudent,
-                                        onSelectStudent = selectStudent,
-                                        onSaveProfile = { updated ->
-                                            coroutineScope.launch {
-                                                dao.updateStudent(updated)
-                                            }
-                                        },
-                                        dao = dao
+                                    LogisticsMapScreen(locationGranted = locationGranted)
+                                }
+                                composable(Screen.REWARDS.name) { RewardVaultScreen() }
+                                composable(Screen.FINANCE.name) { FinanceScreen() }
+                                composable(Screen.PROFILES.name) {
+                                    StudentProfileScreen(
+                                        students = ui.students,
+                                        onSelectStudent = mainViewModel::selectStudent
                                     )
                                 }
                             }
+
+                            // Registered after NavHost so they take priority over its back
+                            // handling: Back closes the drawer / speed-dial before popping a screen.
+                            BackHandler(enabled = drawerState.isOpen) { coroutineScope.launch { drawerState.close() } }
+                            BackHandler(enabled = fabExpanded) { fabExpanded = false }
                         }
                     }
                 }

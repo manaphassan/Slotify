@@ -112,7 +112,7 @@ interface SlotifyDao {
     fun getExamsForStudent(studentId: String): Flow<List<ExamEntity>>
 
     // ── Finance ──────────────────────────────────────────────────────────────
-    @Query("SELECT * FROM commitment_fees WHERE billingMonth = :billingMonth ORDER BY isPaid ASC, amountRm DESC")
+    @Query("SELECT * FROM commitment_fees WHERE billingMonth = :billingMonth ORDER BY isPaid ASC, amountSen DESC")
     fun getFeesForMonth(billingMonth: String): Flow<List<CommitmentFeeEntity>>
 
     @Query("SELECT COUNT(*) FROM commitment_fees WHERE billingMonth = :billingMonth")

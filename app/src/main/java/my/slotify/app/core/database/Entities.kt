@@ -21,7 +21,8 @@ data class StudentEntity(
     val vanDriverName: String?,
     val vanDriverPhone: String?,
     val starCoinsBalance: Int = 50,
-    val dailyCanteenBudget: Double = 5.00,
+    /** Daily canteen allowance in sen (RM 5.00 = 500). */
+    val dailyCanteenBudgetSen: Long = 500,
     val myKid: String = "",
     val heightCm: Double = 0.0,
     val weightKg: Double = 0.0,
@@ -161,7 +162,7 @@ data class CommitmentFeeEntity(
     @PrimaryKey val id: String,         // "<seriesId>_<yyyy-MM>" for recurring fees
     val title: String,
     val childTarget: String,
-    val amountRm: Double,
+    val amountSen: Long,                // RM 80.00 = 8000
     val dueDateLabel: String,           // "1hb Setiap Bulan"
     val billingMonth: String,           // "2026-09"
     val isPaid: Boolean = false,
@@ -182,7 +183,7 @@ data class CommitmentFeeEntity(
 data class DailySpendingEntity(
     val studentId: String,
     val dateKey: String,                // "2026-09-30"
-    val spentAmountRm: Double = 0.0
+    val spentSen: Long = 0
 )
 
 /**

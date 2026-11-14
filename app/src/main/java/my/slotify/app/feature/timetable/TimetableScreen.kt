@@ -26,7 +26,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.launch
 import my.slotify.app.core.database.SchoolSessionEntity
-import my.slotify.app.core.database.SlotifyDao
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import my.slotify.app.core.di.SlotifyViewModelFactory
 import my.slotify.app.core.database.StudentEntity
 import my.slotify.app.core.database.TimetableSlotEntity
 import my.slotify.app.core.designsystem.theme.NeumorphicElevation
@@ -52,14 +54,14 @@ enum class TimetableViewMode {
 
 @Composable
 fun TimetableScreen(
-    selectedStudent: StudentEntity?,
-    slots: List<TimetableSlotEntity>,
-    onToggleYearInversion: () -> Unit,
-    dao: SlotifyDao? = null,
-    session: SchoolSessionEntity? = null,
-    sessions: List<SchoolSessionEntity> = emptyList(),
-    activeSessionIndex: Int = 0
+    viewModel: TimetableViewModel = viewModel(factory = SlotifyViewModelFactory)
 ) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val selectedStudent = state.student
+    val slots = state.slots
+    val session = state.activeSession
+    val sessions = state.sessions
+    val onToggleYearInversion: () -> Unit = viewModel::nextSession
     val liveNow by rememberNow()
     val today = liveNow.toLocalDate()
     val todayDow: Int? = SchoolDay.of(today)
@@ -67,7 +69,6 @@ fun TimetableScreen(
     var viewMode by remember { mutableStateOf(TimetableViewMode.DAY) }
     var selectedDay by rememberSaveable { mutableIntStateOf(todayDow ?: SchoolDay.MONDAY) }
     var showAddSlotDialog by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
 
     // Optional time preview (null = live clock).
     var simulatedMinutes by remember { mutableStateOf<Int?>(null) }
@@ -156,7 +157,7 @@ fun TimetableScreen(
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         // Add Slot FAB-style button (only when DB is available)
-                        if (dao != null && session != null) {
+                        if (session != null) {
                             IconButton(
                                 onClick = { showAddSlotDialog = true },
                                 modifier = Modifier
@@ -309,10 +310,8 @@ fun TimetableScreen(
                         items(currentSlots, key = { it.id }) { slot ->
                             TimetableSlotCard(
                                 slot = slot,
-                                canDelete = dao != null && session != null,
-                                onDelete = {
-                                    coroutineScope.launch { dao?.deleteSlot(slot) }
-                                }
+                                canDelete = session != null,
+                                onDelete = { viewModel.deleteSlot(slot) }
                             )
                         }
                     }
@@ -335,17 +334,15 @@ fun TimetableScreen(
         }
 
         // Add Slot Dialog
-        if (showAddSlotDialog && dao != null && session != null) {
+        if (showAddSlotDialog && session != null) {
             AddSlotDialog(
                 session = session,
                 preselectedDay = selectedDay,
                 existingSlotsCount = currentSlots.size,
                 onDismiss = { showAddSlotDialog = false },
                 onConfirm = { newSlot ->
-                    coroutineScope.launch {
-                        dao.insertSlots(listOf(newSlot))
-                        showAddSlotDialog = false
-                    }
+                    viewModel.addSlot(newSlot)
+                    showAddSlotDialog = false
                 }
             )
         }

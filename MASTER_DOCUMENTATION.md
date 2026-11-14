@@ -4,7 +4,7 @@
 > **Tagline:** *"Susun Waktu Anak, Tenang Sepanjang Hari"* / *"Slotify your day. Plan smarter, slot better."*
 > **Platform:** Native Android (Kotlin 2.0.21 & Jetpack Compose, Min SDK 26, Target SDK 35)
 > **Package Name / Application ID:** `my.slotify.app`
-> **Architecture (current):** Single-module app, Compose screens with direct DAO access (see §2 and §13 for the target MVVM refactor)
+> **Architecture:** Single-module MVVM — Compose screens ➜ feature ViewModels (`StateFlow`) ➜ repositories ➜ Room / DataStore, with Navigation Compose
 > **Data Philosophy:** 🔒 Local-First, Privacy-Focused (user owns all data on-device; personal seed data never committed — see §11)
 > **Map & Routing Engine:** OpenStreetMap via `osmdroid` + OSRM Driving API
 > **UI Style:** Tactile Neumorphic Soft UI (Dual-Shadow Canvas Shaders + Pastel KPM Palettes)
@@ -42,48 +42,48 @@ Malaysian primary school households with children attending **Sekolah Kebangsaan
 
 ## 🏛️ 2. System Architecture & Tech Stack
 
-### 2.1 Current architecture (as built)
+### 2.1 Architecture
 
 ```mermaid
 flowchart TD
     subgraph UI ["Presentation (Jetpack Compose)"]
-        M["MainActivity (manual screen switch)"]
-        A1["TodayDashboardScreen"]
-        A2["TimetableScreen"]
-        A3["LogisticsMapScreen"]
-        A4["RewardVaultScreen"]
-        A5["FinanceScreen"]
-        A6["StudentProfileScreen"]
+        M["MainActivity: Scaffold + NavHost + BackHandler"]
+        S["Screens: Dashboard, Timetable, Logistics, Rewards, Finance, Profile"]
     end
 
-    subgraph Core ["Core helpers (objects)"]
-        B1["StarRewards (idempotent claims)"]
-        B2["PinManager (PBKDF2 + lockout)"]
-        B3["FeeRepository (monthly rollover)"]
-        B4["GeofenceManager / OsrmRoutingService"]
-        B5["FamilyProfile (demo or private)"]
+    subgraph VM ["ViewModels (StateFlow, survive rotation)"]
+        V0["MainViewModel (selection, theme, language)"]
+        V1["Dashboard / Timetable / Rewards / Finance / Profile / Logistics ViewModels"]
+    end
+
+    subgraph Repo ["Repositories (core/data)"]
+        R1["StudentRepository"]
+        R2["RewardsRepository + SchoolworkRepository"]
+        R3["FinanceRepository"]
+        R4["SettingsRepository (DataStore)"]
     end
 
     subgraph Data ["Data (local-first)"]
-        C1["Room: SlotifyDatabase (v6, exported schemas)"]
-        C2["SharedPreferences (PIN, POIs, widget, bag flags)"]
+        C1["Room: SlotifyDatabase (v7, exported schemas)"]
+        C2["DataStore + SharedPreferences (PIN, POIs, widget)"]
         C3["WorkManager + AlarmManager"]
         C4["OSRM HTTP API / OSM tiles"]
     end
 
-    M --> A1 & A2 & A3 & A4 & A5 & A6
-    UI --> Core
-    UI --> C1
-    Core --> Data
+    M --> S --> VM --> Repo --> Data
 ```
 
-There are **no ViewModels or use-case classes yet**: screens receive the `SlotifyDao` directly. The refactor to MVVM is tracked as **P4** in §13.
+- **Dependency wiring:** `core/di/AppContainer` (created once in `SlotifyApplication`) builds repositories; `SlotifyViewModelFactory` creates every ViewModel. Screens obtain theirs with `viewModel(factory = SlotifyViewModelFactory)`, scoped to the navigation destination.
+- **Shared selection:** the selected student is persisted in DataStore and exposed by `StudentRepository.selectedStudent`, so every ViewModel observes the same child without passing it through the UI.
+- **Navigation:** each tab is a `NavHost` destination stacked on Dashboard (`popUpTo(DASHBOARD)` + `saveState/restoreState`). Back closes the drawer / speed-dial first, then returns to Dashboard, then exits. Widget and notification deep links use the `EXTRA_SCREEN` extra.
+- **Still in the UI layer:** map rendering, GPS, TTS and the vehicle simulation in `LogisticsMapScreen` (Android-view and sensor bound); dialogs' local form state.
 
 ### 2.2 Technical Stack Matrix
 - **Language:** Kotlin 2.0.21 (Coroutines & Flow)
 - **UI Toolkit:** Jetpack Compose (Material3 + custom neumorphic modifiers)
-- **Dependency Injection:** None (manual singletons via `SlotifyApplication` / `SlotifyDatabase.getDatabase`)
-- **Local Persistence:** Room 2.6.1 + SQLite, schemas exported to `app/schemas/`
+- **Dependency Injection:** Manual (`AppContainer` + `SlotifyViewModelFactory`)
+- **Settings:** Jetpack DataStore Preferences 1.1.1 (theme, language, selected student)
+- **Local Persistence:** Room 2.6.1 + SQLite (schema v7), schemas exported to `app/schemas/`
 - **Background Tasks:** WorkManager 2.10.0 (widget refresh, geofence monitor) + AlarmManager (daily reminders)
 - **Routing & Distance:** OSRM driving API + OkHttp 4.12
 - **Map Rendering:** `osmdroid-android:6.1.20`
@@ -218,8 +218,11 @@ Redemption uses a single conditional SQL update (`… SET starCoinsBalance = sta
 
 ## 💰 8. Canteen Allowance & Fee Management
 
+### 8.0 Money representation
+All amounts are stored as whole **sen** in `Long` columns (`dailyCanteenBudgetSen`, `amountSen`, `spentSen`; RM 1.00 = 100). Use `core/model/Money` to format (`Money.format(1250)` → `"RM 12.50"`) and parse user input. This removes floating-point drift from repeated ±RM 0.50 adjustments.
+
 ### 8.1 Daily canteen flow
-- Each student has a `dailyCanteenBudget`. Spending is stored per student per day in `daily_spending`.
+- Each student has a `dailyCanteenBudgetSen`. Spending is stored per student per day in `daily_spending`.
 - **Tabung Maya** = Σ max(0, budget − spent) over all recorded days − RM 10 × (number of savings conversions). There is no synthetic starting balance.
 
 ### 8.2 Recurring fees
@@ -231,8 +234,12 @@ Redemption uses a single conditional SQL update (`… SET starCoinsBalance = sta
 
 ## 🗄️ 9. Room Database Schema & Migrations
 
-- **Current version:** 6. Schemas are exported to `app/schemas/my.slotify.app.core.database.SlotifyDatabase/` and must be committed.
-- **Migrations:** `SlotifyMigrations.MIGRATION_5_6` adds `reward_claims` and the fee `seriesId` / `isRecurring` columns. Destructive fallback is only allowed from pre-release versions 1–4.
+- **Current version:** 7. Schemas are exported to `app/schemas/my.slotify.app.core.database.SlotifyDatabase/` and must be committed.
+- **Migrations:**
+  - `MIGRATION_5_6` adds `reward_claims` and the fee `seriesId` / `isRecurring` columns.
+  - `MIGRATION_6_7` converts money to sen by rebuilding `students`, `commitment_fees` and `daily_spending` (create-copy-drop-rename). It compares row counts of every table before/after and runs `PRAGMA foreign_key_check`; any mismatch throws, which rolls the upgrade transaction back with data intact.
+  - Destructive fallback is only allowed from pre-release versions 1–4.
+  - `SlotifyMigrationTest` (instrumented) covers both migrations: `./gradlew connectedDebugAndroidTest`.
 - **Never use `OnConflictStrategy.REPLACE` on parent tables** (`students`, `school_sessions`): SQLite implements REPLACE as delete + insert, which fires `ON DELETE CASCADE` and wipes children. Parent writes use `@Upsert`; seeding uses `INSERT OR IGNORE`.
 
 ```mermaid
@@ -251,7 +258,7 @@ erDiagram
         string fullName
         string nickname
         int starCoinsBalance
-        double dailyCanteenBudget
+        long dailyCanteenBudgetSen
     }
     SCHOOL_SESSION {
         string id PK
@@ -273,7 +280,7 @@ erDiagram
         string billingMonth
         boolean isRecurring
         boolean isPaid
-        double amountRm
+        long amountSen
     }
     REWARD_CLAIM {
         string claimKey PK
@@ -366,11 +373,11 @@ Status legend: ✅ Done · 🔄 In progress · ⏳ Planned
 ### P4 — Architecture (next phase)
 | ID | Finding | Fix | Status |
 |---|---|---|:---:|
-| P4-1 | No ViewModels; DAO and business logic in composables; 1,000–2,700-line files | Feature ViewModels + repositories exposing `StateFlow` | ⏳ |
-| P4-2 | Navigation Compose declared but unused; Back always exits | `NavHost` + `BackHandler` for overlays | ⏳ |
-| P4-3 | Logistics waypoint resolution duplicated 3×; overlays rebuilt every recomposition | Single route resolver; diff overlays | ⏳ |
-| P4-4 | Money stored as `Double` | Store sen as `Long` (migration) | ⏳ |
-| P4-5 | Theme / language not persisted | DataStore-backed settings | ⏳ |
+| P4-1 | No ViewModels; DAO and business logic in composables; 1,000–2,700-line files | Feature ViewModels + repositories exposing `StateFlow` | ✅ |
+| P4-2 | Navigation Compose declared but unused; Back always exits | `NavHost` + `BackHandler` for overlays | ✅ |
+| P4-3 | Logistics waypoint resolution duplicated 3×; overlays rebuilt every recomposition | Single route resolver; diff overlays | ✅ |
+| P4-4 | Money stored as `Double` | Store sen as `Long` (migration) | ✅ |
+| P4-5 | Theme / language not persisted | DataStore-backed settings | ✅ |
 
 ### P5 — Quality
 | ID | Finding | Fix | Status |
@@ -392,6 +399,16 @@ Still open:
 - **P1-1:** history rewritten locally on 2026-11-14 with `git filter-repo` (names, places, coordinates, phone/MyKid numbers replaced in every revision and commit message; ICS timetables, screenshots and UI dumps removed). Force-pushed to GitHub on 2026-11-14 (`main` + tags). If the repo was ever public, request a cache purge from GitHub Support; old clones must be re-cloned.
 - **P3-12 follow-up:** the map still lives inside a `LazyColumn` item; overlays are now released correctly, but moving it out is part of P4-3.
 - **P3-9 follow-up:** background location is not requested; geofence/widget GPS stays off until a deliberate opt-in flow is built.
+
+**2026-11-14 — P4 implemented.** Verified with `./gradlew testDebugUnitTest compileDebugAndroidTestKotlin lintDebug` (private) and `./gradlew -PslotifyProfile=demo testDebugUnitTest assembleRelease`:
+- Unit tests: **55/55 passing** (adds `MoneyTest`; finance tests now in sen). Lint: **0 errors**.
+- P4-1: ViewModels for every screen; repositories in `core/data`; screens no longer receive the DAO.
+- P4-2: `NavHost` with a Dashboard-rooted back stack; `BackHandler` for drawer and speed-dial.
+- P4-3: single `resolveRouteWaypoints`; OSRM routing and POIs moved to `LogisticsViewModel` (stale requests cancelled); the map is outside the `LazyColumn`; overlays are rebuilt only when their inputs change and simulation ticks move just the vehicle marker.
+- P4-4: money in sen + `MIGRATION_6_7` (instrumented test written; needs a device).
+- P4-5: theme, language and selected student persisted with DataStore.
+
+Remaining follow-ups: the Focus timer is still an in-screen overlay rather than a `Dialog`; screens are still long files (split into smaller composables opportunistically).
 
 ### Execution order
 1. **P1 + P2** — privacy, security and data-loss fixes (blocking any further push).

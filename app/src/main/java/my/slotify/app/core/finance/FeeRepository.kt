@@ -2,6 +2,7 @@ package my.slotify.app.core.finance
 
 import my.slotify.app.core.database.CommitmentFeeEntity
 import my.slotify.app.core.database.SlotifyDao
+import my.slotify.app.core.model.Money
 import my.slotify.app.core.profile.FeeTemplate
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -30,7 +31,7 @@ object FeeRepository {
         id = feeId(t.seriesId, billingMonth),
         title = t.title,
         childTarget = t.childTarget,
-        amountRm = t.amountRm,
+        amountSen = Money.fromRm(t.amountRm),
         dueDateLabel = t.dueDateLabel,
         billingMonth = billingMonth,
         isPaid = false,

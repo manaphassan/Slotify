@@ -18,7 +18,7 @@ import androidx.room.RoomDatabase
         PbdAssessmentEntity::class,
         RewardClaimEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class SlotifyDatabase : RoomDatabase() {

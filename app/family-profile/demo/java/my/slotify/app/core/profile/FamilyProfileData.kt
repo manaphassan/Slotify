@@ -36,21 +36,21 @@ object FamilyProfileData : FamilyProfile {
             avatarEmoji = "👦", primarySchoolName = "SK Taman Contoh", secondarySchoolName = "SRA Taman Contoh",
             sessionType = "DUAL_SRA_SK", academicYearShift = "YEAR_4_STANDARD",
             vanDriverName = "Van Sekolah A", vanDriverPhone = "+60100000001",
-            starCoinsBalance = 50, dailyCanteenBudget = 5.00, age = 10, className = "4 Bestari"
+            starCoinsBalance = 50, dailyCanteenBudgetSen = 500, age = 10, className = "4 Bestari"
         ),
         StudentEntity(
             id = CHILD_B, fullName = "Aisyah Binti Ahmad", nickname = "Aisyah", currentLevel = "Darjah 2",
             avatarEmoji = "👧", primarySchoolName = "SRAI Bukit Contoh", secondarySchoolName = null,
             sessionType = "INTEGRATED_SRAISM", academicYearShift = "SRAISM_COMBINED",
             vanDriverName = "Van Sekolah B", vanDriverPhone = "+60100000002",
-            starCoinsBalance = 40, dailyCanteenBudget = 4.00, age = 8, className = "2 Cemerlang"
+            starCoinsBalance = 40, dailyCanteenBudgetSen = 400, age = 8, className = "2 Cemerlang"
         ),
         StudentEntity(
             id = CHILD_C, fullName = "Danial Bin Ahmad", nickname = "Danial", currentLevel = "Tadika 5Y",
             avatarEmoji = "🧒", primarySchoolName = "Tadika Ceria", secondarySchoolName = null,
             sessionType = "TADIKA_DAYCARE", academicYearShift = "TADIKA_STANDARD",
             vanDriverName = "Dihantar Ibu Bapa", vanDriverPhone = null,
-            starCoinsBalance = 30, dailyCanteenBudget = 0.0, age = 5, className = "Tadika 5 Tahun"
+            starCoinsBalance = 30, dailyCanteenBudgetSen = 0, age = 5, className = "Tadika 5 Tahun"
         )
     )
 

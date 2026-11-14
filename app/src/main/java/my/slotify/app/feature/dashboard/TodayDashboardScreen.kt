@@ -49,6 +49,9 @@ import my.slotify.app.core.model.AttireGuide
 import my.slotify.app.core.profile.FamilyProfileData
 import my.slotify.app.core.rewards.RewardKeys
 import my.slotify.app.core.rewards.StarRewards
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import my.slotify.app.core.di.SlotifyViewModelFactory
 import my.slotify.app.core.time.ExamDates
 import my.slotify.app.core.time.SchoolDay
 import my.slotify.app.core.time.rememberNow
@@ -64,67 +67,38 @@ enum class TaskFilter {
 @Composable
 fun TodayDashboardScreen(
     students: List<StudentEntity>,
-    selectedStudent: StudentEntity?,
-    dao: SlotifyDao? = null,
-    onSelectStudent: (StudentEntity) -> Unit
+    onSelectStudent: (StudentEntity) -> Unit,
+    viewModel: DashboardViewModel = viewModel(factory = SlotifyViewModelFactory)
 ) {
-    val coroutineScope = rememberCoroutineScope()
-    val dashboardContext = LocalContext.current
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedFilter by remember { mutableStateOf(TaskFilter.ALL) }
     var showFocusDialog by remember { mutableStateOf(false) }
     var showTakwimDialog by remember { mutableStateOf(false) }
     var showAddHomeworkDialog by remember { mutableStateOf(false) }
     var showSchoolBagDialog by remember { mutableStateOf(false) }
 
-    val studentId = selectedStudent?.id
     val now by rememberNow()
-    val today = now.toLocalDate()
+    LaunchedEffect(now.toLocalDate()) { viewModel.setToday(now.toLocalDate()) }
 
-    // Flows are created once per key (not on every recomposition).
-    val tasks by remember(dao, studentId) {
-        if (dao == null || studentId == null) flowOf(emptyList()) else dao.getHomeworkTasksForStudent(studentId)
-    }.collectAsState(initial = emptyList())
-
-    val exams by remember(dao, studentId) {
-        if (dao == null || studentId == null) flowOf(emptyList()) else dao.getExamsForStudent(studentId)
-    }.collectAsState(initial = emptyList())
+    val selectedStudent = state.student
+    val tasks = state.tasks
+    val exams = state.exams
+    val today = state.today
+    // School-day convention: 1=Isnin..5=Jumaat, null on weekends (no "today" timetable).
+    val todayDayOfWeek: Int? = state.todaySchoolDay
+    val nextSchoolDayOfWeek: Int = state.nextSchoolDay
+    // All of the student's sessions (e.g. SRA pagi + SK petang), ordered by start time.
+    val todaySlots = state.todaySlots
+    val tomorrowSlots = state.nextDaySlots
+    // Bag-packed state is the persisted reward claim for today (shared with the checklist dialog).
+    val bagPacked = state.bagPacked
+    fun claimBagPacked() = viewModel.markBagPacked()
 
     val filteredTasks = when (selectedFilter) {
         TaskFilter.ALL -> tasks
         TaskFilter.PENDING -> tasks.filter { !it.isCompleted }
         TaskFilter.COMPLETED -> tasks.filter { it.isCompleted }
     }
-
-    // School-day convention: 1=Isnin..5=Jumaat, null on weekends (no "today" timetable).
-    val todayDayOfWeek: Int? = SchoolDay.of(today)
-    val nextSchoolDayOfWeek: Int = SchoolDay.nextAfter(today)
-
-    // All of the student's sessions (e.g. SRA pagi + SK petang), ordered by start time.
-    val todaySlots by remember(dao, studentId, todayDayOfWeek) {
-        if (dao == null || studentId == null || todayDayOfWeek == null) flowOf(emptyList())
-        else dao.getStudentSlotsForDay(studentId, todayDayOfWeek)
-    }.collectAsState(initial = emptyList())
-
-    val tomorrowSlots by remember(dao, studentId, nextSchoolDayOfWeek) {
-        if (dao == null || studentId == null) flowOf(emptyList())
-        else dao.getStudentSlotsForDay(studentId, nextSchoolDayOfWeek)
-    }.collectAsState(initial = emptyList())
-
-    // Bag-packed state is the persisted reward claim for today (shared with the checklist dialog).
-    val bagClaimKey = studentId?.let { RewardKeys.bagPacked(it, today) }
-    val bagPacked by remember(dao, bagClaimKey) {
-        if (dao == null || bagClaimKey == null) flowOf(false) else dao.isClaimed(bagClaimKey)
-    }.collectAsState(initial = false)
-
-    fun claimBagPacked() {
-        val s = selectedStudent ?: return
-        val d = dao ?: return
-        coroutineScope.launch {
-            SchoolBagHelper.setBagPackedToday(dashboardContext, s.id, true)
-            StarRewards.claimOnce(d, s.id, RewardKeys.bagPacked(s.id, today), StarRewards.BAG_PACKED_STARS)
-        }
-    }
-
 
     Box(
         modifier = Modifier
@@ -542,21 +516,7 @@ fun TodayDashboardScreen(
                                         .fillMaxWidth()
                                         .clip(SlotifyShapes.Medium)
                                         .background(SlotifyColors.CanvasBase)
-                                        .clickable {
-                                            val d = dao ?: return@clickable
-                                            coroutineScope.launch {
-                                                d.setHomeworkCompleted(task.id, !task.isCompleted)
-                                                // Paid once per task, ever: un-ticking and re-ticking cannot mint stars.
-                                                if (!task.isCompleted) {
-                                                    StarRewards.claimOnce(
-                                                        d,
-                                                        task.studentId,
-                                                        RewardKeys.homework(task.id),
-                                                        task.rewardStars
-                                                    )
-                                                }
-                                            }
-                                        }
+                                        .clickable { viewModel.toggleHomework(task) }
                                         .padding(10.dp)
                                 ) {
                                     Row(
@@ -1201,18 +1161,7 @@ fun TodayDashboardScreen(
                 onDismiss = { showFocusDialog = false },
                 onComplete = {
                     showFocusDialog = false
-                    val s = selectedStudent
-                    val d = dao
-                    if (s != null && d != null) {
-                        coroutineScope.launch {
-                            StarRewards.claimOnce(
-                                d,
-                                s.id,
-                                RewardKeys.focusSession(s.id, today),
-                                StarRewards.FOCUS_SESSION_STARS
-                            )
-                        }
-                    }
+                    viewModel.completeFocusSession()
                 }
             )
         }
@@ -1228,10 +1177,8 @@ fun TodayDashboardScreen(
                 studentId = selectedStudent.id,
                 onDismissRequest = { showAddHomeworkDialog = false },
                 onSaveTask = { newTask ->
-                    coroutineScope.launch {
-                        dao?.insertHomeworkTask(newTask)
-                        showAddHomeworkDialog = false
-                    }
+                    viewModel.addHomework(newTask)
+                    showAddHomeworkDialog = false
                 }
             )
         }

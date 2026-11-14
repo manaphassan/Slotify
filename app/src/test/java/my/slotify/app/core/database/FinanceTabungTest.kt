@@ -15,21 +15,27 @@ class FinanceTabungTest {
 
     @Test
     fun tabungBalance_sumsDailySavings_andIgnoresOverspend() {
-        // budget 5.00: saved 1.80 + 0 (overspent) + 5.00 (nothing spent)
-        assertEquals(6.80, StarRewards.tabungBalance(5.0, listOf(3.20, 6.00, 0.0), conversions = 0), 1e-9)
+        // budget RM 5.00: saved 1.80 + 0 (overspent) + 5.00 (nothing spent)
+        assertEquals(680L, StarRewards.tabungBalanceSen(500, listOf(320, 600, 0), conversions = 0))
     }
 
     @Test
     fun tabungBalance_deductsRm10PerConversion_andNeverGoesNegative() {
-        val spent = List(5) { 1.0 } // 5 days × RM 4 saved = RM 20
-        assertEquals(20.0, StarRewards.tabungBalance(5.0, spent, 0), 1e-9)
-        assertEquals(10.0, StarRewards.tabungBalance(5.0, spent, 1), 1e-9)
-        assertEquals(0.0, StarRewards.tabungBalance(5.0, spent, 3), 1e-9)
+        val spent = List(5) { 100L } // 5 days × RM 4 saved = RM 20
+        assertEquals(2_000L, StarRewards.tabungBalanceSen(500, spent, 0))
+        assertEquals(1_000L, StarRewards.tabungBalanceSen(500, spent, 1))
+        assertEquals(0L, StarRewards.tabungBalanceSen(500, spent, 3))
     }
 
     @Test
     fun tabungBalance_hasNoSyntheticStartingBalance() {
-        assertEquals(0.0, StarRewards.tabungBalance(5.0, emptyList(), 0), 1e-9)
+        assertEquals(0L, StarRewards.tabungBalanceSen(500, emptyList(), 0))
+    }
+
+    @Test
+    fun tabungBalance_repeatedHalfRinggitSteps_areExact() {
+        // 7 × RM 0.10 spent against RM 1.00 budget = RM 0.30 saved — exact in sen (0.1 * 7 != 0.7 in Double).
+        assertEquals(30L, StarRewards.tabungBalanceSen(100, listOf(7 * 10L), 0))
     }
 
     @Test
@@ -73,6 +79,7 @@ class FinanceTabungTest {
             "2026-11"
         )
         assertEquals("van_2026-11", f.id)
+        assertEquals(8_000L, f.amountSen)
         assertTrue(f.isRecurring)
         assertFalse(f.isPaid)
     }
@@ -91,7 +98,7 @@ class FinanceTabungTest {
     }
 
     private fun fee(id: String, series: String, recurring: Boolean, paid: Boolean = false) = CommitmentFeeEntity(
-        id = id, title = "t", childTarget = "c", amountRm = 10.0, dueDateLabel = "x",
+        id = id, title = "t", childTarget = "c", amountSen = 1_000, dueDateLabel = "x",
         billingMonth = id.substringAfterLast('_', "2026-09"), isPaid = paid,
         seriesId = series, isRecurring = recurring
     )
