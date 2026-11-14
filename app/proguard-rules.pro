@@ -1,44 +1,25 @@
 # Slotify — Production ProGuard / R8 Rules
+#
+# AndroidX (Room, Compose, WorkManager, Lifecycle), Kotlin coroutines, OkHttp and osmdroid
+# ship their own consumer rules, so blanket `-keep class androidx.compose.**` style rules are
+# unnecessary and only defeat R8 shrinking. Keep this file limited to app-specific needs.
 
-# ── AndroidX Room Database ───────────────────────────────────────────────────
--keep class * extends androidx.room.RoomDatabase
--keep @androidx.room.Entity class * { *; }
--keep @androidx.room.Dao interface * { *; }
--keep class * extends androidx.room.RoomDatabase$Callback { *; }
--dontwarn androidx.room.paging.**
+# Room entities are mapped by generated code; keep field names stable for readable crash
+# reports and schema export parity.
+-keepclassmembers @androidx.room.Entity class my.slotify.app.core.database.** { <fields>; }
 
-# Keep all database entities
--keep class my.slotify.app.core.database.** { *; }
-
-# ── Kotlin Coroutines & Flow ────────────────────────────────────────────────
--keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
--keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
--keepclassmembers class kotlinx.coroutines.** {
-    volatile <fields>;
+# Widget/alarm/boot receivers and workers are instantiated reflectively from the manifest /
+# WorkManager by class name (AGP keeps manifest components; workers need their constructor).
+-keep class * extends androidx.work.ListenableWorker {
+    public <init>(android.content.Context, androidx.work.WorkerParameters);
 }
 
-# ── OSMDroid (OpenStreetMap) ────────────────────────────────────────────────
--keep class org.osmdroid.** { *; }
+# Keep source/line info for useful stack traces; strip original file names.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+
 -dontwarn org.osmdroid.**
--keepattributes *Annotation*
-
-# ── OkHttp3 & Networking ────────────────────────────────────────────────────
--keepattributes Signature
--keepattributes *Annotation*
--keepclassmembers class okhttp3.internal.publicsuffix.PublicSuffixDatabase {
-    private static final byte[] WILDCARD_LABEL;
-    private static final byte[][] EMPTY_RULE;
-}
--dontwarn okhttp3.**
--dontwarn okio.**
--dontwarn javax.annotation.**
-
-# ── Jetpack Compose ─────────────────────────────────────────────────────────
--keep class androidx.compose.runtime.** { *; }
--keep class androidx.compose.ui.** { *; }
--keep class androidx.compose.material3.** { *; }
-
-# ── Slotify App Models & Domain Objects ──────────────────────────────────────
--keep class my.slotify.app.core.model.** { *; }
--keep class my.slotify.app.core.takwim.** { *; }
--keep class my.slotify.app.core.routing.** { *; }
+-dontwarn okhttp3.internal.platform.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**

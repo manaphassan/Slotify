@@ -6,35 +6,20 @@ import android.location.Geocoder
 import android.os.Build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import my.slotify.app.core.profile.FamilyProfileData
 import java.util.Locale
 import kotlin.math.abs
 
 /**
  * Address resolver and reverse-geocoding utility for Slotify Logistics.
- * Combines Android Geocoder with a local known-landmarks lookup table for
- * Taman Contoh, Bandar Contoh, Daerah Contoh and Selangor to ensure instant, reliable,
- * offline-safe address resolution.
+ * Combines Android Geocoder with the family profile's known landmarks for
+ * instant, offline-safe address resolution.
  */
 object LocationAddressHelper {
 
-    /**
-     * Local landmarks reference in Taman Contoh / Bandar Contoh / Daerah Contoh
-     * for instant fallback when offline or Geocoder service is unavailable.
-     */
-    private val localLandmarks = listOf(
-        Triple(3.1390, 101.6869, "Rumah Kediaman, Taman Contoh, 00000 Bandar Contoh, Selangor"),
-        Triple(3.1390, 101.6869, "Taman Contoh, 00000 Bandar Contoh, Selangor"),
-        Triple(3.1390, 101.6869, "Jalan Contoh 1, SK Taman Contoh, 00000 Bandar Contoh"),
-        Triple(3.1390, 101.6869, "Jalan Contoh 2, SRA Taman Contoh, 00000 Bandar Contoh"),
-        Triple(3.1390, 101.6869, "Taska Ceria, Taman Contoh, 00000 Bandar Contoh"),
-        Triple(3.1390, 101.6869, "Tadika Ceria, Taman Contoh, 00000 Bandar Contoh"),
-        Triple(3.1390, 101.6869, "Jalan Contoh 3, SRAI Bukit Contoh, 00000 Bandar Contoh"),
-        Triple(3.1390, 101.6869, "Jalan Contoh, Pusat Bandar Contoh, 00000 Bandar Contoh, Selangor"),
-        Triple(3.1390, 101.6869, "Kawasan Contoh, 00000 Bandar Contoh, Selangor"),
-        Triple(3.1390, 101.6869, "Pekan Contoh, 00000 Bandar Contoh, Selangor"),
-        Triple(3.1390, 101.6869, "Kawasan Contoh, 00000 Bandar Contoh, Selangor"),
-        Triple(3.1390, 101.6869, "Kawasan Contoh, 00000 Bandar Contoh, Selangor")
-    )
+    /** Offline fallback landmarks supplied by the active family profile. */
+    private val localLandmarks: List<Triple<Double, Double, String>>
+        get() = FamilyProfileData.addressLandmarks.map { Triple(it.lat, it.lng, it.address) }
 
     /**
      * Resolves human-readable street or area address from geographic coordinates.
@@ -86,12 +71,12 @@ object LocationAddressHelper {
                 return@withContext nearest.third
             } else if (dist <= 2.5) {
                 val dir = getCardinalDirection(nearest.first, nearest.second, lat, lng)
-                return@withContext "${nearest.third} ($dist km $dir)"
+                return@withContext "${nearest.third} (${formatKm(dist)} $dir)"
             }
         }
 
         // 3. Fallback coordinate label
-        String.format(Locale.US, "Lokasi Peta (%.5f° U, %.5f° T), Bandar Contoh, Selangor", lat, lng)
+        String.format(Locale.US, "Lokasi Peta (%.5f° U, %.5f° T)", lat, lng)
     }
 
     private fun getCardinalDirection(fromLat: Double, fromLng: Double, toLat: Double, toLng: Double): String {

@@ -1,9 +1,28 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
+
+// Family-specific seed data lives in a git-ignored directory. Fresh clones and CI
+// fall back to the committed, fictional demo profile. See MASTER_DOCUMENTATION §11.
+val privateProfileDir = file("family-profile/private")
+// `-PslotifyProfile=demo` forces the demo profile (e.g. to verify it builds/tests locally).
+val forceDemoProfile = (findProperty("slotifyProfile") as String?) == "demo"
+val familyProfileDir =
+    if (privateProfileDir.exists() && !forceDemoProfile) privateProfileDir else file("family-profile/demo")
+
+// Release signing credentials: keystore.properties (git-ignored) or environment variables.
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
+fun signingValue(propKey: String, envKey: String): String? =
+    keystoreProps.getProperty(propKey) ?: System.getenv(envKey)
 
 android {
     namespace = "my.slotify.app"
@@ -22,15 +41,29 @@ android {
         }
     }
 
+    sourceSets {
+        getByName("main") {
+            java.srcDir(familyProfileDir.resolve("java"))
+            assets.srcDir(familyProfileDir.resolve("assets"))
+        }
+        getByName("androidTest") {
+            assets.srcDir(file("schemas"))
+        }
+    }
+
     signingConfigs {
         create("release") {
-            val keystoreFile = file("slotify-release-key.jks")
-            if (keystoreFile.exists()) {
-                storeFile = keystoreFile
-                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "slotify2026"
-                keyAlias = System.getenv("KEY_ALIAS") ?: "slotify"
-                keyPassword = System.getenv("KEY_PASSWORD") ?: "slotify2026"
+            val storePath = signingValue("storeFile", "SLOTIFY_KEYSTORE_FILE")
+            val storePass = signingValue("storePassword", "SLOTIFY_KEYSTORE_PASSWORD")
+            val alias = signingValue("keyAlias", "SLOTIFY_KEY_ALIAS")
+            val keyPass = signingValue("keyPassword", "SLOTIFY_KEY_PASSWORD")
+            if (storePath != null && storePass != null && alias != null && keyPass != null) {
+                storeFile = rootProject.file(storePath)
+                storePassword = storePass
+                keyAlias = alias
+                keyPassword = keyPass
             } else {
+                // No credentials: produce a debug-signed build that must not be published.
                 initWith(getByName("debug"))
             }
         }
@@ -70,6 +103,10 @@ android {
     }
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     // AndroidX Core & Lifecycle
     implementation("androidx.core:core-ktx:1.15.0")
@@ -107,9 +144,10 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
-    // JSON & Networking for OSRM Routing
+    // JSON & Networking for OSRM Routing (org.json ships with Android; the artifact is only
+    // needed so JVM unit tests get a real implementation instead of the android.jar stubs)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("org.json:json:20240303")
+    testImplementation("org.json:json:20240303")
 
     // OpenStreetMap (osmdroid) for zero-cost offline/online map rendering
     implementation("org.osmdroid:osmdroid-android:6.1.20")
@@ -119,4 +157,5 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.room:room-testing:$roomVersion")
 }

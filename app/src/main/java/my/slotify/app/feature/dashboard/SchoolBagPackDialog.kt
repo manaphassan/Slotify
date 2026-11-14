@@ -30,6 +30,8 @@ import androidx.compose.ui.window.Dialog
 import my.slotify.app.core.database.StudentEntity
 import my.slotify.app.core.database.TimetableSlotEntity
 import my.slotify.app.core.designsystem.theme.SlotifyColors
+import my.slotify.app.core.profile.FamilyProfileData
+import my.slotify.app.core.rewards.StarRewards
 import java.time.LocalDate
 
 data class BagItem(
@@ -66,54 +68,39 @@ object SchoolBagHelper {
                 )
             }
 
-        val baseItems = when (student.nickname) {
-            "Aisyah" -> listOf(
-                BagItem("aisyah-1", "Al-Quran / Iqra' & Rekod Tasmik SRAI", "Agama"),
-                BagItem("aisyah-2", "Telekung & Sejadah Kecil SRAI", "Solat"),
-                BagItem("aisyah-3", "Kotak Pensel & Pensel Warna", "Alat Tulis"),
-                BagItem("aisyah-4", "Botol Air Minuman (500ml)", "Keperluan")
-            )
-            "Danial" -> listOf(
-                BagItem("danial-1", "Buku Aktiviti Prasekolah & Krayon", "Tadika"),
-                BagItem("danial-2", "Botol Air Susu & Bekas Makanan", "Keperluan"),
-                BagItem("danial-3", "Baju Persalinan Tambahan & Tisu", "Pakaian")
-            )
-            else -> listOf( // Adam
-                BagItem("adam-1", "Buku Teks Sains & Buku Nota Garis 1", "SK"),
-                BagItem("adam-2", "Buku Teks Pendidikan Islam & Jawi", "SRA"),
-                BagItem("adam-3", "Peralatan Geometri & Kotak Pensel", "Alat Tulis"),
-                BagItem("adam-4", "Botol Air & Duit Saku Transit", "Keperluan")
-            )
-        }
+        val baseItems = FamilyProfileData.bagEssentials[student.id] ?: FamilyProfileData.defaultBagEssentials
 
         return if (subjectItems.isNotEmpty()) (subjectItems + baseItems).distinctBy { it.title } else baseItems
     }
 }
 
+/**
+ * Checklist for the next school day's bag. When every item is ticked, [onAllPacked] is invoked;
+ * the caller records the (idempotent, once-per-day) reward claim.
+ */
 @Composable
 fun SchoolBagPackDialog(
     student: StudentEntity,
     tomorrowSlots: List<TimetableSlotEntity> = emptyList(),
-    onRewardEarned: (Int) -> Unit,
+    alreadyPacked: Boolean = false,
+    onAllPacked: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
 
-    val bagItems = remember(student.id) {
+    val bagItems = remember(student.id, tomorrowSlots) {
         SchoolBagHelper.getDefaultItemsForStudent(student, tomorrowSlots)
     }
 
-    val checkedStates = remember(student.id) {
+    val checkedStates = remember(student.id, bagItems) {
         mutableStateMapOf<String, Boolean>().apply {
-            bagItems.forEach { item -> put(item.id, false) }
+            bagItems.forEach { item -> put(item.id, alreadyPacked) }
         }
     }
 
     val totalCount = bagItems.size
     val checkedCount = checkedStates.values.count { it }
     val isAllChecked = checkedCount == totalCount && totalCount > 0
-    var rewardGranted by remember { mutableStateOf(false) }
 
     val surfaceCardColor = SlotifyColors.SurfaceCard
     val successColor = SlotifyColors.SuccessMint
@@ -124,11 +111,7 @@ fun SchoolBagPackDialog(
     val canvasBaseColor = SlotifyColors.CanvasBase
 
     LaunchedEffect(isAllChecked) {
-        if (isAllChecked && !rewardGranted) {
-            rewardGranted = true
-            SchoolBagHelper.setBagPackedToday(context, student.id, true)
-            onRewardEarned(2)
-        }
+        if (isAllChecked && !alreadyPacked) onAllPacked()
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -176,7 +159,7 @@ fun SchoolBagPackDialog(
                         }
                     }
 
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(30.dp)) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "Tutup", tint = textSecondaryColor)
                     }
                 }
@@ -208,10 +191,15 @@ fun SchoolBagPackDialog(
                     )
                     if (isAllChecked) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Star, contentDescription = null, tint = starColor, modifier = Modifier.size(13.dp))
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = null,
+                                tint = starColor,
+                                modifier = Modifier.size(13.dp)
+                            )
                             Spacer(Modifier.width(2.dp))
                             Text(
-                                text = "+2 Bintang Diperoleh!",
+                                text = "+${StarRewards.BAG_PACKED_STARS} Bintang Diperoleh!",
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = starColor
                             )
@@ -228,7 +216,7 @@ fun SchoolBagPackDialog(
                         .heightIn(max = 220.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    itemsIndexed(bagItems) { _, item ->
+                    itemsIndexed(bagItems, key = { _, item -> item.id }) { _, item ->
                         val isChecked = checkedStates[item.id] == true
                         Row(
                             modifier = Modifier
@@ -255,7 +243,12 @@ fun SchoolBagPackDialog(
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (isChecked) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(14.dp)
+                                    )
                                 }
                             }
 

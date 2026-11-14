@@ -71,9 +71,6 @@ data class AppStrings(
     val routeChainTitle: String,
     val startSimulation: String,
     val stepSimulationPrefix: String,
-    val routeAbah: String,
-    val routeVanPrimary: String,
-    val routeVanSecondary: String,
     val turnByTurnTitle: String,
 
     // Student Profile Screen
@@ -184,7 +181,7 @@ val BmStrings = AppStrings(
     nextClassPrefix = "Seterusnya:",
     requiredBookPrefix = "Perlu bawa:",
     morningTransitTitle = "Morning Transit Bag Drop",
-    morningTransitDesc = "Hantar Beg Transit & Baju SK ke Taska Ceria",
+    morningTransitDesc = "Hantar beg transit & baju sekolah ke taska",
     starVaultTitle = "Peti Bintang Terkumpul",
     starVaultDesc = "Ganjaran tingkah laku & siapkan kerja rumah",
     quickActions = "Tindakan Pantas",
@@ -202,7 +199,7 @@ val BmStrings = AppStrings(
     tomorrowBooksTitle = "Senarai Buku Mesti Dibawa Hari Esok",
     weeklyAttireSummaryTitle = "Ringkasan Mingguan Subjek & Uniform KPM",
     mondayAttire = "Uniform Penuh KPM (Kemeja Putih)",
-    tuesdayAttire = "T-Shirt Sukan SK / Seluar Track",
+    tuesdayAttire = "T-Shirt Sukan Sekolah / Seluar Track",
     wednesdayAttire = "Uniform Badan Beruniform (Pengakap)",
     thursdayAttire = "Baju Batik KPM / Kurung Putih",
     fridayAttire = "Baju Melayu Lengkap / Kurung",
@@ -217,9 +214,6 @@ val BmStrings = AppStrings(
     routeChainTitle = "Pilih Laluan Berantai",
     startSimulation = "Mula Simulasi",
     stepSimulationPrefix = "Langkah",
-    routeAbah = "Laluan Abah",
-    routeVanPrimary = "Van A",
-    routeVanSecondary = "Van Sekolah B",
     turnByTurnTitle = "Langkah Panduan Arah (Turn-by-Turn Directions)",
 
     profileTitle = "Pengurusan Profil Murid",
@@ -239,7 +233,7 @@ val BmStrings = AppStrings(
     fullNameLabel = "Nama Penuh",
     nicknameLabel = "Panggilan",
     myKidLabel = "No. MyKid",
-    classLabel = "Kelas (cth: 4 A / 4 B)",
+    classLabel = "Kelas (cth: 4 Bestari)",
     schoolLabel = "Sekolah",
     saveButton = "Simpan",
     cancelButton = "Batal",
@@ -283,7 +277,7 @@ val BmStrings = AppStrings(
     eveningAttireTitle = "Peringatan Uniform Esok",
     eveningAttireBody = "Sediakan uniform & semak jadual buku sekolah esok!",
     morningTransitAlertTitle = "Peringatan Beg Transit Pagi",
-    morningTransitAlertBody = "Sila bawa beg transit & baju sekolah ganti ke Taska Ceria!",
+    morningTransitAlertBody = "Sila bawa beg transit & baju sekolah ganti ke taska!",
 
     // MyStudyLife Academic Extensions
     homeworkTrackerTitle = "Tugasan & Kerja Rumah",
@@ -329,7 +323,7 @@ val EnStrings = AppStrings(
     nextClassPrefix = "Next:",
     requiredBookPrefix = "Required book:",
     morningTransitTitle = "Morning Transit Bag Drop",
-    morningTransitDesc = "Drop transit bag & SK clothes at Taska Ceria",
+    morningTransitDesc = "Drop transit bag & school clothes at daycare",
     starVaultTitle = "Collected Star Vault",
     starVaultDesc = "Rewards for good behavior & homework completed",
     quickActions = "Quick Actions",
@@ -362,9 +356,6 @@ val EnStrings = AppStrings(
     routeChainTitle = "Select Route Chain",
     startSimulation = "Start Simulation",
     stepSimulationPrefix = "Step",
-    routeAbah = "Dad's Route",
-    routeVanPrimary = "Van A",
-    routeVanSecondary = "Van Sekolah B",
     turnByTurnTitle = "Turn-by-Turn Navigation Steps",
 
     profileTitle = "Student Profile Management",
@@ -384,7 +375,7 @@ val EnStrings = AppStrings(
     fullNameLabel = "Full Name",
     nicknameLabel = "Nickname",
     myKidLabel = "MyKid No.",
-    classLabel = "Class (e.g. 4 A / 4 B)",
+    classLabel = "Class (e.g. 4 Bestari)",
     schoolLabel = "School",
     saveButton = "Save",
     cancelButton = "Cancel",
@@ -428,7 +419,7 @@ val EnStrings = AppStrings(
     eveningAttireTitle = "Tomorrow Attire Reminder",
     eveningAttireBody = "Prepare school uniform & verify tomorrow's subject books!",
     morningTransitAlertTitle = "Morning Transit Bag Alert",
-    morningTransitAlertBody = "Please pack transit bag & spare clothes to Taska Ceria!",
+    morningTransitAlertBody = "Please pack transit bag & spare clothes for daycare!",
 
     // MyStudyLife Academic Extensions
     homeworkTrackerTitle = "Tasks & Homework",

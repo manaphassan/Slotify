@@ -1,60 +1,98 @@
 package my.slotify.app.core.database
 
+import my.slotify.app.core.finance.FeeRepository
+import my.slotify.app.core.profile.FeeTemplate
+import my.slotify.app.core.rewards.RewardKeys
+import my.slotify.app.core.rewards.StarRewards
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.util.UUID
+import java.time.LocalDate
 
 class FinanceTabungTest {
 
     @Test
-    fun testCommitmentFeeEntityCreationAndToggle() {
-        val fee = CommitmentFeeEntity(
-            id = UUID.randomUUID().toString(),
-            title = "Yuran Van Sekolah A",
-            childTarget = "Adam",
-            amountRm = 120.00,
-            dueDateLabel = "1hb Setiap Bulan",
-            billingMonth = "2026-10",
-            isPaid = false,
-            categoryEmoji = "🚌"
+    fun tabungBalance_sumsDailySavings_andIgnoresOverspend() {
+        // budget 5.00: saved 1.80 + 0 (overspent) + 5.00 (nothing spent)
+        assertEquals(6.80, StarRewards.tabungBalance(5.0, listOf(3.20, 6.00, 0.0), conversions = 0), 1e-9)
+    }
+
+    @Test
+    fun tabungBalance_deductsRm10PerConversion_andNeverGoesNegative() {
+        val spent = List(5) { 1.0 } // 5 days × RM 4 saved = RM 20
+        assertEquals(20.0, StarRewards.tabungBalance(5.0, spent, 0), 1e-9)
+        assertEquals(10.0, StarRewards.tabungBalance(5.0, spent, 1), 1e-9)
+        assertEquals(0.0, StarRewards.tabungBalance(5.0, spent, 3), 1e-9)
+    }
+
+    @Test
+    fun tabungBalance_hasNoSyntheticStartingBalance() {
+        assertEquals(0.0, StarRewards.tabungBalance(5.0, emptyList(), 0), 1e-9)
+    }
+
+    @Test
+    fun rewardKeys_scopeOneTimeRewards() {
+        val d = LocalDate.of(2026, 11, 14)
+        assertEquals(RewardKeys.dailyChest("s1", d), RewardKeys.dailyChest("s1", d))
+        assertNotEquals(RewardKeys.dailyChest("s1", d), RewardKeys.dailyChest("s1", d.plusDays(1)))
+        assertNotEquals(RewardKeys.bagPacked("s1", d), RewardKeys.bagPacked("s2", d))
+        assertNotEquals(RewardKeys.savingsConversion("s1", 1), RewardKeys.savingsConversion("s1", 2))
+        assertTrue(RewardKeys.savingsConversion("s1", 1).startsWith(RewardKeys.SAVINGS_PREFIX))
+        assertEquals(StarRewards.PBD_HIGH_STARS, StarRewards.pbdStars(5))
+        assertEquals(StarRewards.PBD_BASE_STARS, StarRewards.pbdStars(4))
+    }
+
+    @Test
+    fun rollOver_copiesOnlyRecurringFees_asUnpaid_withStableSeries() {
+        val sept = listOf(
+            fee("van_2026-09", series = "van", recurring = true, paid = true),
+            fee("pibg_2026-09", series = "pibg", recurring = false, paid = true)
         )
-
-        assertEquals("Yuran Van Sekolah A", fee.title)
-        assertEquals(120.00, fee.amountRm, 0.001)
-        assertFalse(fee.isPaid)
-
-        val paidFee = fee.copy(isPaid = true)
-        assertTrue(paidFee.isPaid)
+        val nov = FeeRepository.rollOver(sept, "2026-11")
+        assertEquals(1, nov.size)
+        val copy = nov.single()
+        assertEquals("van_2026-11", copy.id)
+        assertEquals("van", copy.seriesId)
+        assertEquals("2026-11", copy.billingMonth)
+        assertFalse(copy.isPaid)
     }
 
     @Test
-    fun testDailySavingsCalculation() {
-        val budget = 5.00
-        val spent = 3.20
-        val saved = (budget - spent).coerceAtLeast(0.0)
-
-        assertEquals(1.80, saved, 0.001)
-
-        // Case when spent exceeds budget
-        val overSpent = 6.00
-        val zeroSaved = (budget - overSpent).coerceAtLeast(0.0)
-        assertEquals(0.00, zeroSaved, 0.001)
+    fun rollOver_legacyRowWithoutSeries_usesIdAsSeries() {
+        val copy = FeeRepository.rollOver(listOf(fee("abc-uuid", series = "", recurring = true)), "2026-12").single()
+        assertEquals("abc-uuid", copy.seriesId)
+        assertEquals("abc-uuid_2026-12", copy.id)
     }
 
     @Test
-    fun testCumulativeSavingsToStarConversion() {
-        // Business logic: Every RM 10 saved can be converted to 10 Star Coins
-        fun calculateConvertibleStars(cumulativeSavedRm: Double): Int {
-            val multiplesOfTen = (cumulativeSavedRm / 10.0).toInt()
-            return multiplesOfTen * 10
-        }
-
-        assertEquals(0, calculateConvertibleStars(9.50))
-        assertEquals(10, calculateConvertibleStars(10.00))
-        assertEquals(10, calculateConvertibleStars(19.90))
-        assertEquals(20, calculateConvertibleStars(24.50))
-        assertEquals(50, calculateConvertibleStars(55.00))
+    fun fromTemplate_buildsCurrentMonthFee() {
+        val f = FeeRepository.fromTemplate(
+            FeeTemplate("van", "Van", "Adam", 80.0, "1hb Setiap Bulan", "🚌", true),
+            "2026-11"
+        )
+        assertEquals("van_2026-11", f.id)
+        assertTrue(f.isRecurring)
+        assertFalse(f.isPaid)
     }
+
+    @Test
+    fun looksRecurring_detectsMonthlyLabels() {
+        assertTrue(FeeRepository.looksRecurring("1hb Setiap Bulan"))
+        assertTrue(FeeRepository.looksRecurring("Hujung Bulan"))
+        assertFalse(FeeRepository.looksRecurring("15hb September"))
+        assertFalse(FeeRepository.looksRecurring("Sekali Bayar"))
+    }
+
+    @Test
+    fun monthKey_isIsoYearMonth() {
+        assertEquals("2026-02", FeeRepository.monthKey(LocalDate.of(2026, 2, 28)))
+    }
+
+    private fun fee(id: String, series: String, recurring: Boolean, paid: Boolean = false) = CommitmentFeeEntity(
+        id = id, title = "t", childTarget = "c", amountRm = 10.0, dueDateLabel = "x",
+        billingMonth = id.substringAfterLast('_', "2026-09"), isPaid = paid,
+        seriesId = series, isRecurring = recurring
+    )
 }

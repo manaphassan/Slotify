@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.widget.Toast
@@ -144,7 +145,8 @@ class MainActivity : ComponentActivity() {
         SlotifyNotificationManager.createNotificationChannels(this)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                == PackageManager.PERMISSION_GRANTED) {
+            == PackageManager.PERMISSION_GRANTED
+        ) {
             SlotifyNotificationManager.scheduleDailyReminders(this)
         }
 
@@ -165,21 +167,33 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                     ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS)
-                        != PackageManager.PERMISSION_GRANTED) {
+                    != PackageManager.PERMISSION_GRANTED
+                ) {
                     notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             }
 
-            // Fix 1.3: Runtime location permission request for LogisticsMapScreen
-            var locationGranted by remember {
-                mutableStateOf(
-                    ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION)
-                        == PackageManager.PERMISSION_GRANTED
-                )
-            }
+            // Location permission for LogisticsMapScreen. FINE must be requested together with
+            // COARSE on Android 12+; either grant is enough to show the user's position.
+            fun hasLocationPermission(): Boolean =
+                ContextCompat.checkSelfPermission(
+                    this@MainActivity,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED ||
+                        ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+
+            var locationGranted by remember { mutableStateOf(hasLocationPermission()) }
             val locationPermissionLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.RequestPermission()
-            ) { granted -> locationGranted = granted }
+                ActivityResultContracts.RequestMultiplePermissions()
+            ) { result -> locationGranted = result.values.any { it } || hasLocationPermission() }
+            // Permission may be granted/revoked from system Settings while we are paused.
+            LifecycleResumeEffect(Unit) {
+                locationGranted = hasLocationPermission()
+                onPauseOrDispose { }
+            }
 
             val cycleTheme: () -> Unit = {
                 appThemeMode = when (appThemeMode) {
@@ -194,9 +208,10 @@ class MainActivity : ComponentActivity() {
                     val coroutineScope = rememberCoroutineScope()
                     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
-                    val initialTarget = intent?.getStringExtra("EXTRA_SCREEN") ?: intent?.getStringExtra("TARGET_SCREEN")
+                    val initialTarget =
+                        intent?.getStringExtra("EXTRA_SCREEN") ?: intent?.getStringExtra("TARGET_SCREEN")
                     val initialScreen = initialTarget?.let { parseScreenTarget(it) } ?: Screen.DASHBOARD
-                    var currentScreen by remember { mutableStateOf(initialScreen) }
+                    var currentScreen by rememberSaveable { mutableStateOf(initialScreen) }
 
                     LaunchedEffect(pendingScreenRoute.value) {
                         pendingScreenRoute.value?.let { screen ->
@@ -208,22 +223,15 @@ class MainActivity : ComponentActivity() {
                     var fabExpanded by remember { mutableStateOf(false) }
 
                     val students by dao.getAllStudents().collectAsState(initial = emptyList())
-                    var selectedStudent by remember { mutableStateOf<StudentEntity?>(null) }
-
-                    LaunchedEffect(Unit) {
-                        my.slotify.app.core.database.DatabaseSeeder.seedHomeworkAndExamsIfMissing(dao)
-                    }
-
-                    LaunchedEffect(students) {
-                        if (selectedStudent == null && students.isNotEmpty()) {
-                            selectedStudent = students.first()
-                        } else if (selectedStudent != null) {
-                            selectedStudent = students.find { it.id == selectedStudent?.id } ?: students.firstOrNull()
-                        }
-                    }
+                    // Track the selection by id and derive the entity from the live students Flow,
+                    // so balance updates appear immediately and async reloads can't switch child.
+                    var selectedStudentId by rememberSaveable { mutableStateOf<String?>(null) }
+                    val selectedStudent: StudentEntity? =
+                        students.find { it.id == selectedStudentId } ?: students.firstOrNull()
+                    val selectStudent: (StudentEntity) -> Unit = { selectedStudentId = it.id }
 
                     // Wire sessions + slots to real DB with dual-session cycling support
-                    val studentSessions by remember(selectedStudent) {
+                    val studentSessions by remember(selectedStudent?.id) {
                         if (selectedStudent != null)
                             dao.getSessionsForStudent(selectedStudent!!.id)
                         else
@@ -256,7 +264,7 @@ class MainActivity : ComponentActivity() {
                                 onToggleTheme = cycleTheme,
                                 onSelectTheme = { appThemeMode = it },
                                 onSelectLanguage = { appLanguage = it },
-                                onSelectStudent = { selectedStudent = it },
+                                onSelectStudent = selectStudent,
                                 onSelectScreen = { screen ->
                                     currentScreen = screen
                                     coroutineScope.launch { drawerState.close() }
@@ -294,7 +302,8 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onToggleTheme = cycleTheme,
                                     onToggleLanguage = {
-                                        appLanguage = if (appLanguage == AppLanguage.BM) AppLanguage.EN else AppLanguage.BM
+                                        appLanguage =
+                                            if (appLanguage == AppLanguage.BM) AppLanguage.EN else AppLanguage.BM
                                     },
                                     isDarkMode = isDarkMode,
                                     appThemeMode = appThemeMode,
@@ -313,16 +322,9 @@ class MainActivity : ComponentActivity() {
                                         students = students,
                                         selectedStudent = selectedStudent,
                                         dao = dao,
-                                        onSelectStudent = { selectedStudent = it },
-                                        onRewardEarned = { delta ->
-                                            selectedStudent?.let { s ->
-                                                coroutineScope.launch {
-                                                    dao.updateStarCoins(s.id, delta)
-                                                    selectedStudent = dao.getStudentById(s.id)
-                                                }
-                                            }
-                                        }
+                                        onSelectStudent = selectStudent
                                     )
+
                                     Screen.TIMETABLE -> TimetableScreen(
                                         selectedStudent = selectedStudent,
                                         slots = slots,
@@ -340,63 +342,37 @@ class MainActivity : ComponentActivity() {
                                     Screen.LOGISTICS -> {
                                         LaunchedEffect(Unit) {
                                             if (!locationGranted) {
-                                                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                                                locationPermissionLauncher.launch(
+                                                    arrayOf(
+                                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                                    )
+                                                )
                                             }
                                         }
                                         LogisticsMapScreen(locationGranted = locationGranted)
                                     }
+
                                     Screen.REWARDS -> RewardVaultScreen(
                                         selectedStudent = selectedStudent,
-                                        onRedeemReward = { item ->
-                                            selectedStudent?.let { s ->
-                                                if (s.starCoinsBalance >= item.pointsCost) {
-                                                    coroutineScope.launch {
-                                                        dao.updateStarCoins(s.id, -item.pointsCost)
-                                                        selectedStudent = dao.getStudentById(s.id)
-                                                    }
-                                                }
-                                            }
-                                        },
-                                        onBonusStarsAwarded = { delta ->
-                                            selectedStudent?.let { s ->
-                                                coroutineScope.launch {
-                                                    dao.updateStarCoins(s.id, delta)
-                                                    selectedStudent = dao.getStudentById(s.id)
-                                                }
-                                            }
-                                        }
+                                        dao = dao
                                     )
+
                                     Screen.FINANCE -> FinanceScreen(
                                         selectedStudent = selectedStudent,
-                                        dao = dao,
-                                        onRewardStars = { delta ->
-                                            selectedStudent?.let { s ->
-                                                coroutineScope.launch {
-                                                    dao.updateStarCoins(s.id, delta)
-                                                    selectedStudent = dao.getStudentById(s.id)
-                                                }
-                                            }
-                                        }
+                                        dao = dao
                                     )
+
                                     Screen.PROFILES -> StudentProfileScreen(
                                         students = students,
                                         selectedStudent = selectedStudent,
-                                        onSelectStudent = { selectedStudent = it },
+                                        onSelectStudent = selectStudent,
                                         onSaveProfile = { updated ->
                                             coroutineScope.launch {
                                                 dao.updateStudent(updated)
-                                                selectedStudent = dao.getStudentById(updated.id)
                                             }
                                         },
-                                        dao = dao,
-                                        onRewardStars = { delta ->
-                                            selectedStudent?.let { s ->
-                                                coroutineScope.launch {
-                                                    dao.updateStarCoins(s.id, delta)
-                                                    selectedStudent = dao.getStudentById(s.id)
-                                                }
-                                            }
-                                        }
+                                        dao = dao
                                     )
                                 }
                             }
@@ -498,9 +474,18 @@ fun SlotifyTopBar(
                     contentAlignment = Alignment.Center
                 ) {
                     val (topBarIcon, topBarDesc, topBarTint) = when (appThemeMode) {
-                        AppThemeMode.LIGHT -> Triple(Icons.Default.DarkMode, strings.darkMode, SlotifyColors.ActionAmber)
+                        AppThemeMode.LIGHT -> Triple(
+                            Icons.Default.DarkMode,
+                            strings.darkMode,
+                            SlotifyColors.ActionAmber
+                        )
+
                         AppThemeMode.DARK -> Triple(Icons.Default.AcUnit, strings.nordMode, NordColors.Nord8)
-                        AppThemeMode.NORD -> Triple(Icons.Default.LightMode, strings.lightMode, SlotifyColors.ActionAmber)
+                        AppThemeMode.NORD -> Triple(
+                            Icons.Default.LightMode,
+                            strings.lightMode,
+                            SlotifyColors.ActionAmber
+                        )
                     }
                     Icon(
                         imageVector = topBarIcon,
@@ -815,9 +800,14 @@ fun SlotifyDrawerSheet(
                             val myProvider = ComponentName(context, SlotifyAppWidgetProvider::class.java)
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && appWidgetManager.isRequestPinAppWidgetSupported) {
                                 appWidgetManager.requestPinAppWidget(myProvider, null, null)
-                                Toast.makeText(context, "Membuka pengesahan widget skrin utama...", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Membuka pengesahan widget skrin utama...", Toast.LENGTH_SHORT)
+                                    .show()
                             } else {
-                                Toast.makeText(context, "Sila tekan lama pada skrin utama dan pilih Widgets ➔ Slotify", Toast.LENGTH_LONG).show()
+                                Toast.makeText(
+                                    context,
+                                    "Sila tekan lama pada skrin utama dan pilih Widgets ➔ Slotify",
+                                    Toast.LENGTH_LONG
+                                ).show()
                             }
                         }
                         .padding(vertical = 8.dp, horizontal = 10.dp),

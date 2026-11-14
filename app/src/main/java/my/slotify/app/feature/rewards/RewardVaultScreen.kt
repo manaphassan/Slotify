@@ -27,8 +27,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import my.slotify.app.core.security.PinResult
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
+import my.slotify.app.core.database.SlotifyDao
 import my.slotify.app.core.database.StudentEntity
+import my.slotify.app.core.rewards.RewardKeys
+import my.slotify.app.core.rewards.StarRewards
+import java.time.LocalDate
 import my.slotify.app.core.designsystem.theme.NeumorphicElevation
 import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.designsystem.theme.SlotifyShapes
@@ -46,19 +55,31 @@ data class RewardCatalogItem(
 @Composable
 fun RewardVaultScreen(
     selectedStudent: StudentEntity?,
-    onRedeemReward: (RewardCatalogItem) -> Unit,
-    onBonusStarsAwarded: (Int) -> Unit = {}
+    dao: SlotifyDao
 ) {
-    var chestOpened by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val today = remember { LocalDate.now() }
+    val chestKey = selectedStudent?.let { RewardKeys.dailyChest(it.id, today) }
+    // Persisted claim: reopening the tab or restarting the app cannot re-open the chest.
+    val chestOpened by remember(chestKey) {
+        if (chestKey == null) flowOf(true) else dao.isClaimed(chestKey)
+    }.collectAsState(initial = true)
     var showChestDialog by remember { mutableStateOf(false) }
 
     var pendingRewardToRedeem by remember { mutableStateOf<RewardCatalogItem?>(null) }
     var showPinDialog by remember { mutableStateOf(false) }
+    var showChangePinDialog by remember { mutableStateOf(false) }
+    var redeemFailedMessage by remember { mutableStateOf<String?>(null) }
     var showSuccessDialog by remember { mutableStateOf<RewardCatalogItem?>(null) }
 
     val rewardItems = remember {
         listOf(
-            RewardCatalogItem("Main Roblox / iPad 1 Jam", "Ganjaran bermain peranti dengan had waktu berjadual", 50, "🎮"),
+            RewardCatalogItem(
+                "Main Roblox / iPad 1 Jam",
+                "Ganjaran bermain peranti dengan had waktu berjadual",
+                50,
+                "🎮"
+            ),
             RewardCatalogItem("Beli Mainan / Hot Wheels", "Tebus mainan kegemaran pilihan anak di kedai", 200, "🏎️"),
             RewardCatalogItem("Keluar Makan Ais Krim", "Ais krim FamilyMart / Tealive hujung minggu", 30, "🍦"),
             RewardCatalogItem("Tidur Lewat 30 Minit", "Kelonggaran waktu tidur hari Sabtu / cuti sekolah", 20, "🌙")
@@ -135,10 +156,19 @@ fun RewardVaultScreen(
                     .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = SlotifyShapes.LargeDp)
                     .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
                     .clip(SlotifyShapes.Large)
-                    .clickable(enabled = !chestOpened) {
-                        chestOpened = true
-                        onBonusStarsAwarded(15)
-                        showChestDialog = true
+                    .clickable(enabled = !chestOpened && selectedStudent != null) {
+                        val s = selectedStudent ?: return@clickable
+                        scope.launch {
+                            if (StarRewards.claimOnce(
+                                    dao,
+                                    s.id,
+                                    RewardKeys.dailyChest(s.id, today),
+                                    StarRewards.DAILY_CHEST_STARS
+                                )
+                            ) {
+                                showChestDialog = true
+                            }
+                        }
                     }
                     .padding(16.dp)
             ) {
@@ -177,7 +207,9 @@ fun RewardVaultScreen(
                                 )
                                 Spacer(Modifier.width(6.dp))
                                 Surface(
-                                    color = if (chestOpened) SlotifyColors.ScienceGreen.copy(alpha = 0.15f) else SlotifyColors.MathAmber.copy(alpha = 0.15f),
+                                    color = if (chestOpened) SlotifyColors.ScienceGreen.copy(alpha = 0.15f) else SlotifyColors.MathAmber.copy(
+                                        alpha = 0.15f
+                                    ),
                                     shape = SlotifyShapes.XSmall
                                 ) {
                                     Text(
@@ -236,8 +268,23 @@ fun RewardVaultScreen(
             }
         }
 
+        // Parent PIN management
+        item {
+            TextButton(
+                onClick = { showChangePinDialog = true },
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) {
+                Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "Tukar PIN Ibu Bapa",
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
+                )
+            }
+        }
+
         // Reward Catalog Items
-        items(rewardItems) { item ->
+        items(rewardItems, key = { it.title }) { item ->
             val canAfford = (selectedStudent?.starCoinsBalance ?: 0) >= item.pointsCost
             Box(
                 modifier = Modifier
@@ -362,11 +409,31 @@ fun RewardVaultScreen(
                 val reward = pendingRewardToRedeem
                 showPinDialog = false
                 pendingRewardToRedeem = null
-                if (reward != null) {
-                    onRedeemReward(reward)
-                    showSuccessDialog = reward
+                val s = selectedStudent
+                if (reward != null && s != null) {
+                    scope.launch {
+                        // Atomic conditional spend: success dialog only if the balance covered it.
+                        if (StarRewards.spend(dao, s.id, reward.pointsCost)) {
+                            showSuccessDialog = reward
+                        } else {
+                            redeemFailedMessage = "Bintang tidak mencukupi untuk ${reward.title}."
+                        }
+                    }
                 }
             }
+        )
+    }
+
+    if (showChangePinDialog) {
+        ChangePinDialog(onDismiss = { showChangePinDialog = false })
+    }
+
+    redeemFailedMessage?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { redeemFailedMessage = null },
+            confirmButton = { TextButton(onClick = { redeemFailedMessage = null }) { Text("OK") } },
+            title = { Text("Tebusan gagal") },
+            text = { Text(msg) }
         )
     }
 
@@ -422,6 +489,13 @@ fun RewardVaultScreen(
     }
 }
 
+
+private enum class PinStep { VERIFY, CREATE, CONFIRM }
+
+/**
+ * Parent approval dialog. Creates the PIN on first use (no default PIN), otherwise verifies it.
+ * Attempts and lockout are persisted by [PinManager], so dismissing the dialog does not reset them.
+ */
 @Composable
 fun ParentPinModalDialog(
     targetReward: RewardCatalogItem,
@@ -429,169 +503,158 @@ fun ParentPinModalDialog(
     onPinVerified: () -> Unit
 ) {
     val context = LocalContext.current
-    var enteredPin by remember { mutableStateOf("") }
-    var isError by remember { mutableStateOf(false) }
-    // Fix 1.1: 3-attempt lockout with 30-second countdown
-    var attemptCount by remember { mutableStateOf(0) }
-    var lockoutSeconds by remember { mutableStateOf(0) }
-    val isLockedOut = lockoutSeconds > 0
+    val scope = rememberCoroutineScope()
+    var step by remember { mutableStateOf(if (PinManager.isPinSet(context)) PinStep.VERIFY else PinStep.CREATE) }
+    var firstEntry by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var lockoutSeconds by remember { mutableIntStateOf(((PinManager.lockoutRemainingMs(context) + 999) / 1000).toInt()) }
 
     LaunchedEffect(lockoutSeconds) {
         if (lockoutSeconds > 0) {
             delay(1000L)
-            lockoutSeconds -= 1
+            lockoutSeconds = ((PinManager.lockoutRemainingMs(context) + 999) / 1000).toInt()
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(SlotifyColors.SurfaceCard, SlotifyShapes.XLarge)
-                .padding(18.dp)
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.Lock,
-                            contentDescription = null,
-                            tint = SlotifyColors.KpmBlue,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = strings.parentPinTitle,
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = SlotifyColors.TextPrimary
-                        )
-                    }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Tutup", tint = SlotifyColors.TextSecondary)
-                    }
+    val title = when (step) {
+        PinStep.VERIFY -> strings.parentPinTitle
+        PinStep.CREATE -> "Cipta PIN Ibu Bapa"
+        PinStep.CONFIRM -> "Sahkan PIN Baharu"
+    }
+    val subtitle = when (step) {
+        PinStep.VERIFY -> "${strings.parentPinSubtitle}\n${targetReward.iconEmoji} ${targetReward.title} (-${targetReward.pointsCost} ⭐)"
+        PinStep.CREATE -> "Tiada PIN lagi. Cipta PIN 4 digit untuk meluluskan tebusan ganjaran."
+        PinStep.CONFIRM -> "Masukkan PIN yang sama sekali lagi."
+    }
+
+    val pinIncorrectText = strings.pinIncorrect
+
+    PinEntryDialog(
+        title = title,
+        subtitle = subtitle,
+        message = if (lockoutSeconds > 0) "🔒 Terlalu banyak cubaan. Cuba lagi dalam ${lockoutSeconds}s." else message,
+        enabled = !busy && lockoutSeconds == 0,
+        onDismiss = onDismiss,
+        onPinComplete = { pin ->
+            when (step) {
+                PinStep.CREATE -> {
+                    firstEntry = pin
+                    message = null
+                    step = PinStep.CONFIRM
                 }
 
-                Text(
-                    text = strings.parentPinSubtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    textAlign = TextAlign.Center,
-                    color = SlotifyColors.TextSecondary
-                )
-
-                // PIN indicator dots
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    modifier = Modifier.padding(vertical = 8.dp)
-                ) {
-                    for (i in 0 until 4) {
-                        val isFilled = i < enteredPin.length
-                        Box(
-                            modifier = Modifier
-                                .size(16.dp)
-                                .background(
-                                    if (isFilled) SlotifyColors.KpmBlue else SlotifyColors.TextTertiary.copy(alpha = 0.3f),
-                                    CircleShape
-                                )
-                        )
+                PinStep.CONFIRM -> {
+                    if (pin != firstEntry) {
+                        message = "PIN tidak sepadan. Cuba lagi."
+                        step = PinStep.CREATE
+                    } else {
+                        busy = true
+                        scope.launch {
+                            val r = withContext(Dispatchers.Default) { PinManager.setInitialPin(context, pin) }
+                            busy = false
+                            if (r == PinResult.Success) onPinVerified() else message = "Gagal menyimpan PIN."
+                        }
                     }
                 }
 
-                if (isLockedOut) {
-                    Text(
-                        text = "🔒 Terlalu banyak cubaan. Cuba lagi dalam ${lockoutSeconds}s...",
-                        color = SlotifyColors.EnglishRed,
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                        textAlign = TextAlign.Center
-                    )
-                } else if (isError) {
-                    Text(
-                        text = strings.pinIncorrect,
-                        color = SlotifyColors.EnglishRed,
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
-                    )
+                PinStep.VERIFY -> {
+                    busy = true
+                    scope.launch {
+                        val r = withContext(Dispatchers.Default) { PinManager.verifyPin(context, pin) }
+                        busy = false
+                        when (r) {
+                            PinResult.Success -> onPinVerified()
+                            is PinResult.Incorrect -> message =
+                                "$pinIncorrectText (${r.attemptsBeforeLockout} cubaan lagi)"
+
+                            is PinResult.LockedOut -> lockoutSeconds = ((r.remainingMs + 999) / 1000).toInt()
+                            PinResult.NotSet -> step = PinStep.CREATE
+                            else -> message = pinIncorrectText
+                        }
+                    }
+                }
+            }
+        }
+    )
+}
+
+private enum class ChangePinStep { CURRENT, NEW, CONFIRM }
+
+/** Changes the parent PIN; requires the current PIN (or creates one if none exists). */
+@Composable
+fun ChangePinDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val hasPin = remember { PinManager.isPinSet(context) }
+    var step by remember { mutableStateOf(if (hasPin) ChangePinStep.CURRENT else ChangePinStep.NEW) }
+    var currentPin by remember { mutableStateOf("") }
+    var newPin by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var done by remember { mutableStateOf(false) }
+
+    if (done) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } },
+            title = { Text("PIN dikemas kini") },
+            text = { Text("PIN ibu bapa baharu telah disimpan.") }
+        )
+        return
+    }
+
+    PinEntryDialog(
+        title = when (step) {
+            ChangePinStep.CURRENT -> "PIN Semasa"
+            ChangePinStep.NEW -> "PIN Baharu"
+            ChangePinStep.CONFIRM -> "Sahkan PIN Baharu"
+        },
+        subtitle = when (step) {
+            ChangePinStep.CURRENT -> "Masukkan PIN ibu bapa semasa."
+            ChangePinStep.NEW -> "Pilih PIN 4 digit baharu."
+            ChangePinStep.CONFIRM -> "Masukkan PIN baharu sekali lagi."
+        },
+        message = message,
+        enabled = !busy,
+        onDismiss = onDismiss,
+        onPinComplete = { pin ->
+            when (step) {
+                ChangePinStep.CURRENT -> {
+                    currentPin = pin; message = null; step = ChangePinStep.NEW
                 }
 
-                // Numeric Keypad 1-9, Backspace, 0, OK
-                val keyRows = listOf(
-                    listOf("1", "2", "3"),
-                    listOf("4", "5", "6"),
-                    listOf("7", "8", "9"),
-                    listOf("C", "0", "⌫")
-                )
+                ChangePinStep.NEW -> {
+                    newPin = pin; message = null; step = ChangePinStep.CONFIRM
+                }
 
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    for (row in keyRows) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            for (key in row) {
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(44.dp)
-                                        .clickable {
-                                            when (key) {
-                                                "C" -> {
-                                                    enteredPin = ""
-                                                    isError = false
-                                                }
-                                                "⌫" -> {
-                                                    if (enteredPin.isNotEmpty()) {
-                                                        enteredPin = enteredPin.dropLast(1)
-                                                        isError = false
-                                                    }
-                                                }
-                                                else -> {
-                                                    if (!isLockedOut && enteredPin.length < 4) {
-                                                        val next = enteredPin + key
-                                                        enteredPin = next
-                                                        if (next.length == 4) {
-                                                            // Fix 1.1: Use PinManager (SHA-256) instead of hardcoded "1234"
-                                                            if (PinManager.verifyPin(context, next)) {
-                                                                attemptCount = 0
-                                                                onPinVerified()
-                                                            } else {
-                                                                attemptCount += 1
-                                                                isError = true
-                                                                enteredPin = ""
-                                                                if (attemptCount >= 3) {
-                                                                    lockoutSeconds = 30
-                                                                    attemptCount = 0
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        },
-                                    shape = SlotifyShapes.Small,
-                                    color = SlotifyColors.CanvasBase
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(
-                                            text = key,
-                                            style = MaterialTheme.typography.headlineSmall,
-                                            color = SlotifyColors.TextPrimary
-                                        )
-                                    }
-                                }
+                ChangePinStep.CONFIRM -> {
+                    if (pin != newPin) {
+                        message = "PIN tidak sepadan. Cuba lagi."
+                        step = ChangePinStep.NEW
+                        return@PinEntryDialog
+                    }
+                    busy = true
+                    scope.launch {
+                        val r = withContext(Dispatchers.Default) {
+                            if (hasPin) PinManager.changePin(context, currentPin, pin) else PinManager.setInitialPin(
+                                context,
+                                pin
+                            )
+                        }
+                        busy = false
+                        when (r) {
+                            PinResult.Success -> done = true
+                            is PinResult.LockedOut -> message =
+                                "🔒 Terlalu banyak cubaan. Cuba lagi dalam ${(r.remainingMs + 999) / 1000}s."
+
+                            else -> {
+                                message = "PIN semasa salah."; step = ChangePinStep.CURRENT
                             }
                         }
                     }
                 }
             }
         }
-    }
+    )
 }

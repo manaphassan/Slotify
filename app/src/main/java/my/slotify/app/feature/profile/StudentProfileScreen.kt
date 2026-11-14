@@ -25,6 +25,8 @@ import androidx.compose.ui.window.Dialog
 import my.slotify.app.core.database.StudentEntity
 import my.slotify.app.core.database.PbdAssessmentEntity
 import my.slotify.app.core.database.SlotifyDao
+import my.slotify.app.core.rewards.RewardKeys
+import my.slotify.app.core.rewards.StarRewards
 import my.slotify.app.core.model.KpmSubjectCatalog
 import my.slotify.app.core.designsystem.theme.NeumorphicElevation
 import my.slotify.app.core.designsystem.theme.SlotifyColors
@@ -43,13 +45,13 @@ private fun String.maskMyKid(): String {
 
 // Fix 4.2: Map raw database enum strings to human-readable Bahasa Melayu labels
 private fun String.toSessionTypeLabel(): String = when (this) {
-    "DUAL_SRA_SK"       -> "Sesi Dual (SRA + SK)"
+    "DUAL_SRA_SK" -> "Sesi Dual (SRA + SK)"
     "INTEGRATED_SRAISM" -> "Sesi Bersepadu Islam"
-    "TADIKA_DAYCARE"    -> "Tadika & Daycare"
-    "FULL_DAY"          -> "Sesi Penuh"
-    "MORNING"           -> "Sesi Pagi"
-    "AFTERNOON"         -> "Sesi Petang"
-    else                -> this
+    "TADIKA_DAYCARE" -> "Tadika & Daycare"
+    "FULL_DAY" -> "Sesi Penuh"
+    "MORNING" -> "Sesi Pagi"
+    "AFTERNOON" -> "Sesi Petang"
+    else -> this
 }
 
 @Composable
@@ -58,8 +60,7 @@ fun StudentProfileScreen(
     selectedStudent: StudentEntity?,
     onSelectStudent: (StudentEntity) -> Unit,
     onSaveProfile: (StudentEntity) -> Unit,
-    dao: SlotifyDao? = null,
-    onRewardStars: ((Int) -> Unit)? = null
+    dao: SlotifyDao? = null
 ) {
     var showEditDialog by remember { mutableStateOf(false) }
     var showAddPbdDialog by remember { mutableStateOf(false) }
@@ -461,7 +462,12 @@ fun StudentProfileScreen(
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                 modifier = Modifier.height(30.dp)
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = Color.White
+                                )
                                 Spacer(Modifier.width(4.dp))
                                 Text("Rekod TP", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
@@ -538,7 +544,10 @@ fun StudentProfileScreen(
                                                             fontSize = 9.sp,
                                                             fontWeight = FontWeight.Bold,
                                                             color = subjectColor,
-                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                            modifier = Modifier.padding(
+                                                                horizontal = 6.dp,
+                                                                vertical = 2.dp
+                                                            )
                                                         )
                                                     }
                                                     Spacer(Modifier.width(8.dp))
@@ -576,7 +585,9 @@ fun StudentProfileScreen(
                                                             .height(5.dp)
                                                             .clip(RoundedCornerShape(3.dp))
                                                             .background(
-                                                                if (isAchieved) tpColor else SlotifyColors.TextSecondary.copy(alpha = 0.2f)
+                                                                if (isAchieved) tpColor else SlotifyColors.TextSecondary.copy(
+                                                                    alpha = 0.2f
+                                                                )
                                                             )
                                                     )
                                                 }
@@ -616,6 +627,40 @@ fun StudentProfileScreen(
             }
         )
     }
+
+    if (showAddPbdDialog && selectedStudent != null && dao != null) {
+        AddPbdAssessmentDialog(
+            student = selectedStudent,
+            onDismiss = { showAddPbdDialog = false },
+            onSave = { assessment ->
+                showAddPbdDialog = false
+                coroutineScope.launch {
+                    dao.upsertAssessment(assessment)
+                    // One award per subject per assessment period, however often it is re-recorded.
+                    val stars = StarRewards.pbdStars(assessment.tahapPenguasaan)
+                    val paid = StarRewards.claimOnce(
+                        dao,
+                        assessment.studentId,
+                        RewardKeys.pbd(assessment.studentId, assessment.subjectCode, assessment.assessmentPeriod),
+                        stars
+                    )
+                    pbdCelebrationMessage = if (paid) {
+                        "🎉 TP${assessment.tahapPenguasaan} ${assessment.subjectName} direkodkan! +$stars ⭐"
+                    } else {
+                        "TP${assessment.tahapPenguasaan} ${assessment.subjectName} dikemas kini."
+                    }
+                }
+            }
+        )
+    }
+
+    pbdCelebrationMessage?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { pbdCelebrationMessage = null },
+            confirmButton = { TextButton(onClick = { pbdCelebrationMessage = null }) { Text("OK") } },
+            text = { Text(msg) }
+        )
+    }
 }
 
 @Composable
@@ -623,7 +668,11 @@ private fun BiometricMetricItem(title: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text = title, style = MaterialTheme.typography.labelSmall, color = SlotifyColors.TextSecondary)
         Spacer(Modifier.height(2.dp))
-        Text(text = value, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = SlotifyColors.TextPrimary)
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = SlotifyColors.TextPrimary
+        )
     }
 }
 
@@ -902,7 +951,12 @@ fun AddPbdAssessmentDialog(
                                 subjectName = selectedSubject.second,
                                 tahapPenguasaan = selectedTp,
                                 teacherComment = comment.ifBlank { "Penguasaan kemahiran subjek memuaskan." },
-                                assessedDate = "Okt 2026"
+                                assessedDate = java.time.LocalDate.now().format(
+                                    java.time.format.DateTimeFormatter.ofPattern(
+                                        "MMM yyyy",
+                                        java.util.Locale("ms", "MY")
+                                    )
+                                )
                             )
                             onSave(newAssessment)
                         },

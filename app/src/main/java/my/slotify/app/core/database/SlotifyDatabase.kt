@@ -15,29 +15,33 @@ import androidx.room.RoomDatabase
         ExamEntity::class,
         CommitmentFeeEntity::class,
         DailySpendingEntity::class,
-        PbdAssessmentEntity::class
+        PbdAssessmentEntity::class,
+        RewardClaimEntity::class
     ],
-    version = 5,
-    exportSchema = false
+    version = 6,
+    exportSchema = true
 )
 abstract class SlotifyDatabase : RoomDatabase() {
     abstract fun slotifyDao(): SlotifyDao
 
     companion object {
+        const val DATABASE_NAME = "slotify_database.db"
+
         @Volatile
         private var INSTANCE: SlotifyDatabase? = null
 
         fun getDatabase(context: Context): SlotifyDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
+                INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     SlotifyDatabase::class.java,
-                    "slotify_database.db"
+                    DATABASE_NAME
                 )
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(*SlotifyMigrations.ALL)
+                    // Versions 1–4 were pre-release builds without exported schemas.
+                    .fallbackToDestructiveMigrationFrom(1, 2, 3, 4)
                     .build()
-                INSTANCE = instance
-                instance
+                    .also { INSTANCE = it }
             }
         }
     }

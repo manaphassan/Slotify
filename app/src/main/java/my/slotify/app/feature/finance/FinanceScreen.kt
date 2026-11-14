@@ -34,6 +34,9 @@ import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.designsystem.theme.SlotifyShapes
 import my.slotify.app.core.designsystem.theme.neumorphic
 import my.slotify.app.core.designsystem.theme.strings
+import my.slotify.app.core.finance.FeeRepository
+import my.slotify.app.core.rewards.RewardKeys
+import my.slotify.app.core.rewards.StarRewards
 import my.slotify.app.core.notification.SlotifyNotificationManager
 import my.slotify.app.core.takwim.KpmTakwimRepository
 import my.slotify.app.feature.takwim.TakwimCalendarDialog
@@ -46,21 +49,27 @@ import java.util.UUID
 @Composable
 fun FinanceScreen(
     selectedStudent: StudentEntity?,
-    dao: SlotifyDao? = null,
-    onRewardStars: ((Int) -> Unit)? = null
+    dao: SlotifyDao? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     // Billing month key: "2026-09"
-    val billingMonth = remember {
-        LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"))
-    }
+    val billingMonth = remember { FeeRepository.monthKey() }
     // Today's date key: "2026-09-30"
     val todayKey = remember {
         LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
     }
     val todayDate = remember { LocalDate.now() }
+
+    // Recurring fees from the previous month are copied into a new month as unpaid.
+    LaunchedEffect(dao, billingMonth) {
+        dao?.let { FeeRepository.ensureMonth(it, billingMonth) }
+    }
+
+    val allStudents by remember(dao) {
+        dao?.getAllStudents() ?: kotlinx.coroutines.flow.flowOf(emptyList())
+    }.collectAsState(initial = emptyList())
 
     // Dialog & UI states
     var showAddFeeDialog by remember { mutableStateOf(false) }
@@ -84,23 +93,24 @@ fun FinanceScreen(
         dao?.getAllSpendingForStudent(sid) ?: kotlinx.coroutines.flow.flowOf(emptyList())
     }.collectAsState(initial = emptyList())
 
+    val savingsConversions: Int by remember(selectedStudent?.id, dao) {
+        val sid = selectedStudent?.id ?: return@remember kotlinx.coroutines.flow.flowOf(0)
+        dao?.countClaimsWithPrefix(sid, RewardKeys.SAVINGS_PREFIX) ?: kotlinx.coroutines.flow.flowOf(0)
+    }.collectAsState(initial = 0)
+
     // Derive spent from DB (fallback to 0.0 on first launch)
     val spentAmount = todaySpendingRow?.spentAmountRm ?: 0.0
     val budget = selectedStudent?.dailyCanteenBudget ?: 5.00
     val todaySaved = (budget - spentAmount).coerceAtLeast(0.0)
 
-    // Cumulative Tabung Maya savings
-    val cumulativeSavings = remember(allSpendings, budget, todaySaved) {
-        if (allSpendings.isEmpty()) {
-            25.00 + todaySaved
-        } else {
-            allSpendings.sumOf { (budget - it.spentAmountRm).coerceAtLeast(0.0) }
-        }
+    // Tabung Maya = recorded savings minus RM 10 per star conversion (no synthetic starting balance).
+    val cumulativeSavings = remember(allSpendings, budget, savingsConversions) {
+        StarRewards.tabungBalance(budget, allSpendings.map { it.spentAmountRm }, savingsConversions)
     }
 
     // ── Commitment summary ────────────────────────────────────────────────────
     val totalAmount = commitmentList.sumOf { it.amountRm }
-    val paidAmount  = commitmentList.filter { it.isPaid }.sumOf { it.amountRm }
+    val paidAmount = commitmentList.filter { it.isPaid }.sumOf { it.amountRm }
     val settledCount = commitmentList.count { it.isPaid }
     val pendingCount = commitmentList.size - settledCount
     val progressFraction = if (totalAmount > 0) (paidAmount / totalAmount).toFloat() else 0f
@@ -120,7 +130,7 @@ fun FinanceScreen(
             dao?.upsertDailySpending(
                 DailySpendingEntity(
                     studentId = sid,
-                    dateKey   = todayKey,
+                    dateKey = todayKey,
                     spentAmountRm = newAmount.coerceAtLeast(0.0)
                 )
             )
@@ -254,7 +264,11 @@ fun FinanceScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
-                            Text(text = strings.canteenSpentLabel, style = MaterialTheme.typography.bodySmall, color = SlotifyColors.TextSecondary)
+                            Text(
+                                text = strings.canteenSpentLabel,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = SlotifyColors.TextSecondary
+                            )
                             Text(
                                 text = "RM ${String.format("%.2f", spentAmount)}",
                                 style = MaterialTheme.typography.headlineMedium,
@@ -262,7 +276,11 @@ fun FinanceScreen(
                             )
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            Text(text = strings.savingsLabel, style = MaterialTheme.typography.bodySmall, color = SlotifyColors.TextSecondary)
+                            Text(
+                                text = strings.savingsLabel,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = SlotifyColors.TextSecondary
+                            )
                             Text(
                                 text = "+ RM ${String.format("%.2f", todaySaved)}",
                                 style = MaterialTheme.typography.headlineMedium,
@@ -291,7 +309,12 @@ fun FinanceScreen(
                                     containerColor = SlotifyColors.CanvasBase
                                 )
                             ) {
-                                Icon(Icons.Default.Remove, contentDescription = "Kurang", modifier = Modifier.size(16.dp), tint = SlotifyColors.TextPrimary)
+                                Icon(
+                                    Icons.Default.Remove,
+                                    contentDescription = "Kurang",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = SlotifyColors.TextPrimary
+                                )
                             }
                             // Quick RM 3.00
                             OutlinedButton(
@@ -300,7 +323,10 @@ fun FinanceScreen(
                                 modifier = Modifier.height(32.dp),
                                 shape = SlotifyShapes.Small
                             ) {
-                                Text("RM 3", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold))
+                                Text(
+                                    "RM 3",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                                )
                             }
                             // Quick RM 5.00
                             OutlinedButton(
@@ -309,7 +335,10 @@ fun FinanceScreen(
                                 modifier = Modifier.height(32.dp),
                                 shape = SlotifyShapes.Small
                             ) {
-                                Text("RM 5", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold))
+                                Text(
+                                    "RM 5",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                                )
                             }
                             // + RM 0.50
                             FilledTonalIconButton(
@@ -319,7 +348,12 @@ fun FinanceScreen(
                                     containerColor = SlotifyColors.CanvasBase
                                 )
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = "Tambah", modifier = Modifier.size(16.dp), tint = SlotifyColors.TextPrimary)
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = "Tambah",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = SlotifyColors.TextPrimary
+                                )
                             }
                         }
                     }
@@ -389,17 +423,24 @@ fun FinanceScreen(
                         Spacer(Modifier.width(8.dp))
                         Button(
                             onClick = {
-                                if (cumulativeSavings >= 10.0) {
-                                    onRewardStars?.invoke(10)
-                                    celebrationMessage = "🎉 Tahniah! RM 10 simpanan ditukarkan kepada +10 ⭐ Bintang untuk ${selectedStudent?.nickname ?: "Anak"}!"
-                                } else {
+                                val s = selectedStudent
+                                val d = dao
+                                if (s == null || d == null) return@Button
+                                if (cumulativeSavings < StarRewards.SAVINGS_CONVERSION_RM) {
                                     celebrationMessage = "Simpan sekurang-kurangnya RM 10 untuk menebus 10 ⭐ Bintang!"
+                                    return@Button
+                                }
+                                scope.launch {
+                                    if (StarRewards.convertSavings(d, s.id, cumulativeSavings)) {
+                                        celebrationMessage =
+                                            "🎉 Tahniah! RM 10 simpanan ditukarkan kepada +10 ⭐ Bintang untuk ${s.nickname}!"
+                                    }
                                 }
                             },
                             shape = SlotifyShapes.Small,
                             colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.ScienceGreen),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.height(34.dp)
+                            modifier = Modifier.heightIn(min = 48.dp)
                         ) {
                             Text("+10 ⭐ Bintang", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
@@ -410,7 +451,8 @@ fun FinanceScreen(
 
         // KPM Takwim Status Banner
         item {
-            val upcomingHoliday = remember { KpmTakwimRepository.getUpcomingHolidays(todayDate, limit = 1).firstOrNull() }
+            val upcomingHoliday =
+                remember { KpmTakwimRepository.getUpcomingHolidays(todayDate, limit = 1).firstOrNull() }
             val currentTerm = remember { KpmTakwimRepository.getCurrentTerm(todayDate) }
 
             Box(
@@ -479,7 +521,12 @@ fun FinanceScreen(
                                 color = SlotifyColors.TextPrimary
                             )
                             Text(
-                                text = "$settledCount / ${commitmentList.size} ${strings.paidLabel} (RM ${String.format("%.0f", paidAmount)} / RM ${String.format("%.0f", totalAmount)})",
+                                text = "$settledCount / ${commitmentList.size} ${strings.paidLabel} (RM ${
+                                    String.format(
+                                        "%.0f",
+                                        paidAmount
+                                    )
+                                } / RM ${String.format("%.0f", totalAmount)})",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = SlotifyColors.TextSecondary
                             )
@@ -518,17 +565,35 @@ fun FinanceScreen(
                         Tab(
                             selected = feeFilter == 0,
                             onClick = { feeFilter = 0 },
-                            text = { Text("Semua (${commitmentList.size})", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
+                            text = {
+                                Text(
+                                    "Semua (${commitmentList.size})",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         )
                         Tab(
                             selected = feeFilter == 1,
                             onClick = { feeFilter = 1 },
-                            text = { Text("Belum Bayar ($pendingCount)", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
+                            text = {
+                                Text(
+                                    "Belum Bayar ($pendingCount)",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         )
                         Tab(
                             selected = feeFilter == 2,
                             onClick = { feeFilter = 2 },
-                            text = { Text("Selesai ($settledCount)", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
+                            text = {
+                                Text(
+                                    "Selesai ($settledCount)",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         )
                     }
                 }
@@ -559,7 +624,9 @@ fun FinanceScreen(
             items(filteredFees, key = { it.id }) { fee ->
                 val isPaid = fee.isPaid
                 val badgeBg by animateColorAsState(
-                    targetValue = if (isPaid) SlotifyColors.ScienceGreen.copy(alpha = 0.15f) else SlotifyColors.MathAmber.copy(alpha = 0.15f),
+                    targetValue = if (isPaid) SlotifyColors.ScienceGreen.copy(alpha = 0.15f) else SlotifyColors.MathAmber.copy(
+                        alpha = 0.15f
+                    ),
                     label = "feeBadge"
                 )
                 val badgeText = if (isPaid) SlotifyColors.ScienceGreen else SlotifyColors.MathAmber
@@ -721,10 +788,20 @@ fun FinanceScreen(
 
                     Button(
                         onClick = {
+                            val unpaid = commitmentList.filter { !it.isPaid }
                             SlotifyNotificationManager.showTestNotification(
                                 context,
                                 "Slotify: Peringatan Yuran Bulanan",
-                                "Yuran Van Sekolah A (RM 80) perlu dijelaskan sebelum 1hb!"
+                                if (unpaid.isEmpty()) "Semua yuran bulan ini telah dijelaskan. ✓"
+                                else unpaid.joinToString("\n") {
+                                    "${it.title} (RM ${
+                                        String.format(
+                                            java.util.Locale.US,
+                                            "%.2f",
+                                            it.amountRm
+                                        )
+                                    }) • ${it.dueDateLabel}"
+                                }
                             )
                             notificationSentSnack = true
                         },
@@ -735,7 +812,10 @@ fun FinanceScreen(
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                         modifier = Modifier.height(32.dp)
                     ) {
-                        Text("Uji Sekarang", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold))
+                        Text(
+                            "Uji Sekarang",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                        )
                     }
                 }
             }
@@ -751,6 +831,7 @@ fun FinanceScreen(
     if (showAddFeeDialog) {
         AddCommitmentFeeDialog(
             billingMonth = billingMonth,
+            childOptions = allStudents.map { it.nickname } + "Semua Anak",
             onDismissRequest = { showAddFeeDialog = false },
             onSaveFee = { newFee ->
                 scope.launch {
@@ -771,18 +852,19 @@ fun FinanceScreen(
 @Composable
 fun AddCommitmentFeeDialog(
     billingMonth: String,
+    childOptions: List<String>,
     onDismissRequest: () -> Unit,
     onSaveFee: (CommitmentFeeEntity) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var amountText by remember { mutableStateOf("") }
-    var selectedChild by remember { mutableStateOf("Adam") }
+    var selectedChild by remember { mutableStateOf(childOptions.firstOrNull() ?: "Semua Anak") }
     var selectedCategoryEmoji by remember { mutableStateOf("🚌") }
     var dueDateLabel by remember { mutableStateOf("1hb Setiap Bulan") }
 
-    val children = listOf("Adam", "Aisyah", "Danial", "Semua Anak")
+    val children = childOptions
     val emojis = listOf("🚌", "🏫", "📋", "🏊‍♂️", "🥋", "📚", "🎨", "💰")
-    val duePresets = listOf("1hb Setiap Bulan", "5hb Setiap Bulan", "10hb Setiap Bulan", "Hujung Bulan")
+    val duePresets = listOf("1hb Setiap Bulan", "5hb Setiap Bulan", "10hb Setiap Bulan", "Hujung Bulan", "Sekali Bayar")
 
     Dialog(onDismissRequest = onDismissRequest) {
         Surface(
@@ -825,7 +907,11 @@ fun AddCommitmentFeeDialog(
 
                 // Target child selection
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Penerima / Anak:", style = MaterialTheme.typography.labelMedium, color = SlotifyColors.TextSecondary)
+                    Text(
+                        "Penerima / Anak:",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = SlotifyColors.TextSecondary
+                    )
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         items(children) { child ->
                             FilterChip(
@@ -839,7 +925,11 @@ fun AddCommitmentFeeDialog(
 
                 // Category Emoji selection
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Kategori Ikon:", style = MaterialTheme.typography.labelMedium, color = SlotifyColors.TextSecondary)
+                    Text(
+                        "Kategori Ikon:",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = SlotifyColors.TextSecondary
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -862,7 +952,11 @@ fun AddCommitmentFeeDialog(
 
                 // Due date preset selection
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Tarikh Bayaran:", style = MaterialTheme.typography.labelMedium, color = SlotifyColors.TextSecondary)
+                    Text(
+                        "Tarikh Bayaran:",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = SlotifyColors.TextSecondary
+                    )
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         items(duePresets) { due ->
                             FilterChip(
@@ -888,17 +982,20 @@ fun AddCommitmentFeeDialog(
                     Spacer(Modifier.width(8.dp))
                     Button(
                         onClick = {
-                            val amt = amountText.toDoubleOrNull() ?: 0.0
+                            val amt = amountText.replace(',', '.').toDoubleOrNull() ?: 0.0
                             if (title.isNotBlank() && amt > 0) {
+                                val seriesId = UUID.randomUUID().toString()
                                 val newFee = CommitmentFeeEntity(
-                                    id = UUID.randomUUID().toString(),
+                                    id = FeeRepository.feeId(seriesId, billingMonth),
                                     title = title.trim(),
                                     childTarget = selectedChild,
                                     amountRm = amt,
                                     dueDateLabel = dueDateLabel,
                                     billingMonth = billingMonth,
                                     isPaid = false,
-                                    categoryEmoji = selectedCategoryEmoji
+                                    categoryEmoji = selectedCategoryEmoji,
+                                    seriesId = seriesId,
+                                    isRecurring = FeeRepository.looksRecurring(dueDateLabel)
                                 )
                                 onSaveFee(newFee)
                             }

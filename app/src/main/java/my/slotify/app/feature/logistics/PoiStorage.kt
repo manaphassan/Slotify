@@ -1,24 +1,19 @@
 package my.slotify.app.feature.logistics
 
 import android.content.Context
+import my.slotify.app.core.profile.FamilyProfileData
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
+import kotlin.math.abs
 
 object PoiStorage {
     private const val PREFS_NAME = "slotify_logistics_pois"
     private const val KEY_POIS_JSON = "pois_json_v2"
     private const val OLD_KEY_POIS_JSON = "pois_json_v1"
 
-    val defaultPois: List<PoiItem> = listOf(
-        PoiItem("poi-1", "Rumah Kediaman", PoiCategory.RUMAH, "🏠", 3.1390, 101.6869, 0.0, "Taman Contoh, 00000 Bandar Contoh"),
-        PoiItem("poi-2", "SK Taman Contoh (SK)", PoiCategory.SEKOLAH, "🏫", 3.1390, 101.6869, 2.4, "Jalan Contoh 1, 00000 Bandar Contoh"),
-        PoiItem("poi-3", "SRA Taman Contoh (SRA)", PoiCategory.SEKOLAH, "🕌", 3.1390, 101.6869, 2.5, "Jalan Contoh 2, Taman Contoh"),
-        PoiItem("poi-4", "Taska Ceria (Transit)", PoiCategory.TRANSIT, "🎒", 3.1390, 101.6869, 0.6, "Taman Contoh, Bandar Contoh"),
-        PoiItem("poi-5", "Tadika Ceria (Danial)", PoiCategory.TRANSIT, "🧒", 3.1390, 101.6869, 1.9, "Taman Contoh, Bandar Contoh"),
-        PoiItem("poi-6", "SRAI Bukit Contoh (SRAI)", PoiCategory.SEKOLAH, "📚", 3.1390, 101.6869, 4.2, "Jalan Contoh 3, Bukit Contoh, Bandar Contoh"),
-        PoiItem("poi-7", "Pejabat", PoiCategory.PEJABAT, "🏢", 3.1390, 101.6869, 7.5, "Pusat Bandar Contoh, Bandar Contoh")
-    )
+    val defaultPois: List<PoiItem>
+        get() = FamilyProfileData.defaultPois
 
     fun loadPois(context: Context): List<PoiItem> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -28,23 +23,20 @@ object PoiStorage {
         return try {
             val arr = JSONArray(json)
             val result = mutableListOf<PoiItem>()
+            var corrected = false
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
                 val rawLat = obj.getDouble("lat")
                 val rawLng = obj.getDouble("lng")
                 val poiId = obj.optString("id", UUID.randomUUID().toString())
 
-                // Auto-migrate old inaccurate mock coordinates (e.g. 3.1390 or 3.1390) to verified coordinates
-                val (migratedLat, migratedLng) = when {
-                    poiId == "poi-1" && (kotlin.math.abs(rawLat - 3.1390) < 0.001 || kotlin.math.abs(rawLat - 3.1390) < 0.001) -> 3.1390 to 101.6869
-                    poiId == "poi-2" && kotlin.math.abs(rawLat - 3.1390) < 0.001 -> 3.1390 to 101.6869
-                    poiId == "poi-3" && kotlin.math.abs(rawLat - 3.1390) < 0.001 -> 3.1390 to 101.6869
-                    poiId == "poi-4" && (kotlin.math.abs(rawLat - 3.1390) < 0.001 || kotlin.math.abs(rawLat - 3.1390) < 0.001) -> 3.1390 to 101.6869
-                    poiId == "poi-5" && (kotlin.math.abs(rawLat - 3.1390) < 0.001 || kotlin.math.abs(rawLat - 3.1390) < 0.001) -> 3.1390 to 101.6869
-                    poiId == "poi-6" && kotlin.math.abs(rawLat - 3.1390) < 0.001 -> 3.1390 to 101.6869
-                    poiId == "poi-7" && kotlin.math.abs(rawLat - 3.1390) < 0.001 -> 3.1390 to 101.6869
-                    else -> rawLat to rawLng
+                // Profile-supplied fixes for stale coordinates written by older builds.
+                val fix = FamilyProfileData.legacyPoiCorrections.firstOrNull { c ->
+                    c.poiId == poiId && c.staleLatitudes.any { abs(rawLat - it) < 0.001 }
                 }
+                if (fix != null) corrected = true
+                val migratedLat = fix?.correctedLat ?: rawLat
+                val migratedLng = fix?.correctedLng ?: rawLng
 
                 result.add(
                     PoiItem(
@@ -63,7 +55,13 @@ object PoiStorage {
                     )
                 )
             }
-            if (result.isEmpty()) defaultPois else result
+            if (result.isEmpty()) {
+                defaultPois
+            } else {
+                // Persist migrations so they are applied once and cannot clobber later edits.
+                if (corrected || !prefs.contains(KEY_POIS_JSON)) savePois(context, result)
+                result
+            }
         } catch (e: Exception) {
             defaultPois
         }
@@ -90,7 +88,7 @@ object PoiStorage {
 
     fun resetToDefaults(context: Context): List<PoiItem> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().remove(KEY_POIS_JSON).apply()
+        prefs.edit().remove(KEY_POIS_JSON).remove(OLD_KEY_POIS_JSON).apply()
         return defaultPois
     }
 }

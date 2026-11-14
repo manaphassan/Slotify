@@ -1,74 +1,75 @@
 package my.slotify.app.feature.logistics
 
-import org.junit.Assert.*
-import org.junit.Before
+import my.slotify.app.feature.logistics.GeofenceEventType.APPROACHING
+import my.slotify.app.feature.logistics.GeofenceEventType.ENTERED
+import my.slotify.app.feature.logistics.GeofenceEventType.EXITED
+import my.slotify.app.feature.logistics.GeofenceEventType.INSIDE
+import my.slotify.app.feature.logistics.GeofenceEventType.NONE
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GeofenceManagerTest {
 
-    private val rumahLat = 3.1390
-    private val rumahLng = 101.6869
+    private val radius = 300.0
 
-    private val skLat = 3.1390
-    private val skLng = 101.6869
-
-    @Before
-    fun setUp() {
-        GeofenceManager.resetCooldowns()
+    /** Runs the state machine over a sequence of distances; returns states and alerts. */
+    private fun run(vararg distances: Double): Pair<List<GeofenceEventType>, List<GeofenceEventType>> {
+        var state = NONE
+        val states = mutableListOf<GeofenceEventType>()
+        val alerts = mutableListOf<GeofenceEventType>()
+        for (d in distances) {
+            val next = GeofenceStateMachine.next(state, d, radius)
+            GeofenceStateMachine.alertFor(state, next)?.let { alerts += it }
+            state = next
+            states += next
+        }
+        return states to alerts
     }
 
     @Test
-    fun testCalculateDistanceMeters_RumahToSkol() {
-        val distance = GeofenceManager.calculateDistanceMeters(
-            rumahLat, rumahLng,
-            skLat, skLng
-        )
-
-        // Distance between Rumah (Taman Contoh) and SK Taman Contoh is ~2.4 km
-        assertTrue("Distance should be between 2300m and 2550m", distance in 2300.0..2550.0)
+    fun haversineDistance_oneHundredthDegreeLatitude_isAbout1112m() {
+        val d = GeofenceManager.calculateDistanceMeters(3.0, 101.0, 3.01, 101.0)
+        assertTrue("was $d", d in 1100.0..1125.0)
     }
 
     @Test
-    fun testOfflineMapBoundingBoxEnclosesFamilyNodes() {
-        val bbox = OfflineMapManager.REGION_BOUNDING_BOX
-
-        // Check North/South & East/West integrity
-        assertTrue(bbox.latNorth > bbox.latSouth)
-        assertTrue(bbox.lonEast > bbox.lonWest)
-
-        // Check that Rumah is inside the pre-cached bounding box
-        assertTrue("Rumah lat must be within bbox", rumahLat in bbox.latSouth..bbox.latNorth)
-        assertTrue("Rumah lng must be within bbox", rumahLng in bbox.lonWest..bbox.lonEast)
-
-        // Check that SK is inside
-        assertTrue("SK lat must be within bbox", skLat in bbox.latSouth..bbox.latNorth)
-        assertTrue("SK lng must be within bbox", skLng in bbox.lonWest..bbox.lonEast)
-
-        // Check that Pejabat Abah in Bandar Contoh is inside
-        val regionLat = 3.1390
-        val regionLng = 101.6869
-        assertTrue("Bandar Contoh lat must be within bbox", regionLat in bbox.latSouth..bbox.latNorth)
-        assertTrue("Bandar Contoh lng must be within bbox", regionLng in bbox.lonWest..bbox.lonEast)
-
-        // Check tile estimation
-        val estimatedTiles = OfflineMapManager.estimateTileCount(12, 16)
-        assertTrue("Estimated tiles should be positive", estimatedTiles > 300)
+    fun arriving_firesApproachingThenEntered_once() {
+        val (states, alerts) = run(2000.0, 500.0, 400.0, 250.0, 100.0, 50.0)
+        assertEquals(listOf(NONE, APPROACHING, APPROACHING, ENTERED, INSIDE, INSIDE), states)
+        assertEquals(listOf(APPROACHING, ENTERED), alerts)
     }
 
     @Test
-    fun testGeofenceTargetModelAndRadius() {
-        val target = GeofenceTarget(
-            id = "test-1",
-            name = "SK Taman Contoh",
-            lat = skLat,
-            lng = skLng,
-            radiusMeters = 350.0,
-            iconEmoji = "🏫"
-        )
+    fun startingInside_firesEnteredOnly() {
+        val (_, alerts) = run(10.0, 20.0)
+        assertEquals(listOf(ENTERED), alerts)
+    }
 
-        assertEquals("test-1", target.id)
-        assertEquals("SK Taman Contoh", target.name)
-        assertEquals(350.0, target.radiusMeters, 0.01)
-        assertEquals("🏫", target.iconEmoji)
+    @Test
+    fun leaving_neverReportsApproaching() {
+        val (states, alerts) = run(50.0, 320.0, 400.0, 550.0, 700.0, 2000.0)
+        // 320 m is within the 10 % exit hysteresis, so still INSIDE.
+        assertEquals(listOf(ENTERED, INSIDE, EXITED, EXITED, NONE, NONE), states)
+        assertEquals(listOf(ENTERED), alerts)
+    }
+
+    @Test
+    fun gpsJitterAtBoundary_doesNotRefireEntered() {
+        val (_, alerts) = run(290.0, 310.0, 295.0, 320.0, 299.0)
+        assertEquals(listOf(ENTERED), alerts)
+    }
+
+    @Test
+    fun reEnteringAfterExit_firesEnteredAgain() {
+        val (_, alerts) = run(50.0, 400.0, 100.0)
+        assertEquals(listOf(ENTERED, ENTERED), alerts)
+    }
+
+    @Test
+    fun noAlertWhileStayingApproaching() {
+        assertNull(GeofenceStateMachine.alertFor(APPROACHING, APPROACHING))
+        assertNull(GeofenceStateMachine.alertFor(INSIDE, INSIDE))
     }
 }

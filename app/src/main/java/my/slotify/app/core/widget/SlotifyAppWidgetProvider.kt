@@ -1,21 +1,29 @@
 package my.slotify.app.core.widget
 
+import android.Manifest
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.RemoteViews
+import androidx.core.content.ContextCompat
 import androidx.work.*
 import my.slotify.app.MainActivity
 import my.slotify.app.R
 import my.slotify.app.core.database.SlotifyDatabase
+import my.slotify.app.core.model.AttireGuide
+import my.slotify.app.core.profile.FamilyProfileData
+import my.slotify.app.core.profile.zoneAt
+import my.slotify.app.core.takwim.JakimPrayerTimeHelper
+import my.slotify.app.core.time.SchoolDay
+import my.slotify.app.feature.dashboard.SchoolBagHelper
 import my.slotify.app.feature.logistics.GeofenceManager
 import my.slotify.app.feature.logistics.GpsLocationHelper
+import java.time.LocalDate
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.util.Calendar
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
@@ -28,8 +36,7 @@ import kotlin.math.roundToInt
  * this class stays on the main thread — AppWidgetProvider cannot suspend itself.
  *
  * onReceive() intercepts [ACTION_SWITCH_STUDENT] when user taps "⇄ Tukar" or
- * child name to cycle seamlessly between Adam, Aisyah, and Danial directly from
- * the Android home screen.
+ * child name to cycle between the family's children directly from the home screen.
  */
 class SlotifyAppWidgetProvider : AppWidgetProvider() {
 
@@ -88,7 +95,7 @@ class SlotifyAppWidgetProvider : AppWidgetProvider() {
         views.setTextViewText(R.id.widget_current_class, "⏳ Mengambil jadual…")
         views.setTextViewText(R.id.widget_next_class, "")
         views.setTextViewText(R.id.widget_books, "")
-        views.setTextViewText(R.id.widget_siblings_status, "👦 Adam • 👧 Aisyah • 🧒 Danial")
+        views.setTextViewText(R.id.widget_siblings_status, "")
         views.setTextViewText(R.id.widget_attire, "")
         appWidgetManager.updateAppWidget(appWidgetId, views)
     }
@@ -113,7 +120,7 @@ class SlotifyAppWidgetProvider : AppWidgetProvider() {
             books: String,
             attire: String,
             locationZone: String = "📍 Zon: Memuatkan...",
-            siblingsSummary: String = "👦 Adam • 👧 Aisyah • 🧒 Danial"
+            siblingsSummary: String = ""
         ) {
             val appWidgetManager = AppWidgetManager.getInstance(context)
             val component = android.content.ComponentName(context, SlotifyAppWidgetProvider::class.java)
@@ -177,187 +184,110 @@ class WidgetUpdateWorker(
         return try {
             val dao = SlotifyDatabase.getDatabase(context).slotifyDao()
 
-            // 1. Get all students and read current active index from SharedPreferences
+            // 1. Students and the widget's active index
             val students = dao.getAllStudentsOnce()
             if (students.isEmpty()) return pushFallback()
 
             val prefs = context.getSharedPreferences(SlotifyAppWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
             val rawIndex = prefs.getInt(SlotifyAppWidgetProvider.PREF_STUDENT_INDEX, 0)
-            val activeIndex = if (students.isNotEmpty()) (rawIndex % students.size + students.size) % students.size else 0
+            val activeIndex = ((rawIndex % students.size) + students.size) % students.size
             prefs.edit().putInt(SlotifyAppWidgetProvider.PREF_STUDENT_INDEX, activeIndex).apply()
-
             val student = students[activeIndex]
 
-            // 2. Get active school session for this child
-            val sessions = dao.getSessionsOnce(student.id)
+            val sessions = dao.getSessionsOnce(student.id).sortedBy { it.startTime }
             if (sessions.isEmpty()) return pushFallback()
 
             val now = LocalTime.now()
-            val calDay = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
-            val dayOfWeek = when (calDay) {
-                Calendar.MONDAY    -> 1
-                Calendar.TUESDAY   -> 2
-                Calendar.WEDNESDAY -> 3
-                Calendar.THURSDAY  -> 4
-                Calendar.FRIDAY    -> 5
-                else               -> -1 // Weekend
-            }
-            val isWeekend = dayOfWeek == -1
-            val timeMinutes = now.hour * 60 + now.minute
+            val today = LocalDate.now()
+            val schoolDay = SchoolDay.of(today)
+            val isWeekend = schoolDay == null
+            val minuteOfDay = now.hour * 60 + now.minute
+            val nowText = String.format(Locale.US, "%02d:%02d", now.hour, now.minute)
 
-            // Pick session: For dual-session (like Adam with SRA pagi + SK petang), choose based on current time
-            val session = if (sessions.size > 1) {
-                if (timeMinutes < 11 * 60 + 30) sessions.first() else sessions.last()
-            } else {
-                sessions.first()
-            }
+            // Session in progress, else the next one today, else the last one.
+            val session = sessions.firstOrNull { it.startTime <= nowText && nowText < it.endTime }
+                ?: sessions.firstOrNull { it.startTime > nowText }
+                ?: sessions.last()
 
-            // 3. Proximity / Zone for the active child
-            val gpsFix = runCatching { GpsLocationHelper.getAccurateLocation(context, timeoutMs = 2500L) }.getOrNull()
-            val zoneText: String = if (gpsFix != null) {
-                val targets = GeofenceManager.getDefaultTargets(context)
-                val closest = targets.minByOrNull { t ->
-                    GeofenceManager.calculateDistanceMeters(gpsFix.latitude, gpsFix.longitude, t.lat, t.lng)
-                }
-                if (closest != null) {
-                    val dist = GeofenceManager.calculateDistanceMeters(gpsFix.latitude, gpsFix.longitude, closest.lat, closest.lng)
-                    when {
-                        dist <= closest.radiusMeters -> "📍 Zon: ${closest.iconEmoji} ${closest.name} (Dalam Zon)"
-                        dist <= closest.radiusMeters * 2 -> "📍 Menghampiri ${closest.iconEmoji} ${closest.name} (~${dist.roundToInt()}m)"
-                        else -> "📍 Zon: ${closest.iconEmoji} ${closest.name} (~${String.format(Locale.US, "%.1f", dist / 1000.0)}km)"
-                    }
-                } else {
-                    "📍 Koordinat: ${String.format(Locale.US, "%.4f", gpsFix.latitude)}, ${String.format(Locale.US, "%.4f", gpsFix.longitude)}"
-                }
-            } else {
-                // Intelligent schedule-based estimation customized per student
-                if (isWeekend) {
-                    "📍 Zon: 🏠 Rumah (Hujung Minggu)"
-                } else {
-                    when (student.nickname) {
-                        "Aisyah" -> when {
-                            timeMinutes < 7 * 60 + 15 -> "📍 Zon: 🏠 Rumah (Persediaan)"
-                            timeMinutes < 15 * 60 + 30 -> "📍 Zon: 🕌 SRAI Bukit Contoh (Seharian)"
-                            timeMinutes < 16 * 60 + 15 -> "📍 Transit: 🚐 Van Sekolah B"
-                            else -> "📍 Zon: 🏠 Rumah (Rehat & Solat)"
-                        }
-                        "Danial" -> when {
-                            timeMinutes < 7 * 60 + 45 -> "📍 Zon: 🏠 Rumah (Persediaan)"
-                            timeMinutes < 12 * 60 -> "📍 Zon: 🎒 Tadika Ceria (Adik Pintar)"
-                            else -> "📍 Zon: 🏠 Rumah (Bermain & Rehat)"
-                        }
-                        else -> when { // Adam (default)
-                            timeMinutes < 7 * 60 + 30 -> "📍 Zon: 🏠 Rumah (Persediaan)"
-                            timeMinutes < 11 * 60 + 15 -> "📍 Zon: 🕌 SRA Taman Contoh (Sesi Pagi)"
-                            timeMinutes < 12 * 60 + 45 -> "📍 Zon: 👶 Transit Taska Ceria"
-                            timeMinutes < 18 * 60 -> "📍 Zon: 🏫 SK Taman Contoh (Sesi Petang)"
-                            timeMinutes < 18 * 60 + 45 -> "📍 Transit: 🚐 Van Sekolah A"
-                            else -> "📍 Zon: 🏠 Rumah (Ulangkaji & Rehat)"
-                        }
-                    }
-                }
+            // 2. Zone: GPS only when background location is granted, else the profile routine.
+            val gpsFix = if (hasBackgroundLocation()) {
+                runCatching { GpsLocationHelper.getAccurateLocation(context, timeoutMs = 2500L) }.getOrNull()
+            } else null
+            val routine = FamilyProfileData.routineZones[student.id].orEmpty()
+            val zoneText: String = when {
+                gpsFix != null -> gpsZoneText(gpsFix.latitude, gpsFix.longitude)
+                isWeekend -> "📍 Zon: 🏠 Rumah (Hujung Minggu)"
+                else -> routine.zoneAt(minuteOfDay)?.let { "📍 ${it.label}" } ?: "📍 Zon: Buka Peta Logistik"
             }
 
-            // 4. Multi-Child Siblings Summary Row (Highlighting active student!)
-            val adamStatus = when {
-                timeMinutes < 7 * 60 + 30 -> "Rumah"
-                timeMinutes < 11 * 60 + 15 -> "SRA"
-                timeMinutes < 12 * 60 + 45 -> "Transit"
-                timeMinutes < 18 * 60 -> "SK"
-                timeMinutes < 18 * 60 + 45 -> "Van"
-                else -> "Rumah"
-            }
-            val aisyahStatus = when {
-                timeMinutes in (7 * 60 + 30)..(15 * 60 + 30) -> "SRAI"
-                timeMinutes in (15 * 60 + 30)..(16 * 60 + 15) -> "Van Sekolah B"
-                else -> "Rumah"
-            }
-            val danialStatus = when {
-                timeMinutes in (8 * 60)..(12 * 60) -> "Tadika"
-                else -> "Rumah"
+            // 3. Siblings summary (active child in brackets)
+            val siblingsSummary = students.joinToString(" • ") { s ->
+                val status = if (isWeekend) "🏠"
+                else FamilyProfileData.routineZones[s.id].orEmpty().zoneAt(minuteOfDay)?.shortLabel ?: "–"
+                val label = "${s.avatarEmoji} ${s.nickname}: $status"
+                if (s.id == student.id) "[$label]" else label
             }
 
-            val siblingsSummary = if (isWeekend) {
-                when (student.nickname) {
-                    "Aisyah" -> "👦 Adam • [👧 Aisyah: 🏠] • 🧒 Danial"
-                    "Danial" -> "👦 Adam • 👧 Aisyah • [🧒 Danial: 🏠]"
-                    else -> "[👦 Adam: 🏠] • 👧 Aisyah • 🧒 Danial"
-                }
-            } else {
-                when (student.nickname) {
-                    "Aisyah" -> "👦 Adam: $adamStatus • [👧 Aisyah: $aisyahStatus] • 🧒 Danial: $danialStatus"
-                    "Danial" -> "👦 Adam: $adamStatus • 👧 Aisyah: $aisyahStatus • [🧒 Danial: $danialStatus]"
-                    else -> "[👦 Adam: $adamStatus] • 👧 Aisyah: $aisyahStatus • 🧒 Danial: $danialStatus"
-                }
-            }
+            val prayerSchedule = JakimPrayerTimeHelper.getSchedule(now)
+            val isBagPacked = SchoolBagHelper.isBagPackedToday(context, student.id)
 
-            // Weekend state
             if (isWeekend) {
-                val prayerSchedule = my.slotify.app.core.takwim.JakimPrayerTimeHelper.getSchedule(now)
-                val isBagPacked = my.slotify.app.feature.dashboard.SchoolBagHelper.isBagPackedToday(context, student.id)
-                val booksText = if (isBagPacked) "🎒 Beg Siap Dikemas ✓" else "📚 Semak beg untuk Isnin"
-                val attireText = "👕 Santai • 🕌 ${prayerSchedule.nextPrayerName} (${prayerSchedule.countdownText})"
-
                 SlotifyAppWidgetProvider.pushUpdate(
                     context = context,
                     childName = "${student.avatarEmoji} ${student.nickname}",
                     sessionLabel = sessionLabel(session.sessionTimeType),
                     currentClass = "🎉 Hujung Minggu! Rehat & Enjoy",
-                    nextClass = "⏩ Sekolah semula Isnin depan",
-                    books = booksText,
-                    attire = attireText,
+                    nextClass = "⏩ Sekolah semula Isnin",
+                    books = if (isBagPacked) "🎒 Beg Siap Dikemas ✓" else "📚 Semak beg untuk Isnin",
+                    attire = "👕 Santai • 🕌 ${prayerSchedule.nextPrayerName} (${prayerSchedule.countdownText})",
                     locationZone = zoneText,
                     siblingsSummary = siblingsSummary
                 )
                 return Result.success()
             }
 
-            // 5. Load today's slots & determine current / next
-            val slots = dao.getSlotsOnce(session.id, dayOfWeek)
-                .filter { !it.isRehat }
+            // 4. Today's slots across all of the student's sessions
+            val slots = dao.getStudentSlotsForDayOnce(student.id, schoolDay!!).filter { !it.isRehat }
+            val currentSlot = slots.lastOrNull { it.startTime <= nowText && nowText < it.endTime }
+            val nextSlot = slots.firstOrNull { it.startTime > nowText }
 
-            val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
+            val currentText = currentSlot?.let { "⏳ ${it.subjectName} (${it.startTime} - ${it.endTime})" }
+                ?: if (nextSlot != null) "⏳ Belum bermula — bersedia sekarang!" else "✅ Kelas hari ini selesai"
+            val nextText = nextSlot?.let { "⏩ Seterusnya: ${it.subjectName} (${it.startTime})" } ?: "⏩ Tamat sesi hari ini ✓"
 
-            val currentSlot = slots.lastOrNull { slot ->
-                runCatching { LocalTime.parse(slot.startTime, timeFmt) <= now }.getOrDefault(false)
-            }
-            val nextSlot = slots.firstOrNull { slot ->
-                runCatching { LocalTime.parse(slot.startTime, timeFmt) > now }.getOrDefault(false)
-            }
-
-            // 6. Compose display strings
-            val currentText = if (currentSlot != null) {
-                "⏳ ${currentSlot.subjectName} (${currentSlot.startTime} - ${currentSlot.endTime})"
-            } else {
-                "⏳ Belum bermula — bersedia sekarang!"
-            }
-
-            val nextText = if (nextSlot != null) {
-                "⏩ Seterusnya: ${nextSlot.subjectName} (${nextSlot.startTime})"
-            } else {
-                "⏩ Tamat sesi hari ini ✓"
-            }
-
-            val prayerSchedule = my.slotify.app.core.takwim.JakimPrayerTimeHelper.getSchedule(now)
-            val isBagPacked = my.slotify.app.feature.dashboard.SchoolBagHelper.isBagPackedToday(context, student.id)
-            val booksText = if (isBagPacked) "🎒 Beg Siap Dikemas ✓" else bookHintForSubject(currentSlot?.subjectCode ?: nextSlot?.subjectCode)
-            val attireText = "${attireForDay(calDay)} • 🕌 ${prayerSchedule.nextPrayerName} (${prayerSchedule.countdownText})"
-
-            // 7. Push to widget
             SlotifyAppWidgetProvider.pushUpdate(
                 context      = context,
                 childName    = "${student.avatarEmoji} ${student.nickname}",
                 sessionLabel = "${session.className} (${sessionLabel(session.sessionTimeType)})",
                 currentClass = currentText,
                 nextClass    = nextText,
-                books        = booksText,
-                attire       = attireText,
+                books        = if (isBagPacked) "🎒 Beg Siap Dikemas ✓" else bookHintForSubject(currentSlot?.subjectCode ?: nextSlot?.subjectCode),
+                attire       = "👕 ${AttireGuide.forSchoolDay(schoolDay)} • 🕌 ${prayerSchedule.nextPrayerName} (${prayerSchedule.countdownText})",
                 locationZone = zoneText,
                 siblingsSummary = siblingsSummary
             )
             Result.success()
         } catch (e: Exception) {
             pushFallback()
+        }
+    }
+
+    private fun hasBackgroundLocation(): Boolean {
+        fun granted(p: String) = ContextCompat.checkSelfPermission(context, p) == PackageManager.PERMISSION_GRANTED
+        val foreground = granted(Manifest.permission.ACCESS_FINE_LOCATION) || granted(Manifest.permission.ACCESS_COARSE_LOCATION)
+        val background = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        return foreground && background
+    }
+
+    private fun gpsZoneText(lat: Double, lng: Double): String {
+        val targets = GeofenceManager.getDefaultTargets(context)
+        val closest = targets.minByOrNull { GeofenceManager.calculateDistanceMeters(lat, lng, it.lat, it.lng) }
+            ?: return "📍 Koordinat: ${String.format(Locale.US, "%.4f, %.4f", lat, lng)}"
+        val dist = GeofenceManager.calculateDistanceMeters(lat, lng, closest.lat, closest.lng)
+        return when {
+            dist <= closest.radiusMeters -> "📍 Zon: ${closest.iconEmoji} ${closest.name} (Dalam Zon)"
+            dist <= closest.radiusMeters * 2 -> "📍 Menghampiri ${closest.iconEmoji} ${closest.name} (~${dist.roundToInt()}m)"
+            else -> "📍 Zon: ${closest.iconEmoji} ${closest.name} (~${String.format(Locale.US, "%.1f", dist / 1000.0)}km)"
         }
     }
 
@@ -371,7 +301,7 @@ class WidgetUpdateWorker(
             books = "📚 Buka app untuk semak beg",
             attire = "👕 Semak pakaian sekolah",
             locationZone = "📍 Zon: Buka Peta Logistik",
-            siblingsSummary = "👦 Adam • 👧 Aisyah • 🧒 Danial: Di Rumah"
+            siblingsSummary = ""
         )
         return Result.success()
     }
@@ -383,15 +313,6 @@ class WidgetUpdateWorker(
         "PETANG"   -> "Sesi Petang"
         "FULL_DAY" -> "Seharian"
         else       -> sessionTimeType
-    }
-
-    private fun attireForDay(calDay: Int) = when (calDay) {
-        Calendar.MONDAY    -> "👕 Uniform Penuh KPM"
-        Calendar.TUESDAY   -> "👕 Baju Sukan Sekolah"
-        Calendar.WEDNESDAY -> "👕 Badan Beruniform (Pengakap / PRS)"
-        Calendar.THURSDAY  -> "👕 Baju Batik KPM"
-        Calendar.FRIDAY    -> "👕 Baju Melayu Lengkap"
-        else               -> "👕 Pakaian Bebas / Hujung Minggu"
     }
 
     private fun bookHintForSubject(subjectCode: String?) = when (subjectCode) {

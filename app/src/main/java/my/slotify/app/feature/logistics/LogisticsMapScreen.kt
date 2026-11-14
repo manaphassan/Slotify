@@ -63,6 +63,13 @@ import my.slotify.app.core.designsystem.theme.strings
 import java.util.UUID
 import java.util.Locale
 import kotlin.math.abs
+import org.osmdroid.views.overlay.CopyrightOverlay
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import kotlin.math.roundToInt
+import my.slotify.app.core.profile.FamilyProfileData
+import my.slotify.app.core.profile.RouteProfile
 
 enum class PoiCategory {
     ALL, SEKOLAH, TRANSIT, RUMAH, PEJABAT
@@ -89,10 +96,20 @@ fun poiCategoryColor(category: PoiCategory): Color = when (category) {
 }
 
 enum class RouteSelection {
-    ABAH_PICKUP,
+    PARENT_PICKUP,
     VAN_PRIMARY,
     VAN_SECONDARY
 }
+
+/** Route waypoints from the user's POIs (by profile id), falling back to profile defaults. */
+fun resolveRouteWaypoints(route: RouteSelection, pois: List<PoiItem>): List<PoiItem> =
+    FamilyProfileData.routes[route]?.waypointPoiIds.orEmpty().mapNotNull { id ->
+        pois.find { it.id == id } ?: FamilyProfileData.defaultPois.find { it.id == id }
+    }
+
+/** OSRM "lon,lat;lon,lat" coordinate list. */
+fun osrmCoordinateString(points: List<PoiItem>): String =
+    points.joinToString(";") { String.format(Locale.US, "%.5f,%.5f", it.lng, it.lat) }
 
 fun launchNavigationIntent(context: Context, lat: Double, lng: Double, label: String) {
     try {
@@ -137,7 +154,8 @@ fun launchWhatsAppIntent(context: Context, phone: String, message: String) {
         try {
             val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
             context.startActivity(dialIntent)
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
     }
 }
 
@@ -145,7 +163,8 @@ fun launchDialerIntent(context: Context, phone: String) {
     try {
         val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
         context.startActivity(intent)
-    } catch (_: Exception) {}
+    } catch (_: Exception) {
+    }
 }
 
 /**
@@ -190,29 +209,7 @@ fun DriverContactCard(
     onWhatsAppClick: (phone: String, message: String) -> Unit,
     onCallClick: (phone: String) -> Unit
 ) {
-    val contact = when (selectedRoute) {
-        RouteSelection.ABAH_PICKUP -> DriverContact(
-            name = "Abah",
-            role = "Kereta Keluarga • Kenderaan Keluarga",
-            phone = "+60100000000",
-            emoji = "🚗",
-            defaultMessage = "Salam Abah, anak-anak dah bersedia untuk diambil. Lokasi semasa rumah sedia."
-        )
-        RouteSelection.VAN_PRIMARY -> DriverContact(
-            name = "Pemandu Van A",
-            role = "Pemandu Van SK & SRA Taman Contoh",
-            phone = "+60100000000",
-            emoji = "🚐",
-            defaultMessage = "Salam Pemandu Van A, Adam & Aisyah dah siap di pintu pagar. Van dah dekat ke?"
-        )
-        RouteSelection.VAN_SECONDARY -> DriverContact(
-            name = "Pemandu Van B",
-            role = "Pemandu Van SRAI Bukit Contoh",
-            phone = "+60100000000",
-            emoji = "🚐",
-            defaultMessage = "Salam Pemandu Van B, Aisyah dah sedia untuk transit petang. Terima kasih."
-        )
-    }
+    val contact = FamilyProfileData.routes[selectedRoute]?.driver ?: return
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -285,7 +282,12 @@ fun DriverContactCard(
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     modifier = Modifier.height(32.dp)
                 ) {
-                    Icon(Icons.Default.Call, contentDescription = "Panggil", tint = SlotifyColors.KpmSkyBlue, modifier = Modifier.size(14.dp))
+                    Icon(
+                        Icons.Default.Call,
+                        contentDescription = "Panggil",
+                        tint = SlotifyColors.KpmSkyBlue,
+                        modifier = Modifier.size(14.dp)
+                    )
                 }
             }
         }
@@ -296,7 +298,7 @@ fun DriverContactCard(
 fun LogisticsMapScreen(locationGranted: Boolean = false) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    var selectedRoute by remember { mutableStateOf(RouteSelection.ABAH_PICKUP) }
+    var selectedRoute by remember { mutableStateOf(RouteSelection.PARENT_PICKUP) }
     var selectedPoiCategory by remember { mutableStateOf(PoiCategory.ALL) }
     var simulationStep by remember { mutableIntStateOf(0) }
     var isSimulating by remember { mutableStateOf(false) }
@@ -328,45 +330,8 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
     // Fetch OSRM route whenever selectedRoute changes or user triggers refresh
     LaunchedEffect(selectedRoute, pois, osrmRefreshTrigger) {
         isOsrmLoading = true
-        val coords = when (selectedRoute) {
-            RouteSelection.ABAH_PICKUP -> {
-                val office = pois.find { it.category == PoiCategory.PEJABAT } ?: PoiItem("def-pej", "Pejabat", PoiCategory.PEJABAT, "🏢", 3.1390, 101.6869, 0.0)
-                val tadika = pois.find { it.id == "poi-5" } ?: pois.find { it.category == PoiCategory.TRANSIT } ?: PoiItem("def-tad", "Tadika", PoiCategory.TRANSIT, "🏫", 3.1390, 101.6869, 0.0)
-                val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT && it.id != tadika.id } ?: PoiItem("def-tas", "Taska", PoiCategory.TRANSIT, "👶", 3.1390, 101.6869, 0.0)
-                val home = pois.find { it.category == PoiCategory.RUMAH } ?: PoiItem("def-hom", "Rumah", PoiCategory.RUMAH, "🏠", 3.1390, 101.6869, 0.0)
-                String.format(Locale.US, "%.4f,%.4f;%.4f,%.4f;%.4f,%.4f;%.4f,%.4f",
-                    office.lng, office.lat,
-                    tadika.lng, tadika.lat,
-                    taska.lng, taska.lat,
-                    home.lng, home.lat
-                )
-            }
-            RouteSelection.VAN_PRIMARY -> {
-                val home = pois.find { it.category == PoiCategory.RUMAH } ?: PoiItem("def-hom", "Rumah", PoiCategory.RUMAH, "🏠", 3.1390, 101.6869, 0.0)
-                val sra = pois.find { it.name.contains("SRA") } ?: PoiItem("def-sra", "SRA", PoiCategory.SEKOLAH, "🕌", 3.1390, 101.6869, 0.0)
-                val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT } ?: PoiItem("def-tas", "Taska", PoiCategory.TRANSIT, "👶", 3.1390, 101.6869, 0.0)
-                val sk = pois.find { it.name.contains("SK") } ?: PoiItem("def-sko", "SK", PoiCategory.SEKOLAH, "🏫", 3.1390, 101.6869, 0.0)
-                String.format(Locale.US, "%.4f,%.4f;%.4f,%.4f;%.4f,%.4f;%.4f,%.4f;%.4f,%.4f",
-                    home.lng, home.lat,
-                    sra.lng, sra.lat,
-                    taska.lng, taska.lat,
-                    sk.lng, sk.lat,
-                    home.lng, home.lat
-                )
-            }
-            RouteSelection.VAN_SECONDARY -> {
-                val home = pois.find { it.category == PoiCategory.RUMAH } ?: PoiItem("def-hom", "Rumah", PoiCategory.RUMAH, "🏠", 3.1390, 101.6869, 0.0)
-                val srai = pois.find { it.name.contains("Bukit Contoh") || it.name.contains("SRAI") } ?: PoiItem("def-srai", "SRAI", PoiCategory.SEKOLAH, "🕌", 3.1390, 101.6869, 0.0)
-                val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT } ?: PoiItem("def-tas", "Taska", PoiCategory.TRANSIT, "👶", 3.1390, 101.6869, 0.0)
-                String.format(Locale.US, "%.4f,%.4f;%.4f,%.4f;%.4f,%.4f;%.4f,%.4f",
-                    home.lng, home.lat,
-                    srai.lng, srai.lat,
-                    taska.lng, taska.lat,
-                    home.lng, home.lat
-                )
-            }
-        }
-        osrmRoute = osrmService.getDrivingRoute(coords)
+        val waypoints = resolveRouteWaypoints(selectedRoute, pois)
+        osrmRoute = if (waypoints.size >= 2) osrmService.getDrivingRoute(osrmCoordinateString(waypoints)) else null
         isOsrmLoading = false
     }
 
@@ -378,7 +343,8 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
 
     // Dynamic ground-truth home reference
     val defaultHomeGeo = remember(pois) {
-        pois.find { it.category == PoiCategory.RUMAH }?.let { GeoPoint(it.lat, it.lng) } ?: GeoPoint(3.1390, 101.6869)
+        pois.find { it.category == PoiCategory.RUMAH }?.let { GeoPoint(it.lat, it.lng) }
+            ?: GeoPoint(FamilyProfileData.mapCenter.lat, FamilyProfileData.mapCenter.lng)
     }
 
     // Realtime Smooth Vehicle Simulation Coroutine
@@ -388,34 +354,14 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
             return@LaunchedEffect
         }
 
-        val (vehicleEmoji, vanName) = when (selectedRoute) {
-            RouteSelection.ABAH_PICKUP -> Pair("🚗", "Kereta Abah")
-            RouteSelection.VAN_PRIMARY -> Pair("🚐", "Van Sekolah A")
-            RouteSelection.VAN_SECONDARY -> Pair("🚐", "Van Sekolah B")
-        }
+        val routeProfile = FamilyProfileData.routes[selectedRoute]
+        val vehicleEmoji = routeProfile?.vehicleEmoji ?: "🚐"
+        val vanName = routeProfile?.vehicleLabel ?: "Kenderaan"
 
         val rawPoints = if (osrmRoute != null && osrmRoute!!.geometryPoints.isNotEmpty()) {
             osrmRoute!!.geometryPoints.map { GeoPoint(it.first, it.second) }
         } else {
-            when (selectedRoute) {
-                RouteSelection.ABAH_PICKUP -> {
-                    val office = pois.find { it.category == PoiCategory.PEJABAT } ?: PoiItem("def-pej", "Pejabat", PoiCategory.PEJABAT, "🏢", 3.1390, 101.6869, 0.0)
-                    val tadika = pois.find { it.id == "poi-5" } ?: pois.find { it.category == PoiCategory.TRANSIT } ?: PoiItem("def-tad", "Tadika", PoiCategory.TRANSIT, "🏫", 3.1390, 101.6869, 0.0)
-                    val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT && it.id != tadika.id } ?: PoiItem("def-tas", "Taska", PoiCategory.TRANSIT, "👶", 3.1390, 101.6869, 0.0)
-                    listOf(GeoPoint(office.lat, office.lng), GeoPoint(tadika.lat, tadika.lng), GeoPoint(taska.lat, taska.lng), defaultHomeGeo)
-                }
-                RouteSelection.VAN_PRIMARY -> {
-                    val sra = pois.find { it.name.contains("SRA") } ?: PoiItem("def-sra", "SRA", PoiCategory.SEKOLAH, "🕌", 3.1390, 101.6869, 0.0)
-                    val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT } ?: PoiItem("def-tas", "Taska", PoiCategory.TRANSIT, "👶", 3.1390, 101.6869, 0.0)
-                    val sk = pois.find { it.name.contains("SK") } ?: PoiItem("def-sko", "SK", PoiCategory.SEKOLAH, "🏫", 3.1390, 101.6869, 0.0)
-                    listOf(defaultHomeGeo, GeoPoint(sra.lat, sra.lng), GeoPoint(taska.lat, taska.lng), GeoPoint(sk.lat, sk.lng), defaultHomeGeo)
-                }
-                RouteSelection.VAN_SECONDARY -> {
-                    val srai = pois.find { it.name.contains("Bukit Contoh") || it.name.contains("SRAI") } ?: PoiItem("def-srai", "SRAI", PoiCategory.SEKOLAH, "🕌", 3.1390, 101.6869, 0.0)
-                    val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT } ?: PoiItem("def-tas", "Taska", PoiCategory.TRANSIT, "👶", 3.1390, 101.6869, 0.0)
-                    listOf(defaultHomeGeo, GeoPoint(srai.lat, srai.lng), GeoPoint(taska.lat, taska.lng), defaultHomeGeo)
-                }
-            }
+            resolveRouteWaypoints(selectedRoute, pois).map { GeoPoint(it.lat, it.lng) }
         }
 
         val animPoints = interpolateRoutePoints(rawPoints, targetCount = 36)
@@ -424,40 +370,50 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
             return@LaunchedEffect
         }
 
-        var alerted3km = false
-        var alerted1km = false
-        var alerted300m = false
+        // Remaining distance along the route (not straight-line to home), so a loop route that
+        // starts at home does not fire every proximity alert immediately.
+        val remainingKm = DoubleArray(animPoints.size)
+        for (i in animPoints.lastIndex - 1 downTo 0) {
+            val a = animPoints[i]
+            val b = animPoints[i + 1]
+            remainingKm[i] = remainingKm[i + 1] + calculateDistanceKm(a.latitude, a.longitude, b.latitude, b.longitude)
+        }
+        val startKm = remainingKm.firstOrNull() ?: 0.0
+        // Alerts only fire for thresholds the route actually crosses.
+        var alerted3km = startKm <= 3.0
+        var alerted1km = startKm <= 1.0
+        var alerted300m = startKm <= 0.35
         var alertedArrived = false
+        val simTag = "[Simulasi]"
 
         for (idx in animPoints.indices) {
             if (!isSimulating) break
             val pt = animPoints[idx]
-            val distToHomeKm = calculateDistanceKm(defaultHomeGeo.latitude, defaultHomeGeo.longitude, pt.latitude, pt.longitude)
+            val distToHomeKm = remainingKm[idx]
             val speed = 38 + (idx % 5) * 4
-            val etaMin = maxOf(1, ((distToHomeKm / 40.0) * 60).toInt())
-            val progressPercent = ((idx.toDouble() / (animPoints.size - 1)) * 100).toInt()
+            val etaMin = maxOf(1, ((distToHomeKm / speed) * 60).roundToInt())
+            val progressPercent = ((idx.toDouble() / (animPoints.size - 1).coerceAtLeast(1)) * 100).toInt()
 
             val status = when {
-                distToHomeKm <= 0.08 -> "Tiba di Rumah Kediaman"
-                distToHomeKm <= 0.35 -> "Menghampiri Pintu Pagar"
-                distToHomeKm <= 1.0 -> "Radius 1.0km Taman Contoh"
+                idx == animPoints.lastIndex -> "Tiba di Destinasi"
+                distToHomeKm <= 0.35 -> "Menghampiri Destinasi"
+                distToHomeKm <= 1.0 -> "Dalam Jarak 1.0km"
                 distToHomeKm <= 3.0 -> "Dalam Jarak 3.0km"
-                progressPercent < 30 -> "Mula Perjalanan: Menuju Taska"
                 else -> "Dalam Perjalanan ($progressPercent%)"
             }
 
-            // Proximity alerts with haptic, Malay voice TTS, & real Android notification
+            // Proximity alerts with haptic, Malay voice TTS, & a notification clearly marked as simulation
             if (distToHomeKm <= 3.0 && !alerted3km) {
                 alerted3km = true
                 simulationStep = 1
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 SlotifyNotificationManager.showTransitAlert(
                     context = context,
-                    childName = vanName,
-                    transitMsg = "🚨 Radar 3,000m: Geofens 3.0km dikesan • Bersedia!"
+                    childName = "$simTag $vanName",
+                    transitMsg = "🚨 Radar 3,000m: Baki 3.0km ke destinasi • Bersedia!"
                 )
                 if (!isVoiceMuted) {
-                    voiceHelper.speak("Perhatian: $vanName kini berada tiga kilometer dari rumah. Sila bersedia.")
+                    voiceHelper.speak("Simulasi: $vanName kini berada tiga kilometer dari destinasi.")
                 }
             }
             if (distToHomeKm <= 1.0 && !alerted1km) {
@@ -466,11 +422,11 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 SlotifyNotificationManager.showTransitAlert(
                     context = context,
-                    childName = vanName,
-                    transitMsg = "🚨 Radar 1,000m: $vanName sedang menghampiri lokasi!"
+                    childName = "$simTag $vanName",
+                    transitMsg = "🚨 Radar 1,000m: $vanName sedang menghampiri destinasi!"
                 )
                 if (!isVoiceMuted) {
-                    voiceHelper.speak("Perhatian: $vanName kini berada satu kilometer dari rumah. Sila bersedia di pintu pagar.")
+                    voiceHelper.speak("Simulasi: $vanName kini berada satu kilometer dari destinasi.")
                 }
             }
             if (distToHomeKm <= 0.35 && !alerted300m) {
@@ -479,11 +435,11 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 SlotifyNotificationManager.showTransitAlert(
                     context = context,
-                    childName = vanName,
-                    transitMsg = "🚨 Radar 300m: Ketibaan dalam 300m • Sila ke pintu pagar!"
+                    childName = "$simTag $vanName",
+                    transitMsg = "🚨 Radar 300m: Ketibaan dalam 300m!"
                 )
                 if (!isVoiceMuted) {
-                    voiceHelper.speak("Perhatian: $vanName menghampiri pintu pagar rumah. Baki tiga ratus meter.")
+                    voiceHelper.speak("Simulasi: $vanName menghampiri destinasi. Baki tiga ratus meter.")
                 }
             }
             if (idx == animPoints.lastIndex && !alertedArrived) {
@@ -491,11 +447,11 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 SlotifyNotificationManager.showTransitAlert(
                     context = context,
-                    childName = vanName,
+                    childName = "$simTag $vanName",
                     transitMsg = "✅ Selamat Tiba: $vanName telah sampai ke destinasi!"
                 )
                 if (!isVoiceMuted) {
-                    voiceHelper.speak("Alhamdulillah, $vanName telah selamat tiba di hadapan rumah kediaman.")
+                    voiceHelper.speak("Simulasi: $vanName telah selamat tiba di destinasi.")
                 }
             }
 
@@ -542,16 +498,21 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
     val coroutineScope = rememberCoroutineScope()
 
     // Real Hardware GPS Location States
-    var hasLocationPermission by remember { mutableStateOf(locationGranted || GpsLocationHelper.hasLocationPermission(context)) }
+    var hasLocationPermission by remember {
+        mutableStateOf(
+            locationGranted || GpsLocationHelper.hasLocationPermission(
+                context
+            )
+        )
+    }
     var isGpsLocating by remember { mutableStateOf(false) }
     var userGpsFix by remember { mutableStateOf<GpsFixResult?>(null) }
     var gpsStatusMessage by remember { mutableStateOf<String?>(null) }
     var locationOverlayRef by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
     var compassOverlayRef by remember { mutableStateOf<CompassOverlay?>(null) }
-    var isOfflineTileDownloading by remember { mutableStateOf(false) }
-    var isOfflineCached by remember { mutableStateOf(OfflineMapManager.isOfflineCacheReady(context)) }
 
-    val filteredPois = if (selectedPoiCategory == PoiCategory.ALL) pois else pois.filter { it.category == selectedPoiCategory }
+    val filteredPois =
+        if (selectedPoiCategory == PoiCategory.ALL) pois else pois.filter { it.category == selectedPoiCategory }
 
     // Function to fetch high-precision hardware GPS fix and center map
     val locateUserWithGps: suspend () -> Unit = {
@@ -572,13 +533,27 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
 
                 // Real-time Geofence Proximity Check
                 val proximityEvents = GeofenceManager.evaluateProximity(context, fix.latitude, fix.longitude)
-                val targetEvent = proximityEvents.firstOrNull { it.eventType == GeofenceEventType.ENTERED || it.eventType == GeofenceEventType.APPROACHING }
+                val targetEvent =
+                    proximityEvents.firstOrNull { it.eventType == GeofenceEventType.ENTERED || it.eventType == GeofenceEventType.APPROACHING }
 
                 if (targetEvent != null) {
-                    val statusText = if (targetEvent.eventType == GeofenceEventType.ENTERED) "Tiba di ${targetEvent.target.name}" else "Menghampiri ${targetEvent.target.name} (${targetEvent.distanceMeters.toInt()}m)"
-                    gpsStatusMessage = "${targetEvent.target.iconEmoji} $statusText • ±${String.format(Locale.US, "%.1f", fix.accuracyMeters)}m"
+                    val statusText =
+                        if (targetEvent.eventType == GeofenceEventType.ENTERED) "Tiba di ${targetEvent.target.name}" else "Menghampiri ${targetEvent.target.name} (${targetEvent.distanceMeters.toInt()}m)"
+                    gpsStatusMessage = "${targetEvent.target.iconEmoji} $statusText • ±${
+                        String.format(
+                            Locale.US,
+                            "%.1f",
+                            fix.accuracyMeters
+                        )
+                    }m"
                 } else {
-                    gpsStatusMessage = "${fix.quality.badgeEmoji} GPS: ±${String.format(Locale.US, "%.1f", fix.accuracyMeters)}m (${fix.quality.label})"
+                    gpsStatusMessage = "${fix.quality.badgeEmoji} GPS: ±${
+                        String.format(
+                            Locale.US,
+                            "%.1f",
+                            fix.accuracyMeters
+                        )
+                    }m (${fix.quality.label})"
                 }
 
                 mapViewRef?.controller?.apply {
@@ -602,12 +577,26 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                 .collect { fix ->
                     userGpsFix = fix
                     val proximityEvents = GeofenceManager.evaluateProximity(context, fix.latitude, fix.longitude)
-                    val targetEvent = proximityEvents.firstOrNull { it.eventType == GeofenceEventType.ENTERED || it.eventType == GeofenceEventType.APPROACHING }
+                    val targetEvent =
+                        proximityEvents.firstOrNull { it.eventType == GeofenceEventType.ENTERED || it.eventType == GeofenceEventType.APPROACHING }
                     if (targetEvent != null) {
-                        val statusText = if (targetEvent.eventType == GeofenceEventType.ENTERED) "Tiba di ${targetEvent.target.name}" else "Menghampiri ${targetEvent.target.name} (${targetEvent.distanceMeters.toInt()}m)"
-                        gpsStatusMessage = "${targetEvent.target.iconEmoji} $statusText • ±${String.format(Locale.US, "%.1f", fix.accuracyMeters)}m"
+                        val statusText =
+                            if (targetEvent.eventType == GeofenceEventType.ENTERED) "Tiba di ${targetEvent.target.name}" else "Menghampiri ${targetEvent.target.name} (${targetEvent.distanceMeters.toInt()}m)"
+                        gpsStatusMessage = "${targetEvent.target.iconEmoji} $statusText • ±${
+                            String.format(
+                                Locale.US,
+                                "%.1f",
+                                fix.accuracyMeters
+                            )
+                        }m"
                     } else {
-                        gpsStatusMessage = "${fix.quality.badgeEmoji} GPS: ±${String.format(Locale.US, "%.1f", fix.accuracyMeters)}m (${fix.quality.label})"
+                        gpsStatusMessage = "${fix.quality.badgeEmoji} GPS: ±${
+                            String.format(
+                                Locale.US,
+                                "%.1f",
+                                fix.accuracyMeters
+                            )
+                        }m (${fix.quality.label})"
                     }
                 }
         }
@@ -615,9 +604,30 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
 
     // Auto-locate user on initial screen display
     LaunchedEffect(Unit) {
-        if (hasLocationPermission) {
+        if (hasLocationPermission && GpsLocationHelper.isLocationServiceEnabled(context)) {
             locateUserWithGps()
         }
+    }
+
+    // Permission can change in system Settings or via MainActivity's request.
+    LaunchedEffect(locationGranted) {
+        if (locationGranted) hasLocationPermission = true
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    hasLocationPermission = GpsLocationHelper.hasLocationPermission(context)
+                    mapViewRef?.onResume()
+                }
+
+                Lifecycle.Event.ON_PAUSE -> mapViewRef?.onPause()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -742,7 +752,9 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
-                        Configuration.getInstance().userAgentValue = ctx.packageName
+                        Configuration.getInstance()
+                            .load(ctx, ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
+                        Configuration.getInstance().userAgentValue = OsrmRoutingService.USER_AGENT
                         MapView(ctx).apply {
                             setTileSource(TileSourceFactory.MAPNIK)
                             setMultiTouchControls(true)
@@ -753,7 +765,7 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                 false
                             }
 
-                            // Adjust zoom and center to fit all markers (Bandar Contoh Office to Taman Contoh)
+                            // Initial zoom and centre on home
                             controller.setZoom(13.5)
                             controller.setCenter(defaultHomeGeo)
 
@@ -799,6 +811,16 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                             mapViewRef = this
                         }
                     },
+                    onRelease = { mapView ->
+                        // The map item can be recycled by the LazyColumn: stop sensors/GPS and
+                        // drop overlay refs so a re-created MapView gets fresh overlays.
+                        locationOverlayRef?.disableMyLocation()
+                        compassOverlayRef?.disableCompass()
+                        locationOverlayRef = null
+                        compassOverlayRef = null
+                        if (mapViewRef === mapView) mapViewRef = null
+                        mapView.onDetach()
+                    },
                     update = { mapView ->
                         if (hasLocationPermission && locationOverlayRef == null) {
                             val overlay = MyLocationNewOverlay(GpsMyLocationProvider(context), mapView).apply {
@@ -810,10 +832,11 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                         }
 
                         if (compassOverlayRef == null) {
-                            val compass = CompassOverlay(context, InternalCompassOrientationProvider(context), mapView).apply {
-                                enableCompass()
-                                setCompassCenter(28f, 28f)
-                            }
+                            val compass =
+                                CompassOverlay(context, InternalCompassOrientationProvider(context), mapView).apply {
+                                    enableCompass()
+                                    setCompassCenter(28f, 28f)
+                                }
                             compassOverlayRef = compass
                             mapView.overlays.add(compass)
                         }
@@ -860,7 +883,12 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                 onClick = { gpsStatusMessage = null },
                                 modifier = Modifier.size(20.dp)
                             ) {
-                                Icon(Icons.Default.Close, contentDescription = "Tutup", tint = SlotifyColors.TextSecondary, modifier = Modifier.size(14.dp))
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Tutup",
+                                    tint = SlotifyColors.TextSecondary,
+                                    modifier = Modifier.size(14.dp)
+                                )
                             }
                         }
                     }
@@ -877,7 +905,15 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                     SmallFloatingActionButton(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            val homePoi = pois.find { it.category == PoiCategory.RUMAH } ?: PoiItem("poi-1", "Rumah Kediaman", PoiCategory.RUMAH, "🏠", 3.1390, 101.6869, 0.0)
+                            val homePoi = pois.find { it.category == PoiCategory.RUMAH } ?: PoiItem(
+                                "poi-home",
+                                "Rumah",
+                                PoiCategory.RUMAH,
+                                "🏠",
+                                FamilyProfileData.mapCenter.lat,
+                                FamilyProfileData.mapCenter.lng,
+                                0.0
+                            )
                             val homePoint = GeoPoint(homePoi.lat, homePoi.lng)
                             mapViewRef?.controller?.apply {
                                 setZoom(17.5)
@@ -903,21 +939,32 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                             }
                         },
                         modifier = Modifier.size(36.dp),
-                        containerColor = if (isGpsLocating) SlotifyColors.ActionAmber else SlotifyColors.SurfaceCard.copy(alpha = 0.94f),
+                        containerColor = if (isGpsLocating) SlotifyColors.ActionAmber else SlotifyColors.SurfaceCard.copy(
+                            alpha = 0.94f
+                        ),
                         contentColor = if (isGpsLocating) Color.White else SlotifyColors.KpmSkyBlue,
                         shape = CircleShape
                     ) {
                         if (isGpsLocating) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = Color.White
+                            )
                         } else {
-                            Icon(Icons.Default.MyLocation, contentDescription = "Kunci Lokasi GPS", modifier = Modifier.size(18.dp))
+                            Icon(
+                                Icons.Default.MyLocation,
+                                contentDescription = "Kunci Lokasi GPS",
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
 
                     // 2. High Precision Location Picker Button
                     SmallFloatingActionButton(
                         onClick = {
-                            precisePickerTarget = userGpsFix?.let { GeoPoint(it.latitude, it.longitude) } ?: defaultHomeGeo
+                            precisePickerTarget =
+                                userGpsFix?.let { GeoPoint(it.latitude, it.longitude) } ?: defaultHomeGeo
                             precisePickerPoi = null
                             showPrecisePicker = true
                         },
@@ -926,7 +973,11 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                         contentColor = SlotifyColors.ActionAmber,
                         shape = CircleShape
                     ) {
-                        Icon(Icons.Default.PinDrop, contentDescription = "Pilih Lokasi Tepat", modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Default.PinDrop,
+                            contentDescription = "Pilih Lokasi Tepat",
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
 
                     // 3. RF Range 3.0 km Radar Pulse Toggle
@@ -934,12 +985,15 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                         onClick = {
                             isRfPulseActive = !isRfPulseActive
                             if (isRfPulseActive && rfCenterGeoPoint == null) {
-                                rfCenterGeoPoint = userGpsFix?.let { GeoPoint(it.latitude, it.longitude) } ?: defaultHomeGeo
+                                rfCenterGeoPoint =
+                                    userGpsFix?.let { GeoPoint(it.latitude, it.longitude) } ?: defaultHomeGeo
                                 rfCenterLabel = if (userGpsFix != null) "GPS Semasa" else "Rumah Kediaman"
                             }
                         },
                         modifier = Modifier.size(36.dp),
-                        containerColor = if (isRfPulseActive) SlotifyColors.KpmSkyBlue else SlotifyColors.SurfaceCard.copy(alpha = 0.94f),
+                        containerColor = if (isRfPulseActive) SlotifyColors.KpmSkyBlue else SlotifyColors.SurfaceCard.copy(
+                            alpha = 0.94f
+                        ),
                         contentColor = if (isRfPulseActive) Color.White else SlotifyColors.KpmSkyBlue,
                         shape = CircleShape
                     ) {
@@ -970,48 +1024,13 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                         contentColor = SlotifyColors.KpmSkyBlue,
                         shape = CircleShape
                     ) {
-                        Icon(Icons.Default.Explore, contentDescription = "Kompas & Orientasi", modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Default.Explore,
+                            contentDescription = "Kompas & Orientasi",
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
 
-                    // 5. Offline Tile Pre-Cache Button (Bandar Contoh Corridor)
-                    SmallFloatingActionButton(
-                        onClick = {
-                            mapViewRef?.let { mv ->
-                                if (!isOfflineTileDownloading) {
-                                    isOfflineTileDownloading = true
-                                    gpsStatusMessage = "⬇️ Memuat turun jubin peta luar talian (Bandar Contoh)..."
-                                    OfflineMapManager.downloadFamilyCorridorTiles(
-                                        context = context,
-                                        mapView = mv,
-                                        minZoom = 12,
-                                        maxZoom = 16,
-                                        onProgress = { cur, tot ->
-                                            gpsStatusMessage = "⬇️ Menyimpan peta luar talian ($cur/$tot)..."
-                                        },
-                                        onComplete = { tot ->
-                                            isOfflineTileDownloading = false
-                                            isOfflineCached = true
-                                            gpsStatusMessage = "✅ Peta Luar Talian Sedia ($tot jubin)!"
-                                        },
-                                        onError = { err ->
-                                            isOfflineTileDownloading = false
-                                            gpsStatusMessage = "⚠️ $err"
-                                        }
-                                    )
-                                }
-                            }
-                        },
-                        modifier = Modifier.size(36.dp),
-                        containerColor = if (isOfflineCached) SlotifyColors.ParentGreen.copy(alpha = 0.18f) else SlotifyColors.SurfaceCard.copy(alpha = 0.94f),
-                        contentColor = if (isOfflineCached) SlotifyColors.ParentGreen else SlotifyColors.TextSecondary,
-                        shape = CircleShape
-                    ) {
-                        if (isOfflineTileDownloading) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = SlotifyColors.KpmSkyBlue)
-                        } else {
-                            Icon(if (isOfflineCached) Icons.Default.CloudDone else Icons.Default.CloudDownload, contentDescription = "Simpan Peta Luar Talian", modifier = Modifier.size(18.dp))
-                        }
-                    }
                 }
 
                 // 1. Selected POI Preview Bottom Card
@@ -1077,7 +1096,13 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                             )
                                         }
                                         Text(
-                                            text = String.format(Locale.US, "%.5f° U, %.5f° T • %.1f km dari Rumah", selPoi.lat, selPoi.lng, selPoi.distanceKm),
+                                            text = String.format(
+                                                Locale.US,
+                                                "%.5f° U, %.5f° T • %.1f km dari Rumah",
+                                                selPoi.lat,
+                                                selPoi.lng,
+                                                selPoi.distanceKm
+                                            ),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = SlotifyColors.KpmSkyBlue
                                         )
@@ -1088,7 +1113,12 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                     onClick = { selectedMapPoi = null },
                                     modifier = Modifier.size(24.dp)
                                 ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Tutup", tint = SlotifyColors.TextSecondary, modifier = Modifier.size(16.dp))
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Tutup",
+                                        tint = SlotifyColors.TextSecondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                             }
 
@@ -1105,7 +1135,12 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                     shape = SlotifyShapes.Small,
                                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
                                 ) {
-                                    Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                                    Icon(
+                                        Icons.Default.Navigation,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = Color.White
+                                    )
                                     Spacer(Modifier.width(4.dp))
                                     Text("Arah", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                                 }
@@ -1120,7 +1155,12 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                     shape = SlotifyShapes.Small,
                                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
                                 ) {
-                                    Text("📡 Pusat RF", fontSize = 11.sp, color = SlotifyColors.KpmSkyBlue, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "📡 Pusat RF",
+                                        fontSize = 11.sp,
+                                        color = SlotifyColors.KpmSkyBlue,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
 
                                 OutlinedButton(
@@ -1133,7 +1173,12 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                     shape = SlotifyShapes.Small,
                                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
                                 ) {
-                                    Text("🎯 Laras", fontSize = 11.sp, color = SlotifyColors.TextPrimary, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "🎯 Laras",
+                                        fontSize = 11.sp,
+                                        color = SlotifyColors.TextPrimary,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
 
                                 IconButton(
@@ -1145,7 +1190,12 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                         .size(32.dp)
                                         .background(SlotifyColors.KpmSkyBlue.copy(alpha = 0.12f), CircleShape)
                                 ) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = SlotifyColors.KpmSkyBlue, modifier = Modifier.size(16.dp))
+                                    Icon(
+                                        Icons.Default.Edit,
+                                        contentDescription = "Edit",
+                                        tint = SlotifyColors.KpmSkyBlue,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                             }
                         }
@@ -1156,7 +1206,12 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                 if (selectedMapPoi == null && droppedMapPin != null) {
                     val dropPt = droppedMapPin!!
                     val home = pois.find { it.category == PoiCategory.RUMAH }
-                    val dist = if (home != null) calculateDistanceKm(home.lat, home.lng, dropPt.latitude, dropPt.longitude) else 0.0
+                    val dist = if (home != null) calculateDistanceKm(
+                        home.lat,
+                        home.lng,
+                        dropPt.latitude,
+                        dropPt.longitude
+                    ) else 0.0
 
                     Surface(
                         modifier = Modifier
@@ -1186,7 +1241,13 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                             color = SlotifyColors.TextPrimary
                                         )
                                         Text(
-                                            text = String.format(Locale.US, "%.5f° U, %.5f° T • %.1f km dari Rumah", dropPt.latitude, dropPt.longitude, dist),
+                                            text = String.format(
+                                                Locale.US,
+                                                "%.5f° U, %.5f° T • %.1f km dari Rumah",
+                                                dropPt.latitude,
+                                                dropPt.longitude,
+                                                dist
+                                            ),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = SlotifyColors.KpmSkyBlue
                                         )
@@ -1197,7 +1258,12 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                     onClick = { droppedMapPin = null },
                                     modifier = Modifier.size(24.dp)
                                 ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Tutup", tint = SlotifyColors.TextSecondary, modifier = Modifier.size(16.dp))
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Tutup",
+                                        tint = SlotifyColors.TextSecondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                             }
 
@@ -1208,7 +1274,11 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                 Button(
                                     onClick = {
                                         coroutineScope.launch {
-                                            val addr = LocationAddressHelper.resolveAddress(context, dropPt.latitude, dropPt.longitude)
+                                            val addr = LocationAddressHelper.resolveAddress(
+                                                context,
+                                                dropPt.latitude,
+                                                dropPt.longitude
+                                            )
                                             editingPoi = PoiItem(
                                                 id = "poi-${UUID.randomUUID().toString().take(8)}",
                                                 name = "",
@@ -1228,9 +1298,19 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                     shape = SlotifyShapes.Small,
                                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
                                 ) {
-                                    Icon(Icons.Default.AddLocationAlt, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                                    Icon(
+                                        Icons.Default.AddLocationAlt,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = Color.White
+                                    )
                                     Spacer(Modifier.width(4.dp))
-                                    Text("Simpan POI", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "Simpan POI",
+                                        fontSize = 11.sp,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
 
                                 OutlinedButton(
@@ -1243,20 +1323,37 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                     shape = SlotifyShapes.Small,
                                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
                                 ) {
-                                    Text("🎯 Laras", fontSize = 11.sp, color = SlotifyColors.TextPrimary, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "🎯 Laras",
+                                        fontSize = 11.sp,
+                                        color = SlotifyColors.TextPrimary,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
 
                                 OutlinedButton(
                                     onClick = {
                                         rfCenterGeoPoint = dropPt
-                                        rfCenterLabel = "Titik Peta (${String.format(Locale.US, "%.4f, %.4f", dropPt.latitude, dropPt.longitude)})"
+                                        rfCenterLabel = "Titik Peta (${
+                                            String.format(
+                                                Locale.US,
+                                                "%.4f, %.4f",
+                                                dropPt.latitude,
+                                                dropPt.longitude
+                                            )
+                                        })"
                                         isRfPulseActive = true
                                     },
                                     modifier = Modifier.weight(1f),
                                     shape = SlotifyShapes.Small,
                                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
                                 ) {
-                                    Text("📡 RF", fontSize = 11.sp, color = SlotifyColors.KpmSkyBlue, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "📡 RF",
+                                        fontSize = 11.sp,
+                                        color = SlotifyColors.KpmSkyBlue,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }
@@ -1320,7 +1417,13 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                             }
                                         }
                                         Text(
-                                            text = "Baki ${String.format(Locale.US, "%.1f", sim.distanceRemainingKm)} km • ETA ~${sim.etaMinutes} min",
+                                            text = "Baki ${
+                                                String.format(
+                                                    Locale.US,
+                                                    "%.1f",
+                                                    sim.distanceRemainingKm
+                                                )
+                                            } km • ETA ~${sim.etaMinutes} min",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = SlotifyColors.SuccessMint,
                                             fontWeight = FontWeight.SemiBold
@@ -1469,10 +1572,16 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             val quickBases = listOfNotNull(
                                 Triple("🏠 Rumah", defaultHomeGeo, "Rumah Kediaman"),
-                                Triple("🏢 Pejabat", GeoPoint(3.1390, 101.6869), "Pejabat Abah (Bandar Contoh)"),
-                                Triple("🏫 SK", GeoPoint(3.1390, 101.6869), "SK Taman Contoh"),
+                                pois.firstOrNull { it.category == PoiCategory.PEJABAT }
+                                    ?.let { Triple("🏢 Pejabat", GeoPoint(it.lat, it.lng), it.name) },
+                                pois.firstOrNull { it.category == PoiCategory.SEKOLAH }
+                                    ?.let { Triple("${it.iconEmoji} Sekolah", GeoPoint(it.lat, it.lng), it.name) },
                                 userGpsFix?.let { fix ->
-                                    Triple("📡 GPS", GeoPoint(fix.latitude, fix.longitude), "Lokasi GPS (${fix.quality.label})")
+                                    Triple(
+                                        "📡 GPS",
+                                        GeoPoint(fix.latitude, fix.longitude),
+                                        "Lokasi GPS (${fix.quality.label})"
+                                    )
                                 },
                                 Triple("🎯 Pilih Peta", null, "Sentuh mana-mana pada peta")
                             )
@@ -1563,7 +1672,7 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                         }
 
                                         Text(
-                                            text = "${dist} km",
+                                            text = formatKm(dist),
                                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                             color = if (inRange) SlotifyColors.SuccessMint else Color(0xFFEF4444)
                                         )
@@ -1576,7 +1685,7 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
             }
         }
 
-        // Active Route Selector Cards: [Abah | Van A | Van Sekolah B]
+        // Active Route Selector Cards: [Parent | Van A | Van B] (labels from FamilyProfile)
         item {
             Box(
                 modifier = Modifier
@@ -1592,7 +1701,12 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Route, contentDescription = null, tint = SlotifyColors.KpmSkyBlue, modifier = Modifier.size(18.dp))
+                            Icon(
+                                Icons.Default.Route,
+                                contentDescription = null,
+                                tint = SlotifyColors.KpmSkyBlue,
+                                modifier = Modifier.size(18.dp)
+                            )
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 text = strings.routeChainTitle,
@@ -1658,31 +1772,55 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        val abahSubtitle = if (isOsrmLoading && selectedRoute == RouteSelection.ABAH_PICKUP) "Mengira..."
-                            else if (osrmRoute != null && selectedRoute == RouteSelection.ABAH_PICKUP) "ETA ~${osrmRoute!!.totalDurationMinutes.toInt()} min (${String.format(Locale.US, "%.1f", osrmRoute!!.totalDistanceKm)} km)"
-                            else "ETA ~18 Minit"
+                        val abahSubtitle =
+                            if (isOsrmLoading && selectedRoute == RouteSelection.PARENT_PICKUP) "Mengira..."
+                            else if (osrmRoute != null && selectedRoute == RouteSelection.PARENT_PICKUP) "ETA ~${osrmRoute!!.totalDurationMinutes.toInt()} min (${
+                                String.format(
+                                    Locale.US,
+                                    "%.1f",
+                                    osrmRoute!!.totalDistanceKm
+                                )
+                            } km)"
+                            else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.PARENT_PICKUP) "Luar talian • tiada ETA"
+                            else FamilyProfileData.routes[RouteSelection.PARENT_PICKUP]?.passengerLabel ?: ""
                         RouteTabCard(
-                            title = strings.routeAbah,
+                            title = FamilyProfileData.routes[RouteSelection.PARENT_PICKUP]?.tabTitle ?: "PARENT_PICKUP",
                             subtitle = abahSubtitle,
-                            isSelected = selectedRoute == RouteSelection.ABAH_PICKUP,
+                            isSelected = selectedRoute == RouteSelection.PARENT_PICKUP,
                             modifier = Modifier.weight(1f)
-                        ) { selectedRoute = RouteSelection.ABAH_PICKUP }
+                        ) { selectedRoute = RouteSelection.PARENT_PICKUP }
 
-                        val vanPrimarySubtitle = if (isOsrmLoading && selectedRoute == RouteSelection.VAN_PRIMARY) "Mengira..."
-                            else if (osrmRoute != null && selectedRoute == RouteSelection.VAN_PRIMARY) "ETA ~${osrmRoute!!.totalDurationMinutes.toInt()} min (${String.format(Locale.US, "%.1f", osrmRoute!!.totalDistanceKm)} km)"
-                            else "Adam (SK)"
+                        val vanPrimarySubtitle =
+                            if (isOsrmLoading && selectedRoute == RouteSelection.VAN_PRIMARY) "Mengira..."
+                            else if (osrmRoute != null && selectedRoute == RouteSelection.VAN_PRIMARY) "ETA ~${osrmRoute!!.totalDurationMinutes.toInt()} min (${
+                                String.format(
+                                    Locale.US,
+                                    "%.1f",
+                                    osrmRoute!!.totalDistanceKm
+                                )
+                            } km)"
+                            else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.VAN_PRIMARY) "Luar talian • tiada ETA"
+                            else FamilyProfileData.routes[RouteSelection.VAN_PRIMARY]?.passengerLabel ?: ""
                         RouteTabCard(
-                            title = strings.routeVanPrimary,
+                            title = FamilyProfileData.routes[RouteSelection.VAN_PRIMARY]?.tabTitle ?: "VAN_PRIMARY",
                             subtitle = vanPrimarySubtitle,
                             isSelected = selectedRoute == RouteSelection.VAN_PRIMARY,
                             modifier = Modifier.weight(1f)
                         ) { selectedRoute = RouteSelection.VAN_PRIMARY }
 
-                        val vanSecondarySubtitle = if (isOsrmLoading && selectedRoute == RouteSelection.VAN_SECONDARY) "Mengira..."
-                            else if (osrmRoute != null && selectedRoute == RouteSelection.VAN_SECONDARY) "ETA ~${osrmRoute!!.totalDurationMinutes.toInt()} min (${String.format(Locale.US, "%.1f", osrmRoute!!.totalDistanceKm)} km)"
-                            else "Aisyah (SRAI)"
+                        val vanSecondarySubtitle =
+                            if (isOsrmLoading && selectedRoute == RouteSelection.VAN_SECONDARY) "Mengira..."
+                            else if (osrmRoute != null && selectedRoute == RouteSelection.VAN_SECONDARY) "ETA ~${osrmRoute!!.totalDurationMinutes.toInt()} min (${
+                                String.format(
+                                    Locale.US,
+                                    "%.1f",
+                                    osrmRoute!!.totalDistanceKm
+                                )
+                            } km)"
+                            else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.VAN_SECONDARY) "Luar talian • tiada ETA"
+                            else FamilyProfileData.routes[RouteSelection.VAN_SECONDARY]?.passengerLabel ?: ""
                         RouteTabCard(
-                            title = strings.routeVanSecondary,
+                            title = FamilyProfileData.routes[RouteSelection.VAN_SECONDARY]?.tabTitle ?: "VAN_SECONDARY",
                             subtitle = vanSecondarySubtitle,
                             isSelected = selectedRoute == RouteSelection.VAN_SECONDARY,
                             modifier = Modifier.weight(1f)
@@ -1707,23 +1845,15 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
 
         // Turn-by-Turn Directions Steps for Selected Route
         item {
-            val steps = when (selectedRoute) {
-                RouteSelection.ABAH_PICKUP -> listOf(
-                    Triple("1. Pejabat Abah (Bandar Contoh) ➔ Tadika Danial", "7.2 km • 12 min", "Ambil Danial dari Daycare"),
-                    Triple("2. Tadika Danial ➔ Taska Ceria", "1.2 km • 3 min", "Ambil Aisyah & beg transit Adam"),
-                    Triple("3. Taska Ceria ➔ Rumah", "1.5 km • 3 min", "Laluan pulang ke Taman Contoh")
-                )
-                RouteSelection.VAN_PRIMARY -> listOf(
-                    Triple("1. Rumah ➔ SRA Taman Contoh", "1.8 km • 5 min", "Sesi Pagi SRA (07:30 AM)"),
-                    Triple("2. SRA ➔ Taska Ceria", "1.2 km • 4 min", "Transit tengah hari (11:15 AM)"),
-                    Triple("3. Taska ➔ SK Taman Contoh", "1.5 km • 5 min", "Sesi Petang SK (12:45 PM)"),
-                    Triple("4. SK ➔ Rumah", "2.4 km • 8 min", "Hantar pulang petang (06:10 PM)")
-                )
-                RouteSelection.VAN_SECONDARY -> listOf(
-                    Triple("1. Rumah ➔ SRAI Bukit Contoh", "4.2 km • 10 min", "Sesi Penuh SRAI (07:15 AM)"),
-                    Triple("2. SRAI ➔ Taska Ceria", "3.8 km • 8 min", "Ambil Aisyah selepas asar (04:00 PM)"),
-                    Triple("3. Taska ➔ Rumah", "1.2 km • 4 min", "Hantar pulang ke rumah")
-                )
+            val routeLegs = osrmRoute?.legs.orEmpty()
+            val steps = FamilyProfileData.routes[selectedRoute]?.steps.orEmpty().mapIndexed { i, step ->
+                val leg = routeLegs.getOrNull(i)
+                val detail = if (leg != null) {
+                    "${formatKm(leg.distanceMeters / 1000.0)} • ${
+                        (leg.durationSeconds / 60.0).roundToInt().coerceAtLeast(1)
+                    } min"
+                } else "—"
+                Triple("${i + 1}. ${step.title}", detail, step.note)
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1758,7 +1888,9 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                     modifier = Modifier
                                         .size(28.dp)
                                         .background(
-                                            if (isCurrentSim) SlotifyColors.ActionAmber else SlotifyColors.KpmSkyBlue.copy(alpha = 0.15f),
+                                            if (isCurrentSim) SlotifyColors.ActionAmber else SlotifyColors.KpmSkyBlue.copy(
+                                                alpha = 0.15f
+                                            ),
                                             CircleShape
                                         ),
                                     contentAlignment = Alignment.Center
@@ -1934,7 +2066,13 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
                                         )
                                     }
                                     Text(
-                                        text = String.format(Locale.US, "%.5f° U, %.5f° T • %s", poi.lat, poi.lng, if (poi.distanceKm > 0) "${poi.distanceKm} km" else "Pusat"),
+                                        text = String.format(
+                                            Locale.US,
+                                            "%.5f° U, %.5f° T • %s",
+                                            poi.lat,
+                                            poi.lng,
+                                            if (poi.distanceKm > 0) "${poi.distanceKm} km" else "Pusat"
+                                        ),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = SlotifyColors.KpmSkyBlue
                                     )
@@ -2065,11 +2203,13 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
     if (showPrecisePicker) {
         val home = pois.find { it.category == PoiCategory.RUMAH }
         PreciseLocationPickerModal(
-            initialLat = precisePickerTarget?.latitude ?: (editingPoi?.lat ?: (home?.lat ?: 3.1390)),
-            initialLng = precisePickerTarget?.longitude ?: (editingPoi?.lng ?: (home?.lng ?: 101.6869)),
+            initialLat = precisePickerTarget?.latitude ?: (editingPoi?.lat ?: (home?.lat
+                ?: FamilyProfileData.mapCenter.lat)),
+            initialLng = precisePickerTarget?.longitude ?: (editingPoi?.lng ?: (home?.lng
+                ?: FamilyProfileData.mapCenter.lng)),
             title = if (precisePickerPoi != null) "Laras Lokasi: ${precisePickerPoi!!.name}" else "Pilih Lokasi Tepat di Peta",
-            homeLat = home?.lat ?: 3.1390,
-            homeLng = home?.lng ?: 101.6869,
+            homeLat = home?.lat ?: FamilyProfileData.mapCenter.lat,
+            homeLng = home?.lng ?: FamilyProfileData.mapCenter.lng,
             onDismiss = {
                 showPrecisePicker = false
                 if (pendingPoiDraft != null) {
@@ -2170,7 +2310,7 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
             },
             text = {
                 Text(
-                    text = "Tindakan ini akan mengembalikan semua nod lokasi kepada senarai asal Slotify (Rumah, SK, SRA, Taska, Tadika, SRAI, dan Pejabat Abah Bandar Contoh).",
+                    text = "Tindakan ini akan mengembalikan semua nod lokasi kepada senarai asal profil keluarga.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = SlotifyColors.TextSecondary
                 )
@@ -2199,11 +2339,11 @@ fun LogisticsMapScreen(locationGranted: Boolean = false) {
 /**
  * Distance calculator between two coordinates in kilometers (1 decimal place)
  */
-fun calculateDistanceKm(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-    val results = FloatArray(1)
-    android.location.Location.distanceBetween(lat1, lng1, lat2, lng2, results)
-    return String.format(Locale.US, "%.1f", results[0] / 1000.0).toDoubleOrNull() ?: 0.0
-}
+/** Exact great-circle distance in km. Round only for display (see [formatKm]). */
+fun calculateDistanceKm(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double =
+    GeofenceManager.calculateDistanceMeters(lat1, lng1, lat2, lng2) / 1000.0
+
+fun formatKm(km: Double): String = String.format(Locale.US, "%.1f km", km)
 
 /**
  * Renders Route polyline, POI markers, RF Pulse 3km overlay, and picked point onto MapView
@@ -2225,9 +2365,15 @@ private fun setupMapOverlays(
     // Keep tile overlays, clear custom Markers, Polylines and RfPulseOverlay
     mapView.overlays.removeAll { it is Marker || it is Polyline || it is RfPulseOverlay }
 
-    // 1. RF Range Pulse 3.0 km Overlay (animated radar waves and distance markers)
+    // Required "© OpenStreetMap contributors" attribution (added once per MapView).
+    if (mapView.overlays.none { it is CopyrightOverlay }) {
+        mapView.overlays.add(CopyrightOverlay(context))
+    }
+
+    // 1. RF Range Pulse 3.0 km Overlay. It also handles map taps, so it is always present,
+    //    but it only draws the 3 km rings when the RF toggle is on.
     val rfOverlay = RfPulseOverlay(
-        center = rfCenter,
+        center = if (isRfActive) rfCenter else null,
         isPulseActive = isRfActive,
         maxRadiusMeters = 3000.0,
         centerLabel = "Pusat RF 3.0 km",
@@ -2241,45 +2387,14 @@ private fun setupMapOverlays(
     if (osrmRoute != null && osrmRoute.geometryPoints.isNotEmpty()) {
         routePoints.addAll(osrmRoute.geometryPoints.map { GeoPoint(it.first, it.second) })
     } else {
-        when (selectedRoute) {
-            RouteSelection.ABAH_PICKUP -> {
-                val office = pois.find { it.category == PoiCategory.PEJABAT }
-                val tadika = pois.find { it.id == "poi-5" } ?: pois.find { it.category == PoiCategory.TRANSIT }
-                val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT && it.id != tadika?.id }
-                val home = pois.find { it.category == PoiCategory.RUMAH }
-                office?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
-                tadika?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
-                taska?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
-                home?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
-            }
-            RouteSelection.VAN_PRIMARY -> {
-                val home = pois.find { it.category == PoiCategory.RUMAH }
-                val sra = pois.find { it.name.contains("SRA") }
-                val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT }
-                val sk = pois.find { it.name.contains("SK") }
-                home?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
-                sra?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
-                taska?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
-                sk?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
-                home?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
-            }
-            RouteSelection.VAN_SECONDARY -> {
-                val home = pois.find { it.category == PoiCategory.RUMAH }
-                val srai = pois.find { it.name.contains("Bukit Contoh") || it.name.contains("SRAI") }
-                val taska = pois.find { it.id == "poi-4" } ?: pois.find { it.category == PoiCategory.TRANSIT }
-                home?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
-                srai?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
-                taska?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
-                home?.let { routePoints.add(GeoPoint(it.lat, it.lng)) }
-            }
-        }
+        resolveRouteWaypoints(selectedRoute, pois).forEach { routePoints.add(GeoPoint(it.lat, it.lng)) }
     }
 
     if (routePoints.size >= 2) {
         val polyline = Polyline().apply {
             setPoints(routePoints)
             outlinePaint.color = when (selectedRoute) {
-                RouteSelection.ABAH_PICKUP -> android.graphics.Color.parseColor("#0284C7")
+                RouteSelection.PARENT_PICKUP -> android.graphics.Color.parseColor("#0284C7")
                 RouteSelection.VAN_PRIMARY -> android.graphics.Color.parseColor("#2563EB")
                 RouteSelection.VAN_SECONDARY -> android.graphics.Color.parseColor("#F59E0B")
             }
@@ -2334,12 +2449,14 @@ private fun setupMapOverlays(
         val vehicleMarker = Marker(mapView).apply {
             id = "simulated_vehicle_marker"
             position = simulatedVehicle.point
-            title = when (selectedRoute) {
-                RouteSelection.ABAH_PICKUP -> "🚗 Kereta Abah"
-                RouteSelection.VAN_PRIMARY -> "🚐 Van Sekolah A"
-                RouteSelection.VAN_SECONDARY -> "🚐 Van Sekolah B"
-            }
-            snippet = "${simulatedVehicle.speedKmh} km/j • Baki ${String.format(Locale.US, "%.1f", simulatedVehicle.distanceRemainingKm)} km (~${simulatedVehicle.etaMinutes} min)"
+            title = FamilyProfileData.routes[selectedRoute]?.let { "${it.vehicleEmoji} ${it.vehicleLabel}" } ?: "🚐"
+            snippet = "${simulatedVehicle.speedKmh} km/j • Baki ${
+                String.format(
+                    Locale.US,
+                    "%.1f",
+                    simulatedVehicle.distanceRemainingKm
+                )
+            } km (~${simulatedVehicle.etaMinutes} min)"
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             icon = PoiMarkerHelper.getVehicleMarker(context, simulatedVehicle.vehicleEmoji)
         }
@@ -2367,9 +2484,33 @@ private fun PoiEditDialog(
     var category by remember { mutableStateOf(poi?.category ?: PoiCategory.SEKOLAH) }
     var iconEmoji by remember { mutableStateOf(poi?.iconEmoji ?: "🏢") }
     var address by remember { mutableStateOf(poi?.address ?: "") }
-    var latText by remember { mutableStateOf(if (poi != null) String.format(Locale.US, "%.5f", poi.lat) else "3.1390") }
-    var lngText by remember { mutableStateOf(if (poi != null) String.format(Locale.US, "%.5f", poi.lng) else "101.6869") }
-    var distanceText by remember { mutableStateOf(if (poi != null) String.format(Locale.US, "%.1f", poi.distanceKm) else "5.0") }
+    var latText by remember {
+        mutableStateOf(
+            if (poi != null) String.format(
+                Locale.US,
+                "%.5f",
+                poi.lat
+            ) else String.format(Locale.US, "%.5f", FamilyProfileData.mapCenter.lat)
+        )
+    }
+    var lngText by remember {
+        mutableStateOf(
+            if (poi != null) String.format(
+                Locale.US,
+                "%.5f",
+                poi.lng
+            ) else String.format(Locale.US, "%.5f", FamilyProfileData.mapCenter.lng)
+        )
+    }
+    var distanceText by remember {
+        mutableStateOf(
+            if (poi != null) String.format(
+                Locale.US,
+                "%.1f",
+                poi.distanceKm
+            ) else "5.0"
+        )
+    }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val presetEmojis = listOf("🏢", "🏫", "🎒", "🏠", "🕌", "🧒", "📚", "🏬", "🩺", "🚌", "📍")
@@ -2401,7 +2542,7 @@ private fun PoiEditDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Nama Lokasi / POI") },
-                    placeholder = { Text("cth: Pejabat Bandar Contoh / Tadika") },
+                    placeholder = { Text("cth: Pejabat / Tadika") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -2468,7 +2609,7 @@ private fun PoiEditDialog(
                     value = address,
                     onValueChange = { address = it },
                     label = { Text("Alamat / Keterangan Lokasi") },
-                    placeholder = { Text("cth: No 9, Tingkat 2, Jalan Contoh...") },
+                    placeholder = { Text("cth: No 1, Jalan Contoh, Taman Contoh") },
                     singleLine = false,
                     maxLines = 2,
                     modifier = Modifier.fillMaxWidth()
@@ -2502,8 +2643,8 @@ private fun PoiEditDialog(
                             name = name.trim(),
                             category = category,
                             iconEmoji = iconEmoji,
-                            lat = latText.toDoubleOrNull() ?: 3.1390,
-                            lng = lngText.toDoubleOrNull() ?: 101.6869,
+                            lat = latText.toDoubleOrNull() ?: FamilyProfileData.mapCenter.lat,
+                            lng = lngText.toDoubleOrNull() ?: FamilyProfileData.mapCenter.lng,
                             distanceKm = distanceText.toDoubleOrNull() ?: 0.0,
                             address = address.trim()
                         )
@@ -2530,7 +2671,11 @@ private fun PoiEditDialog(
                                 latText = String.format(Locale.US, "%.5f", userGpsFix.latitude)
                                 lngText = String.format(Locale.US, "%.5f", userGpsFix.longitude)
                                 coroutineScope.launch {
-                                    val resolved = LocationAddressHelper.resolveAddress(context, userGpsFix.latitude, userGpsFix.longitude)
+                                    val resolved = LocationAddressHelper.resolveAddress(
+                                        context,
+                                        userGpsFix.latitude,
+                                        userGpsFix.longitude
+                                    )
                                     if (address.isBlank() && resolved.isNotBlank()) {
                                         address = resolved
                                     }
@@ -2541,17 +2686,28 @@ private fun PoiEditDialog(
                             modifier = Modifier
                                 .weight(1.1f)
                                 .height(28.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(containerColor = SlotifyColors.ActionAmber.copy(alpha = 0.2f))
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = SlotifyColors.ActionAmber.copy(
+                                    alpha = 0.2f
+                                )
+                            )
                         ) {
-                            Text("📡 GPS (${userGpsFix.quality.label})", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = SlotifyColors.ActionAmber)
+                            Text(
+                                "📡 GPS (${userGpsFix.quality.label})",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SlotifyColors.ActionAmber
+                            )
                         }
                     }
 
                     FilledTonalButton(
                         onClick = {
-                            latText = "3.1390"
-                            lngText = "101.6869"
-                            if (address.isBlank()) address = "Pusat Bandar Contoh, Bandar Contoh, Selangor"
+                            FamilyProfileData.defaultPois.firstOrNull { it.category == PoiCategory.PEJABAT }?.let {
+                                latText = String.format(Locale.US, "%.5f", it.lat)
+                                lngText = String.format(Locale.US, "%.5f", it.lng)
+                                if (address.isBlank()) address = it.address
+                            }
                         },
                         shape = SlotifyShapes.Small,
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
@@ -2559,14 +2715,13 @@ private fun PoiEditDialog(
                             .weight(1f)
                             .height(28.dp)
                     ) {
-                        Text("📍 Bandar Contoh", fontSize = 10.sp)
+                        Text("📍 Pejabat", fontSize = 10.sp)
                     }
 
                     FilledTonalButton(
                         onClick = {
-                            latText = "3.1390"
-                            lngText = "101.6869"
-                            if (address.isBlank()) address = "Taman Contoh, Bandar Contoh"
+                            latText = String.format(Locale.US, "%.5f", FamilyProfileData.mapCenter.lat)
+                            lngText = String.format(Locale.US, "%.5f", FamilyProfileData.mapCenter.lng)
                         },
                         shape = SlotifyShapes.Small,
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
@@ -2574,7 +2729,7 @@ private fun PoiEditDialog(
                             .weight(1f)
                             .height(28.dp)
                     ) {
-                        Text("📍 Taman Contoh", fontSize = 10.sp)
+                        Text("📍 Rumah", fontSize = 10.sp)
                     }
                 }
 

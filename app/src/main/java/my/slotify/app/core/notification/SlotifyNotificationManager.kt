@@ -1,15 +1,19 @@
 package my.slotify.app.core.notification
 
+import android.Manifest
 import android.app.AlarmManager
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import my.slotify.app.MainActivity
 import java.util.Calendar
 
@@ -60,6 +64,23 @@ object SlotifyNotificationManager {
         }
     }
 
+    /**
+     * Posts [notification] only when the user has granted POST_NOTIFICATIONS (Android 13+)
+     * and notifications are enabled; silently drops it otherwise.
+     */
+    private fun notifySafely(context: Context, id: Int, notification: Notification) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return
+        val manager = NotificationManagerCompat.from(context)
+        if (!manager.areNotificationsEnabled()) return
+        try {
+            manager.notify(id, notification)
+        } catch (e: SecurityException) {
+            Log.w("SlotifyNotification", "Notification permission revoked", e)
+        }
+    }
+
     private fun getLaunchPendingIntent(context: Context): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -86,11 +107,7 @@ object SlotifyNotificationManager {
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
 
-        try {
-            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_TEST, builder.build())
-        } catch (_: SecurityException) {
-            // Handled when permission is missing on Android 13+
-        }
+        notifySafely(context, NOTIFICATION_ID_TEST, builder.build())
     }
 
     fun showAttireReminder(context: Context, childName: String, attire: String, books: String) {
@@ -109,11 +126,7 @@ object SlotifyNotificationManager {
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
 
-        try {
-            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_ATTIRE, builder.build())
-        } catch (e: Exception) {
-            Log.e("SlotifyNotification", "Failed to send attire reminder", e)
-        }
+        notifySafely(context, NOTIFICATION_ID_ATTIRE, builder.build())
     }
 
     fun showTransitAlert(context: Context, childName: String, transitMsg: String) {
@@ -131,11 +144,7 @@ object SlotifyNotificationManager {
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
 
-        try {
-            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_TRANSIT, builder.build())
-        } catch (e: Exception) {
-            Log.e("SlotifyNotification", "Failed to send transit alert", e)
-        }
+        notifySafely(context, NOTIFICATION_ID_TRANSIT, builder.build())
     }
 
     /**
@@ -173,11 +182,7 @@ object SlotifyNotificationManager {
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
 
-        try {
-            NotificationManagerCompat.from(context).notify(notificationId, builder.build())
-        } catch (e: Exception) {
-            Log.e("SlotifyNotification", "Failed to send geofence alert", e)
-        }
+        notifySafely(context, notificationId, builder.build())
     }
 
     fun scheduleDailyReminders(context: Context) {

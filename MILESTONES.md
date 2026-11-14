@@ -14,6 +14,7 @@
 | **M4: Reward Vault & Academics** | `v1.0.0-beta02` | Star Coins, Parent PIN Authorization & PBD/UASA Records | ✅ **SIAP** |
 | **M5: Finance, Takwim & Polish** | `v1.0.0-rc01` | Canteen Tracker, Fee Alerts & KPM Takwim 2026/2027 | ✅ **SIAP** |
 | **M6: Production Release** | `v1.0.0` | Signed AAB/APK, Google Play Store Publishing | ✅ **SIAP** |
+| **M7: Hardening (Audit 2026-11)** | `v1.2.0` | Privacy, PIN security, idempotent rewards, DB migrations, correctness fixes | 🔄 **SEDANG** |
 
 ---
 
@@ -66,3 +67,14 @@
 - [x] Jana kunci tandatangan keluaran (*Release Signing Keystore*) & konfigurasi `signingConfigs.release`.
 - [x] Uji binaan keluaran ProGuard / R8 minification (`app/proguard-rules.pro`).
 - [x] Terbitkan fail APK (`app-release.apk`, ~3.8 MB) dan AAB (`app-release.aab`, ~6.7 MB) keluaran akhir untuk Google Play Store.
+
+---
+
+### 🔄 M7: Hardening (`v1.2.0`) — SEDANG
+Pelan penuh dan status terperinci: [MASTER_DOCUMENTATION.md §13](MASTER_DOCUMENTATION.md#-13-audit-findings--fix-plan).
+- [x] P1 — Data keluarga dipindahkan ke profil peribadi (git-ignored); PIN PBKDF2 tanpa PIN lalai; ganjaran bintang idempoten.
+- [x] P2 — Skema Room dieksport, `MIGRATION_5_6`, tiada lagi `REPLACE` pada jadual induk; 0 ralat lint.
+- [x] P3 — Pembetulan hari sekolah/hujung minggu, yuran berulang, geofens, OSRM luar talian, kitar hayat peta.
+- [ ] P1-1 — Bersihkan sejarah git sebelum `push` seterusnya.
+- [ ] P4 — ViewModel + NavHost.
+- [ ] P5 — Penyatuan bahasa, aksesibiliti, CI.

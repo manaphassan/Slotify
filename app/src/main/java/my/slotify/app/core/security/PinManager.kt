@@ -1,43 +1,101 @@
 package my.slotify.app.core.security
 
 import android.content.Context
-import java.security.MessageDigest
+
+sealed interface PinResult {
+    data object Success : PinResult
+
+    /** No PIN has been created yet — the UI must run the setup flow. */
+    data object NotSet : PinResult
+    data class Incorrect(val attemptsBeforeLockout: Int) : PinResult
+    data class LockedOut(val remainingMs: Long) : PinResult
+    data object InvalidFormat : PinResult
+    data object AlreadySet : PinResult
+}
 
 /**
- * Fix 1.1: PinManager — stores the parent PIN as a SHA-256 hash in private SharedPreferences.
- * The default PIN is "1234" but it is never stored or compared in plain text.
+ * Parent PIN storage.
  *
- * Usage:
- *   PinManager.verifyPin(context, enteredPin)   // returns Boolean
- *   PinManager.setPin(context, newPin)           // updates the stored hash
+ * - There is no default PIN: [isPinSet] is false until the parent creates one.
+ * - The PIN is stored as PBKDF2-HMAC-SHA256 with a random per-install salt.
+ * - Failed attempts and the lockout deadline are persisted, so dismissing the
+ *   dialog or killing the app does not reset them.
+ *
+ * Hashing is slow by design (~tens of ms); call [verifyPin]/[setPin]/[changePin]
+ * off the main thread.
  */
 object PinManager {
 
     private const val PREFS_NAME = "slotify_secure"
-    private const val KEY_PIN_HASH = "parent_pin_hash"
-    private const val DEFAULT_PIN = "1234"
+    private const val KEY_HASH = "parent_pin_pbkdf2"
+    private const val KEY_SALT = "parent_pin_salt"
+    private const val KEY_ITERATIONS = "parent_pin_iterations"
+    private const val KEY_FAILED = "parent_pin_failed_attempts"
+    private const val KEY_LOCKED_UNTIL = "parent_pin_locked_until"
 
-    /** Returns the stored SHA-256 hash, initialising to the default if absent. */
-    fun getStoredHash(context: Context): String {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getString(KEY_PIN_HASH, hashPin(DEFAULT_PIN)) ?: hashPin(DEFAULT_PIN)
+    /** Unsalted SHA-256 hash written by v1.x builds; never trusted, only removed. */
+    private const val LEGACY_KEY_SHA256 = "parent_pin_hash"
+
+    private fun prefs(context: Context) =
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    fun isPinSet(context: Context): Boolean = prefs(context).contains(KEY_HASH)
+
+    /** Milliseconds until the lockout ends (0 when not locked). */
+    fun lockoutRemainingMs(context: Context, now: Long = System.currentTimeMillis()): Long =
+        (prefs(context).getLong(KEY_LOCKED_UNTIL, 0L) - now).coerceAtLeast(0L)
+
+    /** Creates the first PIN. Returns [PinResult.AlreadySet] if one exists (use [changePin]). */
+    fun setInitialPin(context: Context, newPin: String): PinResult {
+        if (isPinSet(context)) return PinResult.AlreadySet
+        return storePin(context, newPin)
     }
 
-    /** Returns true if [input] matches the stored PIN hash. */
-    fun verifyPin(context: Context, input: String): Boolean =
-        hashPin(input) == getStoredHash(context)
+    fun verifyPin(context: Context, input: String, now: Long = System.currentTimeMillis()): PinResult {
+        val p = prefs(context)
+        if (!isPinSet(context)) return PinResult.NotSet
+        val remaining = lockoutRemainingMs(context, now)
+        if (remaining > 0) return PinResult.LockedOut(remaining)
 
-    /** Persists a new PIN (stored only as its SHA-256 hash). */
-    fun setPin(context: Context, newPin: String) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_PIN_HASH, hashPin(newPin))
+        val salt = PinHasher.decode(p.getString(KEY_SALT, null) ?: return PinResult.NotSet)
+        val expected = PinHasher.decode(p.getString(KEY_HASH, null) ?: return PinResult.NotSet)
+        val iterations = p.getInt(KEY_ITERATIONS, PinHasher.ITERATIONS)
+
+        if (PinHasher.matches(input, salt, expected, iterations)) {
+            p.edit().putInt(KEY_FAILED, 0).putLong(KEY_LOCKED_UNTIL, 0L).apply()
+            return PinResult.Success
+        }
+
+        val failed = p.getInt(KEY_FAILED, 0) + 1
+        val lockMs = PinHasher.lockoutDurationMs(failed)
+        p.edit()
+            .putInt(KEY_FAILED, failed)
+            .putLong(KEY_LOCKED_UNTIL, if (lockMs > 0) now + lockMs else 0L)
             .apply()
+        return if (lockMs > 0) PinResult.LockedOut(lockMs) else PinResult.Incorrect(3 - failed % 3)
     }
 
-    /** Produces a lowercase hex SHA-256 digest of [pin]. */
-    private fun hashPin(pin: String): String {
-        val bytes = MessageDigest.getInstance("SHA-256").digest(pin.toByteArray(Charsets.UTF_8))
-        return bytes.joinToString("") { "%02x".format(it) }
+    /** Replaces the PIN after verifying [currentPin]. */
+    fun changePin(context: Context, currentPin: String, newPin: String): PinResult {
+        if (!PinHasher.isValidPin(newPin)) return PinResult.InvalidFormat
+        return when (val r = verifyPin(context, currentPin)) {
+            PinResult.Success -> storePin(context, newPin)
+            else -> r
+        }
+    }
+
+    private fun storePin(context: Context, newPin: String): PinResult {
+        if (!PinHasher.isValidPin(newPin)) return PinResult.InvalidFormat
+        val salt = PinHasher.newSalt()
+        val hash = PinHasher.hash(newPin, salt)
+        prefs(context).edit()
+            .putString(KEY_SALT, PinHasher.encode(salt))
+            .putString(KEY_HASH, PinHasher.encode(hash))
+            .putInt(KEY_ITERATIONS, PinHasher.ITERATIONS)
+            .putInt(KEY_FAILED, 0)
+            .putLong(KEY_LOCKED_UNTIL, 0L)
+            .remove(LEGACY_KEY_SHA256)
+            .apply()
+        return PinResult.Success
     }
 }

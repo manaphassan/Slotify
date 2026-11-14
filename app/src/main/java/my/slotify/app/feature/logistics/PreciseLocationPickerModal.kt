@@ -49,6 +49,7 @@ import my.slotify.app.core.designsystem.theme.NeumorphicElevation
 import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.designsystem.theme.SlotifyShapes
 import my.slotify.app.core.designsystem.theme.neumorphic
+import my.slotify.app.core.profile.FamilyProfileData
 import java.util.Locale
 
 enum class NudgeStepSize(val label: String, val deltaDeg: Double) {
@@ -65,7 +66,7 @@ enum class NudgeStepSize(val label: String, val deltaDeg: Double) {
  * 3. Real-time 6-decimal latitude & longitude coordinate tracking.
  * 4. Micro-adjustment Stepper / Nudge D-Pad (1m, 10m, 50m increments) for zero-slip targeting.
  * 5. Automatic reverse-geocoding address lookup via LocationAddressHelper.
- * 6. One-tap preset jumps (Rumah, SK, SRA, Taska, Tadika, Pejabat Bandar Contoh, SRAI).
+ * 6. One-tap preset jumps to the family's saved points of interest.
  * 7. Direct coordinate manual input & validation.
  * 8. Live distance calculation from Home.
  */
@@ -74,8 +75,8 @@ fun PreciseLocationPickerModal(
     initialLat: Double,
     initialLng: Double,
     title: String = "Pilih Lokasi Tepat di Peta",
-    homeLat: Double = 3.1390,
-    homeLng: Double = 101.6869,
+    homeLat: Double = FamilyProfileData.mapCenter.lat,
+    homeLng: Double = FamilyProfileData.mapCenter.lng,
     onDismiss: () -> Unit,
     onConfirmLocation: (lat: Double, lng: Double, address: String, distanceKm: Double) -> Unit
 ) {
@@ -116,16 +117,13 @@ fun PreciseLocationPickerModal(
         calculateDistanceKm(homeLat, homeLng, centerLat, centerLng)
     }
 
-    // Verified Accurate Landmarks in Taman Contoh / Bandar Contoh
-    val landmarks = listOf(
-        Triple("🏠 Rumah", homeLat, homeLng),
-        Triple("🏫 SK", 3.1390, 101.6869),
-        Triple("🕌 SRA", 3.1390, 101.6869),
-        Triple("🎒 Taska", 3.1390, 101.6869),
-        Triple("🧒 Tadika", 3.1390, 101.6869),
-        Triple("📚 SRAI", 3.1390, 101.6869),
-        Triple("🏢 Pejabat", 3.1390, 101.6869)
-    )
+    // Preset jumps: home plus the user's saved points of interest
+    val landmarks = remember(context) {
+        listOf(Triple("🏠 Rumah", homeLat, homeLng)) +
+                PoiStorage.loadPois(context)
+                    .filter { it.category != PoiCategory.RUMAH }
+                    .map { Triple("${it.iconEmoji} ${it.name.substringBefore(" (")}", it.lat, it.lng) }
+    }
 
     // Hardware GPS Location Fetching Function
     suspend fun fetchGpsLocation() {
@@ -149,7 +147,13 @@ fun PreciseLocationPickerModal(
             activeGpsResult = fix
             centerLat = fix.latitude
             centerLng = fix.longitude
-            gpsNotification = "${fix.quality.badgeEmoji} GPS: ±${String.format(Locale.US, "%.1f", fix.accuracyMeters)}m (${fix.quality.label})"
+            gpsNotification = "${fix.quality.badgeEmoji} GPS: ±${
+                String.format(
+                    Locale.US,
+                    "%.1f",
+                    fix.accuracyMeters
+                )
+            }m (${fix.quality.label})"
             mapViewRef?.controller?.apply {
                 setZoom(18.0) // 1-meter ground resolution
                 animateTo(GeoPoint(fix.latitude, fix.longitude))
@@ -249,7 +253,10 @@ fun PreciseLocationPickerModal(
                             }
                         }
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             // GPS Sync Button in Header
                             FilledTonalButton(
                                 onClick = {
@@ -268,11 +275,17 @@ fun PreciseLocationPickerModal(
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                 modifier = Modifier.height(32.dp),
                                 colors = ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = if (activeGpsResult != null) SlotifyColors.ParentGreen.copy(alpha = 0.18f) else SlotifyColors.KpmSkyBlue.copy(alpha = 0.15f)
+                                    containerColor = if (activeGpsResult != null) SlotifyColors.ParentGreen.copy(alpha = 0.18f) else SlotifyColors.KpmSkyBlue.copy(
+                                        alpha = 0.15f
+                                    )
                                 )
                             ) {
                                 if (isGpsFetching) {
-                                    CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp, color = SlotifyColors.KpmSkyBlue)
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(12.dp),
+                                        strokeWidth = 1.5.dp,
+                                        color = SlotifyColors.KpmSkyBlue
+                                    )
                                 } else {
                                     Text("📡", fontSize = 12.sp)
                                 }
@@ -315,10 +328,14 @@ fun PreciseLocationPickerModal(
                     AndroidView(
                         modifier = Modifier.fillMaxSize(),
                         factory = { ctx ->
-                            Configuration.getInstance().userAgentValue = ctx.packageName
+                            Configuration.getInstance()
+                                .load(ctx, ctx.getSharedPreferences("osmdroid", android.content.Context.MODE_PRIVATE))
+                            Configuration.getInstance().userAgentValue =
+                                my.slotify.app.core.routing.OsrmRoutingService.USER_AGENT
                             MapView(ctx).apply {
                                 setTileSource(TileSourceFactory.MAPNIK)
                                 setMultiTouchControls(true)
+                                overlays.add(org.osmdroid.views.overlay.CopyrightOverlay(ctx))
                                 controller.setZoom(17.5) // Street-level precision zoom
                                 controller.setCenter(GeoPoint(centerLat, centerLng))
 
@@ -354,7 +371,13 @@ fun PreciseLocationPickerModal(
                                 mapViewRef = this
                             }
                         },
-                        update = { /* MapView handles scroll events directly */ }
+                        update = { /* MapView handles scroll events directly */ },
+                        onRelease = { mapView ->
+                            locationOverlayRef?.disableMyLocation()
+                            locationOverlayRef = null
+                            if (mapViewRef === mapView) mapViewRef = null
+                            mapView.onDetach()
+                        }
                     )
 
                     // 3. Fixed Center Crosshair & Floating Reticle Pin (Grab / Uber style)
@@ -373,15 +396,15 @@ fun PreciseLocationPickerModal(
                             // Crosshair Lines
                             Box(
                                 modifier = Modifier
-                                .width(44.dp)
-                                .height(1.5.dp)
-                                .background(SlotifyColors.KpmSkyBlue.copy(alpha = 0.5f))
+                                    .width(44.dp)
+                                    .height(1.5.dp)
+                                    .background(SlotifyColors.KpmSkyBlue.copy(alpha = 0.5f))
                             )
                             Box(
                                 modifier = Modifier
-                                .width(1.5.dp)
-                                .height(44.dp)
-                                .background(SlotifyColors.KpmSkyBlue.copy(alpha = 0.5f))
+                                    .width(1.5.dp)
+                                    .height(44.dp)
+                                    .background(SlotifyColors.KpmSkyBlue.copy(alpha = 0.5f))
                             )
                             // Precision Center Dot
                             Box(
@@ -451,7 +474,7 @@ fun PreciseLocationPickerModal(
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = "•  $liveDistance km",
+                                    text = "•  ${formatKm(liveDistance)}",
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                                     color = SlotifyColors.TextSecondary
                                 )
@@ -461,8 +484,13 @@ fun PreciseLocationPickerModal(
                         if (gpsNotification != null || activeGpsResult != null) {
                             Surface(
                                 shape = RoundedCornerShape(14.dp),
-                                color = if (activeGpsResult != null) Color(activeGpsResult!!.quality.colorHex).copy(alpha = 0.15f) else SlotifyColors.SurfaceCard.copy(alpha = 0.95f),
-                                border = if (activeGpsResult != null) BorderStroke(1.dp, Color(activeGpsResult!!.quality.colorHex).copy(alpha = 0.4f)) else null,
+                                color = if (activeGpsResult != null) Color(activeGpsResult!!.quality.colorHex).copy(
+                                    alpha = 0.15f
+                                ) else SlotifyColors.SurfaceCard.copy(alpha = 0.95f),
+                                border = if (activeGpsResult != null) BorderStroke(
+                                    1.dp,
+                                    Color(activeGpsResult!!.quality.colorHex).copy(alpha = 0.4f)
+                                ) else null,
                                 shadowElevation = 4.dp
                             ) {
                                 Row(
@@ -470,7 +498,13 @@ fun PreciseLocationPickerModal(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = gpsNotification ?: "${activeGpsResult!!.quality.badgeEmoji} GPS: ±${String.format(Locale.US, "%.1f", activeGpsResult!!.accuracyMeters)}m (${activeGpsResult!!.quality.label})",
+                                        text = gpsNotification ?: "${activeGpsResult!!.quality.badgeEmoji} GPS: ±${
+                                            String.format(
+                                                Locale.US,
+                                                "%.1f",
+                                                activeGpsResult!!.accuracyMeters
+                                            )
+                                        }m (${activeGpsResult!!.quality.label})",
                                         fontSize = 10.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = if (activeGpsResult != null) Color(activeGpsResult!!.quality.colorHex) else SlotifyColors.TextPrimary
@@ -540,7 +574,11 @@ fun PreciseLocationPickerModal(
                                     },
                                     modifier = Modifier.size(32.dp)
                                 ) {
-                                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Utara", tint = SlotifyColors.KpmSkyBlue)
+                                    Icon(
+                                        Icons.Default.KeyboardArrowUp,
+                                        contentDescription = "Utara",
+                                        tint = SlotifyColors.KpmSkyBlue
+                                    )
                                 }
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -554,7 +592,11 @@ fun PreciseLocationPickerModal(
                                         },
                                         modifier = Modifier.size(32.dp)
                                     ) {
-                                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Barat", tint = SlotifyColors.KpmSkyBlue)
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                                            contentDescription = "Barat",
+                                            tint = SlotifyColors.KpmSkyBlue
+                                        )
                                     }
 
                                     // Center Nudge Icon
@@ -564,7 +606,12 @@ fun PreciseLocationPickerModal(
                                             .background(SlotifyColors.KpmSkyBlue.copy(alpha = 0.15f), CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text("⊕", fontSize = 14.sp, color = SlotifyColors.KpmSkyBlue, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            "⊕",
+                                            fontSize = 14.sp,
+                                            color = SlotifyColors.KpmSkyBlue,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     }
 
                                     // Right (East)
@@ -577,7 +624,11 @@ fun PreciseLocationPickerModal(
                                         },
                                         modifier = Modifier.size(32.dp)
                                     ) {
-                                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Timur", tint = SlotifyColors.KpmSkyBlue)
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                            contentDescription = "Timur",
+                                            tint = SlotifyColors.KpmSkyBlue
+                                        )
                                     }
                                 }
 
@@ -591,7 +642,11 @@ fun PreciseLocationPickerModal(
                                     },
                                     modifier = Modifier.size(32.dp)
                                 ) {
-                                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Selatan", tint = SlotifyColors.KpmSkyBlue)
+                                    Icon(
+                                        Icons.Default.KeyboardArrowDown,
+                                        contentDescription = "Selatan",
+                                        tint = SlotifyColors.KpmSkyBlue
+                                    )
                                 }
                             }
                         }
@@ -630,7 +685,11 @@ fun PreciseLocationPickerModal(
                                     color = Color.White
                                 )
                             } else {
-                                Icon(Icons.Default.MyLocation, contentDescription = "Kunci GPS Semasa", modifier = Modifier.size(20.dp))
+                                Icon(
+                                    Icons.Default.MyLocation,
+                                    contentDescription = "Kunci GPS Semasa",
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
                         }
 
@@ -653,7 +712,11 @@ fun PreciseLocationPickerModal(
                             contentColor = SlotifyColors.KpmSkyBlue,
                             shape = CircleShape
                         ) {
-                            Icon(Icons.Default.Remove, contentDescription = "Zum Keluar", modifier = Modifier.size(20.dp))
+                            Icon(
+                                Icons.Default.Remove,
+                                contentDescription = "Zum Keluar",
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
 
                         // Reset to Home
@@ -726,7 +789,7 @@ fun PreciseLocationPickerModal(
                                             showManualInput = false
                                             manualInputError = null
                                         } else {
-                                            manualInputError = "Koordinat tidak sah (cth: 3.1390, 101.6869)"
+                                            manualInputError = "Koordinat tidak sah (cth: 3.13900, 101.68690)"
                                         }
                                     },
                                     shape = SlotifyShapes.Small,
@@ -761,7 +824,8 @@ fun PreciseLocationPickerModal(
                         Spacer(Modifier.height(4.dp))
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             items(landmarks) { (name, lat, lng) ->
-                                val isNear = kotlin.math.abs(centerLat - lat) < 0.0003 && kotlin.math.abs(centerLng - lng) < 0.0003
+                                val isNear =
+                                    kotlin.math.abs(centerLat - lat) < 0.0003 && kotlin.math.abs(centerLng - lng) < 0.0003
                                 Box(
                                     modifier = Modifier
                                         .clip(SlotifyShapes.Small)
@@ -819,7 +883,13 @@ fun PreciseLocationPickerModal(
                                     maxLines = 2
                                 )
                                 Text(
-                                    text = String.format(Locale.US, "%.5f, %.5f • Jarak dari Rumah: %.1f km", centerLat, centerLng, liveDistance),
+                                    text = String.format(
+                                        Locale.US,
+                                        "%.5f, %.5f • Jarak dari Rumah: %.1f km",
+                                        centerLat,
+                                        centerLng,
+                                        liveDistance
+                                    ),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = SlotifyColors.TextSecondary
                                 )
@@ -840,6 +910,8 @@ fun PreciseLocationPickerModal(
                             }
 
                             Button(
+                                // Wait for reverse-geocoding so a placeholder or stale address is never saved.
+                                enabled = !isGeocoding,
                                 onClick = {
                                     onConfirmLocation(centerLat, centerLng, resolvedAddress, liveDistance)
                                 },
@@ -847,7 +919,12 @@ fun PreciseLocationPickerModal(
                                 shape = SlotifyShapes.Medium,
                                 colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue)
                             ) {
-                                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = Color.White
+                                )
                                 Spacer(Modifier.width(6.dp))
                                 Text("Sahkan Lokasi Ini", color = Color.White, fontWeight = FontWeight.Bold)
                             }

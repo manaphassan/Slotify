@@ -38,6 +38,11 @@ import my.slotify.app.core.designsystem.theme.strings
 import my.slotify.app.core.model.KpmSubjectCatalog
 import java.util.Calendar
 import java.util.UUID
+import androidx.compose.runtime.saveable.rememberSaveable
+import my.slotify.app.core.time.SchoolDay
+import my.slotify.app.core.model.AttireGuide
+import my.slotify.app.core.time.TimeOfDay
+import my.slotify.app.core.time.rememberNow
 
 enum class TimetableViewMode {
     DAY,
@@ -55,52 +60,39 @@ fun TimetableScreen(
     sessions: List<SchoolSessionEntity> = emptyList(),
     activeSessionIndex: Int = 0
 ) {
+    val liveNow by rememberNow()
+    val today = liveNow.toLocalDate()
+    val todayDow: Int? = SchoolDay.of(today)
+
     var viewMode by remember { mutableStateOf(TimetableViewMode.DAY) }
-    var selectedDay by remember { mutableIntStateOf(1) } // 1=Isnin
+    var selectedDay by rememberSaveable { mutableIntStateOf(todayDow ?: SchoolDay.MONDAY) }
     var showAddSlotDialog by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
-    // Simulated / current time state
-    var simulatedHour by remember { mutableIntStateOf(8) }
-    var simulatedMinute by remember { mutableIntStateOf(15) }
+    // Optional time preview (null = live clock).
+    var simulatedMinutes by remember { mutableStateOf<Int?>(null) }
 
     val days = listOf("Isnin" to 1, "Selasa" to 2, "Rabu" to 3, "Khamis" to 4, "Jumaat" to 5)
 
-    val sampleSlots = remember {
-        listOf(
-            TimetableSlotEntity(sessionId = "1", dayOfWeek = 1, periodIndex = 1, startTime = "08:00", endTime = "08:30", subjectCode = "BM", subjectName = "Bahasa Melayu", teacherName = "Cikgu Rosli"),
-            TimetableSlotEntity(sessionId = "1", dayOfWeek = 1, periodIndex = 2, startTime = "08:30", endTime = "09:30", subjectCode = "MT", subjectName = "Matematik", teacherName = "Cikgu Halim"),
-            TimetableSlotEntity(sessionId = "1", dayOfWeek = 1, periodIndex = 3, startTime = "09:30", endTime = "10:00", subjectCode = "REHAT", subjectName = "Waktu Rehat SRA", isRehat = true),
-            TimetableSlotEntity(sessionId = "1", dayOfWeek = 1, periodIndex = 4, startTime = "10:00", endTime = "11:00", subjectCode = "TAHFIZ", subjectName = "Hafazan Al-Quran", teacherName = "Ustaz Zakaria"),
-            TimetableSlotEntity(sessionId = "1", dayOfWeek = 1, periodIndex = 5, startTime = "13:00", endTime = "14:00", subjectCode = "SN", subjectName = "Sains (Makmal)", teacherName = "Puan Hasnah"),
-            TimetableSlotEntity(sessionId = "1", dayOfWeek = 1, periodIndex = 6, startTime = "14:00", endTime = "15:00", subjectCode = "BI", subjectName = "English Language", teacherName = "Miss Cheryl"),
-            TimetableSlotEntity(sessionId = "1", dayOfWeek = 1, periodIndex = 7, startTime = "15:00", endTime = "15:30", subjectCode = "REHAT", subjectName = "Rehat Petang SK", isRehat = true),
-            TimetableSlotEntity(sessionId = "1", dayOfWeek = 1, periodIndex = 8, startTime = "15:30", endTime = "17:00", subjectCode = "PI", subjectName = "Pendidikan Islam", teacherName = "Ustazah Zaimah")
-        )
-    }
-    val allSlots = if (slots.isNotEmpty()) slots else sampleSlots
+    val allSlots = slots
     val currentSlots = allSlots.filter { it.dayOfWeek == selectedDay }
 
-    // Compute realtime current and next class
-    val currentSimMinutes = simulatedHour * 60 + simulatedMinute
-    val activeSlot = currentSlots.firstOrNull { slot ->
+    // Live tracking uses today's slots (none on weekends); a time preview uses the selected day.
+    val currentSimMinutes = simulatedMinutes ?: (liveNow.hour * 60 + liveNow.minute)
+    val trackedSlots = if (simulatedMinutes != null) currentSlots
+    else if (todayDow != null) allSlots.filter { it.dayOfWeek == todayDow } else emptyList()
+    val activeSlot = trackedSlots.firstOrNull { slot ->
         val startMin = parseTimeToMinutes(slot.startTime)
         val endMin = parseTimeToMinutes(slot.endTime)
         currentSimMinutes in startMin until endMin
     }
-    val nextSlot = currentSlots.firstOrNull { slot ->
+    val nextSlot = trackedSlots.firstOrNull { slot ->
         val startMin = parseTimeToMinutes(slot.startTime)
         startMin > currentSimMinutes
     }
 
-    // Tomorrow's slots for book list
-    val todayDow = remember {
-        when (Calendar.getInstance().get(Calendar.DAY_OF_WEEK)) {
-            Calendar.MONDAY -> 1; Calendar.TUESDAY -> 2; Calendar.WEDNESDAY -> 3
-            Calendar.THURSDAY -> 4; Calendar.FRIDAY -> 5; else -> 1
-        }
-    }
-    val tomorrowDow = if (todayDow >= 5) 1 else todayDow + 1
+    // Next school day's slots for the book list (Friday/weekend → Monday)
+    val tomorrowDow = SchoolDay.nextAfter(today)
     val tomorrowSlots = allSlots.filter { it.dayOfWeek == tomorrowDow }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -136,16 +128,16 @@ fun TimetableScreen(
                             // Session badge — shows active session context (SRA Pagi / SK Petang)
                             if (session != null) {
                                 val sessionLabel = when (session.sessionTimeType) {
-                                    "PAGI"     -> "🌅 ${session.schoolName.substringBefore(" ").take(3)} Pagi"
-                                    "PETANG"   -> "🌆 ${session.schoolName.substringBefore(" ").take(3)} Petang"
+                                    "PAGI" -> "🌅 ${session.schoolName.substringBefore(" ").take(3)} Pagi"
+                                    "PETANG" -> "🌆 ${session.schoolName.substringBefore(" ").take(3)} Petang"
                                     "FULL_DAY" -> "🏫 ${session.schoolName.substringBefore(" ").take(4)}"
-                                    else       -> session.sessionTimeType
+                                    else -> session.sessionTimeType
                                 }
                                 val badgeColor = when (session.sessionTimeType) {
-                                    "PAGI"     -> SlotifyColors.KpmSkyBlue
-                                    "PETANG"   -> SlotifyColors.ActionAmber
+                                    "PAGI" -> SlotifyColors.KpmSkyBlue
+                                    "PETANG" -> SlotifyColors.ActionAmber
                                     "FULL_DAY" -> SlotifyColors.SuccessMint
-                                    else       -> SlotifyColors.TextSecondary
+                                    else -> SlotifyColors.TextSecondary
                                 }
                                 Box(
                                     modifier = Modifier
@@ -168,7 +160,10 @@ fun TimetableScreen(
                             IconButton(
                                 onClick = { showAddSlotDialog = true },
                                 modifier = Modifier
-                                    .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = SlotifyShapes.LargeDp)
+                                    .neumorphic(
+                                        elevation = NeumorphicElevation.LOW,
+                                        cornerRadius = SlotifyShapes.LargeDp
+                                    )
                                     .background(SlotifyColors.KpmSkyBlue, SlotifyShapes.Large)
                                     .size(36.dp)
                             ) {
@@ -186,7 +181,10 @@ fun TimetableScreen(
                             IconButton(
                                 onClick = onToggleYearInversion,
                                 modifier = Modifier
-                                    .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = SlotifyShapes.LargeDp)
+                                    .neumorphic(
+                                        elevation = NeumorphicElevation.LOW,
+                                        cornerRadius = SlotifyShapes.LargeDp
+                                    )
                                     .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
                                     .size(36.dp)
                             ) {
@@ -241,10 +239,17 @@ fun TimetableScreen(
                 RealtimeClassTrackerCard(
                     activeSlot = activeSlot,
                     nextSlot = nextSlot,
-                    simulatedTime = String.format("%02d:%02d", simulatedHour, simulatedMinute),
-                    onSimulateMorning = { simulatedHour = 8; simulatedMinute = 15 },
-                    onSimulateNoon = { simulatedHour = 10; simulatedMinute = 15 },
-                    onSimulateAfternoon = { simulatedHour = 14; simulatedMinute = 30 }
+                    simulatedTime = String.format(
+                        java.util.Locale.US,
+                        "%02d:%02d",
+                        currentSimMinutes / 60,
+                        currentSimMinutes % 60
+                    ) +
+                            if (simulatedMinutes == null) " (kini)" else " (pratonton)",
+                    onSimulateMorning = { simulatedMinutes = 8 * 60 + 15 },
+                    onSimulateNoon = { simulatedMinutes = 10 * 60 + 15 },
+                    onSimulateAfternoon = { simulatedMinutes = 14 * 60 + 30 },
+                    onLive = { simulatedMinutes = null }
                 )
             }
 
@@ -321,7 +326,7 @@ fun TimetableScreen(
 
                 TimetableViewMode.TOMORROW -> {
                     item {
-                        TomorrowViewSection(tomorrowSlots)
+                        TomorrowViewSection(tomorrowSlots, tomorrowDow)
                     }
                 }
             }
@@ -486,7 +491,11 @@ private fun AddSlotDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Mula (HH:MM)", style = MaterialTheme.typography.labelMedium, color = SlotifyColors.TextSecondary)
+                        Text(
+                            "Mula (HH:MM)",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = SlotifyColors.TextSecondary
+                        )
                         OutlinedTextField(
                             value = startTime,
                             onValueChange = { if (it.length <= 5) startTime = it },
@@ -503,7 +512,11 @@ private fun AddSlotDialog(
                         )
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Tamat (HH:MM)", style = MaterialTheme.typography.labelMedium, color = SlotifyColors.TextSecondary)
+                        Text(
+                            "Tamat (HH:MM)",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = SlotifyColors.TextSecondary
+                        )
                         OutlinedTextField(
                             value = endTime,
                             onValueChange = { if (it.length <= 5) endTime = it },
@@ -522,7 +535,11 @@ private fun AddSlotDialog(
                 }
 
                 // Teacher name
-                Text("Nama Guru (pilihan)", style = MaterialTheme.typography.labelMedium, color = SlotifyColors.TextSecondary)
+                Text(
+                    "Nama Guru (pilihan)",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = SlotifyColors.TextSecondary
+                )
                 OutlinedTextField(
                     value = teacherName,
                     onValueChange = { teacherName = it },
@@ -554,7 +571,11 @@ private fun AddSlotDialog(
                                 .padding(8.dp)
                         ) {
                             Checkbox(checked = requiresTextbook, onCheckedChange = { requiresTextbook = it })
-                            Text("📘 Buku Teks", style = MaterialTheme.typography.bodySmall, color = SlotifyColors.TextPrimary)
+                            Text(
+                                "📘 Buku Teks",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = SlotifyColors.TextPrimary
+                            )
                         }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -566,21 +587,36 @@ private fun AddSlotDialog(
                                 .padding(8.dp)
                         ) {
                             Checkbox(checked = requiresWorkbook, onCheckedChange = { requiresWorkbook = it })
-                            Text("📙 Buku Aktiviti", style = MaterialTheme.typography.bodySmall, color = SlotifyColors.TextPrimary)
+                            Text(
+                                "📙 Buku Aktiviti",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = SlotifyColors.TextPrimary
+                            )
                         }
                     }
                 }
 
                 // Confirm Button
+                val normalizedStart = TimeOfDay.normalize(startTime)
+                val normalizedEnd = TimeOfDay.normalize(endTime)
+                val timesValid = normalizedStart != null && normalizedEnd != null && normalizedStart < normalizedEnd
+                if (!timesValid && startTime.isNotBlank() && endTime.isNotBlank()) {
+                    Text(
+                        "Masa tidak sah: gunakan format HH:MM dan pastikan masa mula sebelum masa tamat.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SlotifyColors.EnglishRed
+                    )
+                }
                 Button(
+                    enabled = timesValid,
                     onClick = {
                         val slot = TimetableSlotEntity(
                             id = UUID.randomUUID().toString(),
                             sessionId = session.id,
                             dayOfWeek = selectedDay,
                             periodIndex = existingSlotsCount + 1,
-                            startTime = startTime.trim(),
-                            endTime = endTime.trim(),
+                            startTime = normalizedStart!!,
+                            endTime = normalizedEnd!!,
                             subjectCode = selectedSubject.code,
                             subjectName = selectedSubject.nameBm,
                             teacherName = teacherName.ifBlank { null },
@@ -648,7 +684,8 @@ private fun RealtimeClassTrackerCard(
     simulatedTime: String,
     onSimulateMorning: () -> Unit,
     onSimulateNoon: () -> Unit,
-    onSimulateAfternoon: () -> Unit
+    onSimulateAfternoon: () -> Unit,
+    onLive: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -680,6 +717,7 @@ private fun RealtimeClassTrackerCard(
 
                 // Time Simulation Chips
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    SimTimeChip("Kini", onClick = onLive)
                     SimTimeChip("08:15", onClick = onSimulateMorning)
                     SimTimeChip("10:15", onClick = onSimulateNoon)
                     SimTimeChip("14:30", onClick = onSimulateAfternoon)
@@ -697,7 +735,12 @@ private fun RealtimeClassTrackerCard(
                 ) {
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(strings.ongoingStatus, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = SlotifyColors.ActionAmber)
+                            Text(
+                                strings.ongoingStatus,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SlotifyColors.ActionAmber
+                            )
                         }
                         Spacer(Modifier.height(4.dp))
                         if (activeSlot != null) {
@@ -729,7 +772,12 @@ private fun RealtimeClassTrackerCard(
                         .padding(10.dp)
                 ) {
                     Column {
-                        Text(strings.nextStatus, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = SlotifyColors.KpmSkyBlue)
+                        Text(
+                            strings.nextStatus,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SlotifyColors.KpmSkyBlue
+                        )
                         Spacer(Modifier.height(4.dp))
                         if (nextSlot != null) {
                             Text(
@@ -875,7 +923,12 @@ private fun TimetableSlotCard(
                         shape = SlotifyShapes.Small,
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                     ) {
-                        Icon(Icons.Default.Delete, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp)
+                        )
                         Spacer(Modifier.width(4.dp))
                         Text("Padam Slot", style = MaterialTheme.typography.bodySmall, color = Color.White)
                     }
@@ -888,11 +941,11 @@ private fun TimetableSlotCard(
 @Composable
 private fun WeekOverviewView(slots: List<TimetableSlotEntity>) {
     val days = listOf(
-        Triple("Isnin", 1, "Uniform Lengkap KPM"),
-        Triple("Selasa", 2, "Uniform Sukan / PJ"),
-        Triple("Rabu", 3, "Baju Batik Sekolah"),
-        Triple("Khamis", 4, "Uniform Lengkap KPM"),
-        Triple("Jumaat", 5, "Baju Melayu / Kurung")
+        Triple("Isnin", 1, AttireGuide.forSchoolDay(1)),
+        Triple("Selasa", 2, AttireGuide.forSchoolDay(2)),
+        Triple("Rabu", 3, AttireGuide.forSchoolDay(3)),
+        Triple("Khamis", 4, AttireGuide.forSchoolDay(4)),
+        Triple("Jumaat", 5, AttireGuide.forSchoolDay(5))
     )
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
@@ -915,8 +968,16 @@ private fun WeekOverviewView(slots: List<TimetableSlotEntity>) {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(dayName, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = SlotifyColors.TextPrimary)
-                        Text(attire, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold), color = SlotifyColors.ActionAmber)
+                        Text(
+                            dayName,
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = SlotifyColors.TextPrimary
+                        )
+                        Text(
+                            attire,
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = SlotifyColors.ActionAmber
+                        )
                     }
                     if (daySlots.isNotEmpty()) {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -927,12 +988,21 @@ private fun WeekOverviewView(slots: List<TimetableSlotEntity>) {
                                         .background(meta.color.copy(alpha = 0.2f), SlotifyShapes.XSmall)
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                 ) {
-                                    Text(slot.subjectCode, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = meta.color)
+                                    Text(
+                                        slot.subjectCode,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = meta.color
+                                    )
                                 }
                             }
                         }
                     } else {
-                        Text("Tiada slot lagi", style = MaterialTheme.typography.labelSmall, color = SlotifyColors.TextTertiary)
+                        Text(
+                            "Tiada slot lagi",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SlotifyColors.TextTertiary
+                        )
                     }
                 }
             }
@@ -941,7 +1011,7 @@ private fun WeekOverviewView(slots: List<TimetableSlotEntity>) {
 }
 
 @Composable
-private fun TomorrowViewSection(tomorrowSlots: List<TimetableSlotEntity>) {
+private fun TomorrowViewSection(tomorrowSlots: List<TimetableSlotEntity>, tomorrowDow: Int) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Box(
             modifier = Modifier
@@ -954,8 +1024,16 @@ private fun TomorrowViewSection(tomorrowSlots: List<TimetableSlotEntity>) {
                 Text("👕", fontSize = 20.sp)
                 Spacer(Modifier.width(8.dp))
                 Column {
-                    Text(strings.tomorrowAttireTitle, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = SlotifyColors.TextPrimary)
-                    Text("T-Shirt Sukan SK + Seluar Track Gelap", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold), color = SlotifyColors.ScienceGreen)
+                    Text(
+                        strings.tomorrowAttireTitle,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = SlotifyColors.TextPrimary
+                    )
+                    Text(
+                        AttireGuide.label(tomorrowDow),
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = SlotifyColors.ScienceGreen
+                    )
                 }
             }
         }
@@ -1000,7 +1078,12 @@ private fun TomorrowViewSection(tomorrowSlots: List<TimetableSlotEntity>) {
                     .padding(10.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SlotifyColors.SuccessMint, modifier = Modifier.size(16.dp))
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = SlotifyColors.SuccessMint,
+                        modifier = Modifier.size(16.dp)
+                    )
                     Spacer(Modifier.width(8.dp))
                     Text(text = book, style = MaterialTheme.typography.bodySmall, color = SlotifyColors.TextPrimary)
                 }

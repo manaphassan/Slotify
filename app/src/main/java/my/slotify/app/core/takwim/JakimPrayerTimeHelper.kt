@@ -8,15 +8,14 @@ import java.util.Locale
 import kotlin.math.*
 
 /**
- * JAKIM-aligned Prayer Times Calculator calibrated for Zon SGR01:
- * Daerah Daerah Contoh (Bandar Contoh, Taman Contoh, Bukit Contoh), Sepang & Hulu Langat.
+ * JAKIM-aligned Prayer Times Calculator for the family's location
+ * (FamilyProfile.prayerLocation).
  * Uses official Malaysian solar calculation parameters (Fajr 20.0°, Isha 18.0°, Ihtiyat +2 min).
  */
 object JakimPrayerTimeHelper {
 
-    // Coordinates for Bandar Contoh, Daerah Contoh
-    const val REGION_LATITUDE = 3.1390
-    const val REGION_LONGITUDE = 101.6869
+    private val latitude: Double get() = my.slotify.app.core.profile.FamilyProfileData.prayerLocation.lat
+    private val longitude: Double get() = my.slotify.app.core.profile.FamilyProfileData.prayerLocation.lng
     const val TIMEZONE_OFFSET_HOURS = 8.0 // UTC+8
 
     data class PrayerSchedule(
@@ -52,11 +51,11 @@ object JakimPrayerTimeHelper {
         val eotMinutes = 9.87 * sin(2 * b) - 7.53 * cos(b) - 1.5 * sin(b)
         val declinationDegrees = 23.45 * sin(2.0 * Math.PI * (284 + dayOfYear) / 365.0)
         val decRad = Math.toRadians(declinationDegrees)
-        val latRad = Math.toRadians(REGION_LATITUDE)
+        val latRad = Math.toRadians(latitude)
 
         // Solar noon (Zohor) in minutes from midnight UTC+8
         // Local Mean Time to Standard Time adjustment: 4 minutes per degree longitude difference from 120°E (Malaysia standard meridian)
-        val longDiffMinutes = (120.0 - REGION_LONGITUDE) * 4.0
+        val longDiffMinutes = (120.0 - longitude) * 4.0
         val solarNoonMinutes = (12.0 * 60.0) + longDiffMinutes - eotMinutes + 2.0 // +2 min ihtiyat
 
         // Hour angle calculation helper: cos(H) = (sin(alt) - sin(lat)*sin(dec)) / (cos(lat)*cos(dec))

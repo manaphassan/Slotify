@@ -13,7 +13,7 @@ class PbdAssessmentTest {
     fun testPbdAssessmentEntityCreation() {
         val assessment = PbdAssessmentEntity(
             id = UUID.randomUUID().toString(),
-            studentId = "adam-uuid-1",
+            studentId = "student-uuid-1",
             subjectCode = "BM",
             subjectName = "Bahasa Melayu",
             tahapPenguasaan = 5,

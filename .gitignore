@@ -22,5 +22,10 @@ output.json
 *.keystore
 keystore.properties
 
+# Private family profile (names, addresses, routines) — never commit
+/app/family-profile/private/
+
 # Google Services
 google-services.json
+
+.kotlin

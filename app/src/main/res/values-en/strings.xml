@@ -20,12 +20,6 @@
     <string name="bag_packed_done">Great job! School bag is neatly packed.</string>
     
     <!-- Logistics & Transport -->
-    <string name="van_adam_title">Pemandu Van A\'s Van</string>
-    <string name="van_aisyah_title">Sekolah B School Van</string>
-    <string name="parent_route_title">Dad\'s Evening Pickup Route</string>
-    <string name="route_step_1">Office ➔ Danial\'s Tadika (Daycare)</string>
-    <string name="route_step_2">Tadika ➔ Taska Ceria (Aisyah)</string>
-    <string name="route_step_3">Taska ➔ Home</string>
     
     <!-- Rewards & Star Vault -->
     <string name="star_coins_balance">Star Balance: %d ⭐</string>
@@ -37,7 +31,4 @@
     <string name="canteen_budget_label">Daily Canteen Budget</string>
     <string name="canteen_spent_label">Amount Spent at Canteen</string>
     <string name="canteen_saved_label">Saved to Piggy Bank</string>
-    <string name="fee_van_vana">Pemandu Van A Van Fee</string>
-    <string name="fee_taska">Taska Ceria Transit Fee</string>
-    <string name="fee_tadika">Danial Tadika Fee</string>
 </resources>

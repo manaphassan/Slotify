@@ -3,7 +3,6 @@ package my.slotify.app.feature.logistics
 import android.content.Context
 import androidx.work.*
 import my.slotify.app.core.notification.SlotifyNotificationManager
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlin.math.*
 
@@ -30,50 +29,65 @@ data class GeofenceProximityStatus(
     val eventType: GeofenceEventType
 )
 
+/**
+ * Pure geofence state machine (no Android dependencies, unit-tested).
+ *
+ * - "Near" is within 2 × radius. Approaching only fires when coming from outside that ring.
+ * - Leaving requires going 10 % beyond the radius (hysteresis against GPS jitter).
+ * - After leaving, the target stays EXITED while still near, so walking away never reports
+ *   "approaching"; it resets to NONE once beyond the near ring.
+ */
+object GeofenceStateMachine {
+    const val NEAR_FACTOR = 2.0
+    const val EXIT_HYSTERESIS = 1.1
+
+    fun next(previous: GeofenceEventType, distanceMeters: Double, radiusMeters: Double): GeofenceEventType {
+        val inside = distanceMeters <= radiusMeters
+        val near = distanceMeters <= radiusMeters * NEAR_FACTOR
+        return when (previous) {
+            GeofenceEventType.ENTERED, GeofenceEventType.INSIDE ->
+                if (distanceMeters <= radiusMeters * EXIT_HYSTERESIS) GeofenceEventType.INSIDE else GeofenceEventType.EXITED
+
+            GeofenceEventType.EXITED -> when {
+                inside -> GeofenceEventType.ENTERED
+                near -> GeofenceEventType.EXITED
+                else -> GeofenceEventType.NONE
+            }
+
+            GeofenceEventType.NONE, GeofenceEventType.APPROACHING -> when {
+                inside -> GeofenceEventType.ENTERED
+                near -> GeofenceEventType.APPROACHING
+                else -> GeofenceEventType.NONE
+            }
+        }
+    }
+
+    /** Event that should trigger an alert for this transition, or null. */
+    fun alertFor(previous: GeofenceEventType, current: GeofenceEventType): GeofenceEventType? = when {
+        current == GeofenceEventType.ENTERED && previous != GeofenceEventType.ENTERED -> GeofenceEventType.ENTERED
+        current == GeofenceEventType.APPROACHING && previous == GeofenceEventType.NONE -> GeofenceEventType.APPROACHING
+        else -> null
+    }
+}
+
 object GeofenceManager {
 
     private const val WORK_NAME = "slotify_geofence_periodic_monitor"
-    private const val ALERT_COOLDOWN_MS = 10 * 60 * 1000L // 10 minutes between duplicate chimes
+    private const val STATE_PREFS = "slotify_geofence_state"
+    private const val ALERT_COOLDOWN_MS = 10 * 60 * 1000L // per target *and* event type
 
-    // State memory for cooldown & previous location
-    private val lastAlertTimestamps = ConcurrentHashMap<String, Long>()
-    private val activeProximityStates = ConcurrentHashMap<String, GeofenceEventType>()
-
-    /**
-     * Default list of ground-truth Taman Contoh / Bandar Contoh geofence perimeters
-     */
-    fun getDefaultTargets(context: Context): List<GeofenceTarget> {
-        val savedPois = PoiStorage.loadPois(context)
-        return if (savedPois.isNotEmpty()) {
-            savedPois.map { poi ->
-                val radius = when (poi.category) {
-                    PoiCategory.RUMAH -> 500.0
-                    PoiCategory.SEKOLAH -> 350.0
-                    PoiCategory.TRANSIT -> 300.0
-                    PoiCategory.PEJABAT -> 400.0
-                    PoiCategory.ALL -> 400.0
-                }
-                GeofenceTarget(
-                    id = poi.id,
-                    name = poi.name,
-                    lat = poi.lat,
-                    lng = poi.lng,
-                    radiusMeters = radius,
-                    iconEmoji = poi.iconEmoji
-                )
+    /** Geofence perimeters derived from the user's saved POIs (or the profile defaults). */
+    fun getDefaultTargets(context: Context): List<GeofenceTarget> =
+        PoiStorage.loadPois(context).map { poi ->
+            val radius = when (poi.category) {
+                PoiCategory.RUMAH -> 500.0
+                PoiCategory.SEKOLAH -> 350.0
+                PoiCategory.TRANSIT -> 300.0
+                PoiCategory.PEJABAT -> 400.0
+                PoiCategory.ALL -> 400.0
             }
-        } else {
-            listOf(
-                GeofenceTarget("geo-hom", "Rumah (Taman Contoh)", 3.1390, 101.6869, 500.0, "🏠"),
-                GeofenceTarget("geo-sko", "SK Taman Contoh", 3.1390, 101.6869, 350.0, "🏫"),
-                GeofenceTarget("geo-sra", "SRA Taman Contoh", 3.1390, 101.6869, 350.0, "🕌"),
-                GeofenceTarget("geo-tas", "Taska Ceria", 3.1390, 101.6869, 300.0, "👶"),
-                GeofenceTarget("geo-tad", "Tadika Ceria", 3.1390, 101.6869, 300.0, "🎒"),
-                GeofenceTarget("geo-srai", "SRAI Bukit Contoh", 3.1390, 101.6869, 400.0, "🕌"),
-                GeofenceTarget("geo-pej", "Pejabat Abah (Bandar Contoh)", 3.1390, 101.6869, 400.0, "🏢")
-            )
+            GeofenceTarget(poi.id, poi.name, poi.lat, poi.lng, radius, poi.iconEmoji)
         }
-    }
 
     /**
      * WGS-84 Haversine distance in meters
@@ -88,70 +102,47 @@ object GeofenceManager {
     }
 
     /**
-     * Evaluates current user coordinate against all active geofence targets.
-     * Fires high-priority chime notifications when boundary transitions occur.
+     * Evaluates the current coordinate against all targets, persists each target's state and
+     * posts a notification on ENTERED / APPROACHING transitions (rate-limited per event type).
      */
     fun evaluateProximity(
         context: Context,
         currentLat: Double,
         currentLng: Double,
-        targets: List<GeofenceTarget> = getDefaultTargets(context)
+        targets: List<GeofenceTarget> = getDefaultTargets(context),
+        now: Long = System.currentTimeMillis()
     ): List<GeofenceProximityStatus> {
-        val results = mutableListOf<GeofenceProximityStatus>()
-        val now = System.currentTimeMillis()
-
-        targets.forEach { target ->
+        val prefs = context.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+        val results = targets.map { target ->
             val dist = calculateDistanceMeters(currentLat, currentLng, target.lat, target.lng)
-            val previousState = activeProximityStates[target.id] ?: GeofenceEventType.NONE
+            val previous = prefs.getString("state_${target.id}", null)
+                ?.let { runCatching { GeofenceEventType.valueOf(it) }.getOrNull() }
+                ?: GeofenceEventType.NONE
+            val current = GeofenceStateMachine.next(previous, dist, target.radiusMeters)
+            editor.putString("state_${target.id}", current.name)
 
-            val currentState = when {
-                dist <= target.radiusMeters -> {
-                    if (previousState == GeofenceEventType.NONE || previousState == GeofenceEventType.APPROACHING) {
-                        GeofenceEventType.ENTERED
-                    } else {
-                        GeofenceEventType.INSIDE
-                    }
-                }
-                dist <= target.radiusMeters * 2.0 -> {
-                    if (previousState == GeofenceEventType.NONE || previousState == GeofenceEventType.EXITED) {
-                        GeofenceEventType.APPROACHING
-                    } else {
-                        GeofenceEventType.APPROACHING
-                    }
-                }
-                else -> {
-                    if (previousState == GeofenceEventType.ENTERED || previousState == GeofenceEventType.INSIDE) {
-                        GeofenceEventType.EXITED
-                    } else {
-                        GeofenceEventType.NONE
-                    }
+            GeofenceStateMachine.alertFor(previous, current)?.let { event ->
+                val key = "alert_${target.id}_${event.name}"
+                if (now - prefs.getLong(key, 0L) >= ALERT_COOLDOWN_MS) {
+                    editor.putLong(key, now)
+                    SlotifyNotificationManager.showGeofenceProximityAlert(
+                        context = context,
+                        locationName = target.name,
+                        distanceMeters = dist,
+                        eventType = event.name
+                    )
                 }
             }
-
-            activeProximityStates[target.id] = currentState
-            results.add(GeofenceProximityStatus(target, dist, currentState))
-
-            // Check if notification is warranted
-            val lastAlertTime = lastAlertTimestamps[target.id] ?: 0L
-            val isCooldownOver = (now - lastAlertTime) >= ALERT_COOLDOWN_MS
-
-            if (isCooldownOver && (currentState == GeofenceEventType.ENTERED || currentState == GeofenceEventType.APPROACHING)) {
-                lastAlertTimestamps[target.id] = now
-                val eventName = if (currentState == GeofenceEventType.ENTERED) "ENTERED" else "APPROACHING"
-                SlotifyNotificationManager.showGeofenceProximityAlert(
-                    context = context,
-                    locationName = target.name,
-                    distanceMeters = dist,
-                    eventType = eventName
-                )
-            }
+            GeofenceProximityStatus(target, dist, current)
         }
-
+        editor.apply()
         return results
     }
 
     /**
-     * Enqueues Android WorkManager background periodic sync
+     * Enqueues the periodic background check. The worker itself exits early unless
+     * background location has been granted.
      */
     fun scheduleBackgroundMonitoring(context: Context) {
         val workRequest = PeriodicWorkRequestBuilder<GeofenceProximityWorker>(
@@ -170,18 +161,12 @@ object GeofenceManager {
         )
     }
 
-    /**
-     * Cancels background periodic monitoring
-     */
     fun cancelBackgroundMonitoring(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
     }
 
-    /**
-     * Clears cooldown memory (useful for testing and reset)
-     */
-    fun resetCooldowns() {
-        lastAlertTimestamps.clear()
-        activeProximityStates.clear()
+    /** Clears persisted geofence state and cooldowns. */
+    fun resetState(context: Context) {
+        context.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE).edit().clear().apply()
     }
 }

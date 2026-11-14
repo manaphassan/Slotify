@@ -1,5 +1,6 @@
 package my.slotify.app.core.database
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -13,11 +14,11 @@ data class StudentEntity(
     val nickname: String,
     val currentLevel: String,           // e.g. "Darjah 4", "Darjah 2", "Tadika 4Y"
     val avatarEmoji: String,            // e.g. "👦", "📚", "🧒"
-    val primarySchoolName: String,      // "SK Taman Contoh"
-    val secondarySchoolName: String?,   // "SRA Taman Contoh"
+    val primarySchoolName: String,
+    val secondarySchoolName: String?,
     val sessionType: String,            // "DUAL_SRA_SK", "INTEGRATED_SRAISM", "TADIKA_DAYCARE"
     val academicYearShift: String,      // "YEAR_4_STANDARD", "YEAR_5_INVERTED"
-    val vanDriverName: String?,         // "Pemandu Van A", "Van Sekolah B"
+    val vanDriverName: String?,
     val vanDriverPhone: String?,
     val starCoinsBalance: Int = 50,
     val dailyCanteenBudget: Double = 5.00,
@@ -43,8 +44,8 @@ data class StudentEntity(
 data class SchoolSessionEntity(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val studentId: String,
-    val schoolName: String,             // "SRA Taman Contoh"
-    val className: String,              // "4B"
+    val schoolName: String,
+    val className: String,
     val sessionTimeType: String,        // "PAGI", "PETANG", "FULL_DAY"
     val startTime: String,              // "08:00"
     val endTime: String,                // "11:00"
@@ -93,7 +94,7 @@ data class TimetableSlotEntity(
 data class LocationNodeEntity(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val studentId: String,
-    val name: String,                   // "Rumah", "SK", "SRA", "Taska Ceria"
+    val name: String,                   // "Rumah", "Sekolah", "Taska"
     val nodeType: String,               // "HOME", "SCHOOL", "TRANSIT", "TADIKA"
     val latitude: Double,
     val longitude: Double,
@@ -144,27 +145,29 @@ data class ExamEntity(
     val title: String,                  // "Ujian Akhir Sesi Akademik (UASA)"
     val examDate: String,               // "25 Sep 2026"
     val daysRemaining: Int,             // 4
-    val venue: String,                  // "Dewan Terbuka SK"
+    val venue: String,
     val syllabusNote: String = "Unit 1 - Unit 4"
 )
 
 // ── Finance Entities ──────────────────────────────────────────────────────────
 
 /**
- * Monthly recurring commitment fee (Van, Transit, PIBG, Daycare).
- * isPaid persists across app restarts — the whole point of Room here.
- * billingMonth: "2026-09" (yyyy-MM) for monthly scoping.
+ * Monthly commitment fee (Van, Transit, PIBG, Daycare).
+ * One row per fee per [billingMonth] ("yyyy-MM"); [seriesId] links the same fee across
+ * months. Recurring fees are copied into each new month as unpaid by FeeRepository.
  */
 @Entity(tableName = "commitment_fees")
 data class CommitmentFeeEntity(
-    @PrimaryKey val id: String,         // e.g. "van_vana", "transit_taska"
-    val title: String,                  // "Yuran Van Sekolah A"
-    val childTarget: String,            // "Adam", "Adam & Adam"
-    val amountRm: Double,               // 80.00
+    @PrimaryKey val id: String,         // "<seriesId>_<yyyy-MM>" for recurring fees
+    val title: String,
+    val childTarget: String,
+    val amountRm: Double,
     val dueDateLabel: String,           // "1hb Setiap Bulan"
-    val billingMonth: String,           // "2026-09"  (scope resets each month)
+    val billingMonth: String,           // "2026-09"
     val isPaid: Boolean = false,
-    val categoryEmoji: String = "💰"    // "🚌", "🏫", "📋" etc.
+    val categoryEmoji: String = "💰",
+    @ColumnInfo(defaultValue = "") val seriesId: String = id,
+    @ColumnInfo(defaultValue = "0") val isRecurring: Boolean = false
 )
 
 /**
@@ -209,4 +212,14 @@ data class PbdAssessmentEntity(
     val assessedDate: String = "Okt 2026"
 )
 
-
+/**
+ * One row per star award. [claimKey] is unique per reward opportunity (see RewardKeys),
+ * which makes every award idempotent.
+ */
+@Entity(tableName = "reward_claims", indices = [Index("studentId")])
+data class RewardClaimEntity(
+    @PrimaryKey val claimKey: String,
+    val studentId: String,
+    val stars: Int,
+    val claimedAt: Long = System.currentTimeMillis()
+)

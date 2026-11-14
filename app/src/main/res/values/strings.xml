@@ -20,12 +20,6 @@
     <string name="bag_packed_done">Tahniah! Beg sudah dikemas dengan rapi.</string>
     
     <!-- Logistics & Transport -->
-    <string name="van_adam_title">Van Sekolah A</string>
-    <string name="van_aisyah_title">Van Sekolah B</string>
-    <string name="parent_route_title">Laluan Ambilan Petang Abah</string>
-    <string name="route_step_1">Pejabat ➔ Tadika Danial (Daycare)</string>
-    <string name="route_step_2">Tadika ➔ Taska Ceria (Aisyah)</string>
-    <string name="route_step_3">Taska ➔ Rumah</string>
     
     <!-- Rewards & Star Vault -->
     <string name="star_coins_balance">Baki Bintang: %d ⭐</string>
@@ -37,7 +31,4 @@
     <string name="canteen_budget_label">Bajet Duit Poket Harian</string>
     <string name="canteen_spent_label">Jumlah Belanja Kantin</string>
     <string name="canteen_saved_label">Baki Simpanan Tabung</string>
-    <string name="fee_van_vana">Yuran Van Sekolah A</string>
-    <string name="fee_taska">Yuran Transit Taska Ceria</string>
-    <string name="fee_tadika">Yuran Tadika Danial</string>
 </resources>
