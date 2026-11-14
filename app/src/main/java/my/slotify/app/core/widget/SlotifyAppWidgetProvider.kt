@@ -135,11 +135,7 @@ class SlotifyAppWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_siblings_status, siblingsSummary)
             views.setTextViewText(R.id.widget_attire, attire)
 
-            val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            } else {
-                PendingIntent.FLAG_UPDATE_CURRENT
-            }
+            val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
             // 1. Tap Root or Timetable: Opens TimetableScreen
             val timetableIntent = Intent(context, MainActivity::class.java).apply {

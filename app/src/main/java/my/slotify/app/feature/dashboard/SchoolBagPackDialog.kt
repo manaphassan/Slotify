@@ -1,5 +1,8 @@
 package my.slotify.app.feature.dashboard
 
+import my.slotify.app.core.designsystem.theme.strings
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.toggleable
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -147,7 +150,7 @@ fun SchoolBagPackDialog(
                         Spacer(Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "Kemas Beg Sekolah",
+                                text = strings.bagDialogTitle,
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = textPrimaryColor
                             )
@@ -160,7 +163,7 @@ fun SchoolBagPackDialog(
                     }
 
                     IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Tutup", tint = textSecondaryColor)
+                        Icon(Icons.Default.Close, contentDescription = strings.close, tint = textSecondaryColor)
                     }
                 }
 
@@ -185,7 +188,7 @@ fun SchoolBagPackDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "$checkedCount daripada $totalCount item dimasukkan",
+                        text = strings.bagItemsProgress(checkedCount, totalCount),
                         style = MaterialTheme.typography.labelSmall,
                         color = textSecondaryColor
                     )
@@ -199,7 +202,7 @@ fun SchoolBagPackDialog(
                             )
                             Spacer(Modifier.width(2.dp))
                             Text(
-                                text = "+${StarRewards.BAG_PACKED_STARS} Bintang Diperoleh!",
+                                text = strings.bagStarsEarned(StarRewards.BAG_PACKED_STARS),
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = starColor
                             )
@@ -223,9 +226,9 @@ fun SchoolBagPackDialog(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(if (isChecked) successColor.copy(alpha = 0.1f) else canvasBaseColor)
-                                .clickable {
+                                .toggleable(value = isChecked, role = Role.Checkbox) { checked ->
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    checkedStates[item.id] = !isChecked
+                                    checkedStates[item.id] = checked
                                 }
                                 .padding(horizontal = 10.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically

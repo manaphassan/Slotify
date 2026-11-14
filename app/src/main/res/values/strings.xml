@@ -1,34 +1,10 @@
 <resources>
+    <!-- UI text lives in core/designsystem/theme/SlotifyStrings.kt (follows the in-app BM/EN switch).
+         Only text rendered outside Compose belongs here: the launcher label and home-screen widget. -->
     <string name="app_name">Slotify</string>
-    <string name="app_tagline">Susun Waktu Anak, Tenang Sepanjang Hari</string>
-    
-    <!-- Navigation Tabs -->
-    <string name="nav_dashboard">Hari Ini</string>
-    <string name="nav_timetable">Jadual</string>
-    <string name="nav_logistics">Logistik &amp; Peta</string>
-    <string name="nav_rewards">Ganjaran</string>
-    <string name="nav_finance">Kewangan</string>
-    <string name="nav_profile">Profil Murid</string>
-
-    <!-- Dashboard Widgets -->
-    <string name="section_today_schedule">Jadual Waktu Hari Ini</string>
-    <string name="section_bag_pack">Buku Kena Bawa (Beg Sekolah)</string>
-    <string name="section_attire">Etika Pakaian Hari Ini</string>
-    <string name="section_transit_drop">Hantar Beg Transit ke Taska</string>
-    <string name="section_active_slot">Sesi Sedang Berjalan</string>
-    <string name="btn_bag_packed">Beg Dah Siap Kemas (+5 ⭐)</string>
-    <string name="bag_packed_done">Tahniah! Beg sudah dikemas dengan rapi.</string>
-    
-    <!-- Logistics & Transport -->
-    
-    <!-- Rewards & Star Vault -->
-    <string name="star_coins_balance">Baki Bintang: %d ⭐</string>
-    <string name="redeem_roblox">Main Roblox / iPad 1 Jam (50 ⭐)</string>
-    <string name="redeem_toy">Beli Mainan / Hot Wheels (200 ⭐)</string>
-    <string name="redeem_ice_cream">Keluar Makan Ais Krim (30 ⭐)</string>
-
-    <!-- Finance & Fees -->
-    <string name="canteen_budget_label">Bajet Duit Poket Harian</string>
-    <string name="canteen_spent_label">Jumlah Belanja Kantin</string>
-    <string name="canteen_saved_label">Baki Simpanan Tabung</string>
+    <string name="widget_brand">SLOTIFY</string>
+    <string name="widget_switch">⇄ Tukar</string>
+    <string name="widget_live">● LIVE</string>
+    <string name="widget_map">Peta 🗺️</string>
+    <string name="widget_open_timetable">Jadual ➔</string>
 </resources>

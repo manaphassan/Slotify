@@ -1,5 +1,6 @@
 package my.slotify.app.feature.rewards
 
+import my.slotify.app.core.rewards.StarRewards
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
@@ -57,6 +58,7 @@ fun RewardVaultScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val event by viewModel.event.collectAsStateWithLifecycle()
+    val str = strings
     val selectedStudent = state.student
     // Persisted claim: reopening the tab or restarting the app cannot re-open the chest.
     val chestOpened = state.chestClaimed
@@ -74,7 +76,7 @@ fun RewardVaultScreen(
         when (val e = event) {
             RewardsEvent.ChestOpened -> showChestDialog = true
             is RewardsEvent.Redeemed -> showSuccessDialog = e.item
-            is RewardsEvent.RedeemFailed -> redeemFailedMessage = "Bintang tidak mencukupi untuk ${e.item.title}."
+            is RewardsEvent.RedeemFailed -> redeemFailedMessage = str.redeemNotEnoughStars(e.item.title)
             null -> Unit
         }
         if (event != null) viewModel.consumeEvent()
@@ -127,7 +129,7 @@ fun RewardVaultScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
-                        text = "${strings.starTabungTitle} (${selectedStudent?.nickname ?: "Anak"})",
+                        text = "${strings.starTabungTitle} (${selectedStudent?.nickname ?: strings.childFallback})",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
                         color = SlotifyColors.TextSecondary
                     )
@@ -272,7 +274,7 @@ fun RewardVaultScreen(
                 Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    "Tukar PIN Ibu Bapa",
+                    str.changePinButton,
                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
                 )
             }
@@ -363,18 +365,18 @@ fun RewardVaultScreen(
                 ) {
                     Text(text = "🎉 🎁 🎉", fontSize = 32.sp)
                     Text(
-                        text = "Peti Bintang Misteri Terbuka!",
+                        text = strings.chestOpenedTitle,
                         style = MaterialTheme.typography.headlineSmall,
                         color = SlotifyColors.TextPrimary
                     )
                     Text(
-                        text = "Hebat! Anda berjaya mengutip bonus harian +15 Bintang untuk tabung anda!",
+                        text = strings.chestOpenedBody(StarRewards.DAILY_CHEST_STARS),
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
                         color = SlotifyColors.TextSecondary
                     )
                     Text(
-                        text = "+15 ⭐",
+                        text = "+${StarRewards.DAILY_CHEST_STARS} ⭐",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 28.sp,
                         color = SlotifyColors.MathAmber
@@ -385,7 +387,7 @@ fun RewardVaultScreen(
                         shape = SlotifyShapes.Small,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Terima Kasih!", fontWeight = FontWeight.Bold)
+                        Text(strings.thankYou, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -416,8 +418,8 @@ fun RewardVaultScreen(
     redeemFailedMessage?.let { msg ->
         AlertDialog(
             onDismissRequest = { redeemFailedMessage = null },
-            confirmButton = { TextButton(onClick = { redeemFailedMessage = null }) { Text("OK") } },
-            title = { Text("Tebusan gagal") },
+            confirmButton = { TextButton(onClick = { redeemFailedMessage = null }) { Text(str.ok) } },
+            title = { Text(str.redeemFailedTitle) },
             text = { Text(msg) }
         )
     }
@@ -466,7 +468,7 @@ fun RewardVaultScreen(
                         shape = SlotifyShapes.Small,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Selesai", fontWeight = FontWeight.Bold)
+                        Text(strings.done, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -488,6 +490,7 @@ fun ParentPinModalDialog(
     onPinVerified: () -> Unit
 ) {
     val context = LocalContext.current
+    val str = strings
     val scope = rememberCoroutineScope()
     var step by remember { mutableStateOf(if (PinManager.isPinSet(context)) PinStep.VERIFY else PinStep.CREATE) }
     var firstEntry by remember { mutableStateOf("") }
@@ -504,13 +507,13 @@ fun ParentPinModalDialog(
 
     val title = when (step) {
         PinStep.VERIFY -> strings.parentPinTitle
-        PinStep.CREATE -> "Cipta PIN Ibu Bapa"
-        PinStep.CONFIRM -> "Sahkan PIN Baharu"
+        PinStep.CREATE -> str.pinCreateTitle
+        PinStep.CONFIRM -> str.pinConfirmTitle
     }
     val subtitle = when (step) {
         PinStep.VERIFY -> "${strings.parentPinSubtitle}\n${targetReward.iconEmoji} ${targetReward.title} (-${targetReward.pointsCost} ⭐)"
-        PinStep.CREATE -> "Tiada PIN lagi. Cipta PIN 4 digit untuk meluluskan tebusan ganjaran."
-        PinStep.CONFIRM -> "Masukkan PIN yang sama sekali lagi."
+        PinStep.CREATE -> str.pinCreateSubtitle
+        PinStep.CONFIRM -> str.pinConfirmSubtitle
     }
 
     val pinIncorrectText = strings.pinIncorrect
@@ -518,7 +521,7 @@ fun ParentPinModalDialog(
     PinEntryDialog(
         title = title,
         subtitle = subtitle,
-        message = if (lockoutSeconds > 0) "🔒 Terlalu banyak cubaan. Cuba lagi dalam ${lockoutSeconds}s." else message,
+        message = if (lockoutSeconds > 0) str.pinLockedOut(lockoutSeconds.toLong()) else message,
         enabled = !busy && lockoutSeconds == 0,
         onDismiss = onDismiss,
         onPinComplete = { pin ->
@@ -531,14 +534,14 @@ fun ParentPinModalDialog(
 
                 PinStep.CONFIRM -> {
                     if (pin != firstEntry) {
-                        message = "PIN tidak sepadan. Cuba lagi."
+                        message = str.pinMismatch
                         step = PinStep.CREATE
                     } else {
                         busy = true
                         scope.launch {
                             val r = withContext(Dispatchers.Default) { PinManager.setInitialPin(context, pin) }
                             busy = false
-                            if (r == PinResult.Success) onPinVerified() else message = "Gagal menyimpan PIN."
+                            if (r == PinResult.Success) onPinVerified() else message = str.pinSaveFailed
                         }
                     }
                 }
@@ -551,7 +554,7 @@ fun ParentPinModalDialog(
                         when (r) {
                             PinResult.Success -> onPinVerified()
                             is PinResult.Incorrect -> message =
-                                "$pinIncorrectText (${r.attemptsBeforeLockout} cubaan lagi)"
+                                "$pinIncorrectText (${str.pinAttemptsLeft(r.attemptsBeforeLockout)})"
 
                             is PinResult.LockedOut -> lockoutSeconds = ((r.remainingMs + 999) / 1000).toInt()
                             PinResult.NotSet -> step = PinStep.CREATE
@@ -570,6 +573,7 @@ private enum class ChangePinStep { CURRENT, NEW, CONFIRM }
 @Composable
 fun ChangePinDialog(onDismiss: () -> Unit) {
     val context = LocalContext.current
+    val str = strings
     val scope = rememberCoroutineScope()
     val hasPin = remember { PinManager.isPinSet(context) }
     var step by remember { mutableStateOf(if (hasPin) ChangePinStep.CURRENT else ChangePinStep.NEW) }
@@ -582,23 +586,23 @@ fun ChangePinDialog(onDismiss: () -> Unit) {
     if (done) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } },
-            title = { Text("PIN dikemas kini") },
-            text = { Text("PIN ibu bapa baharu telah disimpan.") }
+            confirmButton = { TextButton(onClick = onDismiss) { Text(str.ok) } },
+            title = { Text(str.pinUpdatedTitle) },
+            text = { Text(str.pinUpdatedBody) }
         )
         return
     }
 
     PinEntryDialog(
         title = when (step) {
-            ChangePinStep.CURRENT -> "PIN Semasa"
-            ChangePinStep.NEW -> "PIN Baharu"
-            ChangePinStep.CONFIRM -> "Sahkan PIN Baharu"
+            ChangePinStep.CURRENT -> str.pinCurrentTitle
+            ChangePinStep.NEW -> str.pinNewTitle
+            ChangePinStep.CONFIRM -> str.pinConfirmTitle
         },
         subtitle = when (step) {
-            ChangePinStep.CURRENT -> "Masukkan PIN ibu bapa semasa."
-            ChangePinStep.NEW -> "Pilih PIN 4 digit baharu."
-            ChangePinStep.CONFIRM -> "Masukkan PIN baharu sekali lagi."
+            ChangePinStep.CURRENT -> str.pinCurrentSubtitle
+            ChangePinStep.NEW -> str.pinNewSubtitle
+            ChangePinStep.CONFIRM -> str.pinConfirmSubtitle
         },
         message = message,
         enabled = !busy,
@@ -615,7 +619,7 @@ fun ChangePinDialog(onDismiss: () -> Unit) {
 
                 ChangePinStep.CONFIRM -> {
                     if (pin != newPin) {
-                        message = "PIN tidak sepadan. Cuba lagi."
+                        message = str.pinMismatch
                         step = ChangePinStep.NEW
                         return@PinEntryDialog
                     }
@@ -631,10 +635,10 @@ fun ChangePinDialog(onDismiss: () -> Unit) {
                         when (r) {
                             PinResult.Success -> done = true
                             is PinResult.LockedOut -> message =
-                                "🔒 Terlalu banyak cubaan. Cuba lagi dalam ${(r.remainingMs + 999) / 1000}s."
+                                str.pinLockedOut((r.remainingMs + 999) / 1000)
 
                             else -> {
-                                message = "PIN semasa salah."; step = ChangePinStep.CURRENT
+                                message = str.pinCurrentWrong; step = ChangePinStep.CURRENT
                             }
                         }
                     }

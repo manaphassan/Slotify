@@ -446,7 +446,7 @@ private fun AddSlotDialog(
                                     selectedSubject.code,
                                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
                                     color = selectedSubject.color,
-                                    fontSize = 9.sp
+                                    fontSize = 10.sp
                                 )
                             }
                             Spacer(Modifier.width(8.dp))
@@ -471,7 +471,7 @@ private fun AddSlotDialog(
                                     ) {
                                         Text(
                                             subj.code,
-                                            fontSize = 9.sp,
+                                            fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = if (isSel) Color.White else subj.color
                                         )
@@ -734,7 +734,7 @@ private fun RealtimeClassTrackerCard(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 strings.ongoingStatus,
-                                fontSize = 9.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = SlotifyColors.ActionAmber
                             )
@@ -771,7 +771,7 @@ private fun RealtimeClassTrackerCard(
                     Column {
                         Text(
                             strings.nextStatus,
-                            fontSize = 9.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = SlotifyColors.KpmSkyBlue
                         )
@@ -811,7 +811,7 @@ private fun SimTimeChip(label: String, onClick: () -> Unit) {
             .neumorphicClickable(cornerRadius = 6.dp, onClick = onClick)
             .padding(horizontal = 6.dp, vertical = 2.dp)
     ) {
-        Text(text = label, fontSize = 9.sp, color = SlotifyColors.TextSecondary, fontWeight = FontWeight.Medium)
+        Text(text = label, fontSize = 10.sp, color = SlotifyColors.TextSecondary, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -889,7 +889,7 @@ private fun TimetableSlotCard(
                     if (canDelete) {
                         IconButton(
                             onClick = { showDeleteConfirm = !showDeleteConfirm },
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 if (showDeleteConfirm) Icons.Default.ExpandLess else Icons.Default.MoreVert,
@@ -987,7 +987,7 @@ private fun WeekOverviewView(slots: List<TimetableSlotEntity>) {
                                 ) {
                                     Text(
                                         slot.subjectCode,
-                                        fontSize = 9.sp,
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = meta.color
                                     )

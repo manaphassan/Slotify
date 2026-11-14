@@ -69,12 +69,7 @@ class VoiceAnnouncementHelper(private val context: Context) : TextToSpeech.OnIni
 
         if (isInitialized && tts != null) {
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "slotify_alert_${System.currentTimeMillis()}")
-                } else {
-                    @Suppress("DEPRECATION")
-                    tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null)
-                }
+                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "slotify_alert_${System.currentTimeMillis()}")
             } catch (e: Exception) {
                 Log.e("VoiceAnnouncement", "Error speaking utterance: ${e.message}")
             }

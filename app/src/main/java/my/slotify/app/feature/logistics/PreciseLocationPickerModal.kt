@@ -228,7 +228,7 @@ fun PreciseLocationPickerModal(
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                             IconButton(
                                 onClick = onDismiss,
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.ArrowBack,
@@ -545,7 +545,7 @@ fun PreciseLocationPickerModal(
                                     ) {
                                         Text(
                                             text = step.label,
-                                            fontSize = 9.5.sp,
+                                            fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = if (isSelected) Color.White else SlotifyColors.TextSecondary
                                         )
@@ -673,7 +673,7 @@ fun PreciseLocationPickerModal(
                                     coroutineScope.launch { fetchGpsLocation() }
                                 }
                             },
-                            modifier = Modifier.size(38.dp),
+                            modifier = Modifier.size(48.dp),
                             containerColor = if (isGpsFetching) SlotifyColors.ActionAmber else SlotifyColors.KpmSkyBlue,
                             contentColor = Color.White,
                             shape = CircleShape
@@ -696,7 +696,7 @@ fun PreciseLocationPickerModal(
                         // Zoom In (+)
                         SmallFloatingActionButton(
                             onClick = { mapViewRef?.controller?.zoomIn() },
-                            modifier = Modifier.size(36.dp),
+                            modifier = Modifier.size(48.dp),
                             containerColor = SlotifyColors.SurfaceCard.copy(alpha = 0.94f),
                             contentColor = SlotifyColors.KpmSkyBlue,
                             shape = CircleShape
@@ -707,7 +707,7 @@ fun PreciseLocationPickerModal(
                         // Zoom Out (-)
                         SmallFloatingActionButton(
                             onClick = { mapViewRef?.controller?.zoomOut() },
-                            modifier = Modifier.size(36.dp),
+                            modifier = Modifier.size(48.dp),
                             containerColor = SlotifyColors.SurfaceCard.copy(alpha = 0.94f),
                             contentColor = SlotifyColors.KpmSkyBlue,
                             shape = CircleShape
@@ -729,7 +729,7 @@ fun PreciseLocationPickerModal(
                                     animateTo(GeoPoint(homeLat, homeLng))
                                 }
                             },
-                            modifier = Modifier.size(36.dp),
+                            modifier = Modifier.size(48.dp),
                             containerColor = SlotifyColors.SurfaceCard.copy(alpha = 0.94f),
                             contentColor = SlotifyColors.ParentGreen,
                             shape = CircleShape

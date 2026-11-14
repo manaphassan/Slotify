@@ -94,6 +94,14 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    lint {
+        // UI copy is Bahasa Melayu; the English "Typos" checker flags valid Malay words.
+        disable += "Typos"
+        warningsAsErrors = false
+        abortOnError = true
     }
 
     packaging {

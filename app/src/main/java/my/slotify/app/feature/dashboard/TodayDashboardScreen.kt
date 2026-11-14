@@ -1,5 +1,9 @@
 package my.slotify.app.feature.dashboard
 
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -22,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -291,7 +294,12 @@ fun TodayDashboardScreen(
                                         1.dp,
                                         SlotifyColors.KpmSkyBlue.copy(alpha = 0.6f)
                                     ) else null,
-                                    modifier = Modifier.weight(1f).padding(horizontal = 2.dp)
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(horizontal = 2.dp)
+                                        .semantics(mergeDescendants = true) {
+                                            if (isCurrent) stateDescription = "Waktu solat semasa"
+                                        }
                                 ) {
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -299,7 +307,7 @@ fun TodayDashboardScreen(
                                     ) {
                                         Text(
                                             text = name,
-                                            fontSize = 9.sp,
+                                            fontSize = 10.sp,
                                             fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                                             color = if (isCurrent) SlotifyColors.KpmSkyBlue else SlotifyColors.TextSecondary
                                         )
@@ -516,7 +524,11 @@ fun TodayDashboardScreen(
                                         .fillMaxWidth()
                                         .clip(SlotifyShapes.Medium)
                                         .background(SlotifyColors.CanvasBase)
-                                        .clickable { viewModel.toggleHomework(task) }
+                                        .toggleable(
+                                            value = task.isCompleted,
+                                            role = Role.Checkbox,
+                                            onValueChange = { viewModel.toggleHomework(task) }
+                                        )
                                         .padding(10.dp)
                                 ) {
                                     Row(
@@ -564,7 +576,7 @@ fun TodayDashboardScreen(
                                                     ) {
                                                         Text(
                                                             text = task.subjectCode,
-                                                            fontSize = 9.sp,
+                                                            fontSize = 10.sp,
                                                             fontWeight = FontWeight.Bold,
                                                             color = subjectColor,
                                                             modifier = Modifier.padding(
@@ -600,7 +612,7 @@ fun TodayDashboardScreen(
                                         ) {
                                             Text(
                                                 text = task.dueDateDescription,
-                                                fontSize = 9.5.sp,
+                                                fontSize = 10.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = if (task.dueDateDescription == "Hari Ini") SlotifyColors.EnglishRed else SlotifyColors.ActionAmber
                                             )
@@ -702,7 +714,7 @@ fun TodayDashboardScreen(
                                                     )
                                                     Text(
                                                         text = "HARI",
-                                                        fontSize = 7.sp,
+                                                        fontSize = 10.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         color = if (daysLeft <= 4) SlotifyColors.EnglishRed else SlotifyColors.ActionAmber
                                                     )
@@ -719,7 +731,7 @@ fun TodayDashboardScreen(
                                                     ) {
                                                         Text(
                                                             text = exam.subjectCode,
-                                                            fontSize = 9.sp,
+                                                            fontSize = 10.sp,
                                                             fontWeight = FontWeight.Bold,
                                                             color = subjectColor,
                                                             modifier = Modifier.padding(
@@ -753,7 +765,7 @@ fun TodayDashboardScreen(
 
                                         Text(
                                             text = exam.examDate,
-                                            fontSize = 9.5.sp,
+                                            fontSize = 10.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = SlotifyColors.TextSecondary
                                         )
@@ -879,7 +891,7 @@ fun TodayDashboardScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = stringResource(R.string.section_active_slot),
+                                text = strings.sectionActiveSlot,
                                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
                                 color = SlotifyColors.ActionAmber // 10% Radiant Action Glow
                             )
@@ -935,7 +947,7 @@ fun TodayDashboardScreen(
                         Spacer(Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = stringResource(R.string.section_attire),
+                                text = strings.sectionAttire,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = SlotifyColors.TextPrimary
                             )
@@ -960,7 +972,7 @@ fun TodayDashboardScreen(
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = stringResource(R.string.section_bag_pack),
+                            text = strings.sectionBagPack,
                             style = MaterialTheme.typography.titleMedium,
                             color = SlotifyColors.TextPrimary
                         )
@@ -1018,7 +1030,7 @@ fun TodayDashboardScreen(
                                 .height(42.dp)
                         ) {
                             Text(
-                                text = if (bagPacked) stringResource(R.string.bag_packed_done) else stringResource(R.string.btn_bag_packed),
+                                text = if (bagPacked) strings.bagPackedDone else strings.btnBagPacked,
                                 style = MaterialTheme.typography.titleMedium
                             )
                         }
@@ -1269,7 +1281,7 @@ fun InHomeRealtimeClassWidget(
                 ) {
                     Text(
                         text = strings.todayDaySuffix,
-                        fontSize = 9.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = SlotifyColors.KpmSkyBlue
                     )
@@ -1290,7 +1302,7 @@ fun InHomeRealtimeClassWidget(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = "🔴 ${strings.ongoingClass}",
-                                fontSize = 9.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = SlotifyColors.EnglishRed
                             )
@@ -1318,7 +1330,7 @@ fun InHomeRealtimeClassWidget(
                     } else {
                         Text(
                             text = "🟢 ${strings.ongoingClass}",
-                            fontSize = 9.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = SlotifyColors.SuccessMint
                         )
@@ -1547,7 +1559,7 @@ fun FocusTimerModalDialog(
                     // Circular Countdown Timer Display
                     val minutesLeft = secondsRemaining / 60
                     val secsLeft = secondsRemaining % 60
-                    val timeString = String.format("%02d:%02d", minutesLeft, secsLeft)
+                    val timeString = String.format(java.util.Locale.US, "%02d:%02d", minutesLeft, secsLeft)
 
                     Box(
                         modifier = Modifier
@@ -1565,7 +1577,7 @@ fun FocusTimerModalDialog(
                             )
                             Text(
                                 text = if (isRunning) "SEDANG BERJALAN" else "BERSEDIA",
-                                fontSize = 8.5.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isRunning) SlotifyColors.SuccessMint else SlotifyColors.ActionAmber
                             )
@@ -1682,7 +1694,7 @@ fun AddHomeworkTaskDialog(
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = SlotifyColors.TextPrimary
                     )
-                    IconButton(onClick = onDismissRequest, modifier = Modifier.size(24.dp)) {
+                    IconButton(onClick = onDismissRequest, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "Tutup", tint = SlotifyColors.TextSecondary)
                     }
                 }

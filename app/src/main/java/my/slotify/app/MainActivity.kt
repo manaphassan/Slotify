@@ -571,7 +571,7 @@ fun SlotifyDrawerSheet(
                                 Spacer(Modifier.height(2.dp))
                                 Text(
                                     text = s.nickname,
-                                    fontSize = 9.5.sp,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (isSelected) Color.White else SlotifyColors.TextPrimary
                                 )
@@ -624,7 +624,7 @@ fun SlotifyDrawerSheet(
 
                 // App Settings: Dark Mode & Language Toggles
                 Text(
-                    text = "Konfigurasi / Settings",
+                    text = strings.settingsTitle,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = SlotifyColors.TextSecondary
@@ -730,7 +730,7 @@ fun SlotifyDrawerSheet(
                         .clickable {
                             val appWidgetManager = AppWidgetManager.getInstance(context)
                             val myProvider = ComponentName(context, SlotifyAppWidgetProvider::class.java)
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && appWidgetManager.isRequestPinAppWidgetSupported) {
+                            if (appWidgetManager.isRequestPinAppWidgetSupported) {
                                 appWidgetManager.requestPinAppWidget(myProvider, null, null)
                                 Toast.makeText(context, "Membuka pengesahan widget skrin utama...", Toast.LENGTH_SHORT)
                                     .show()
@@ -751,7 +751,7 @@ fun SlotifyDrawerSheet(
                     ) {
                         Text("📱", fontSize = 13.sp)
                         Text(
-                            text = "Pasang Widget Skrin Utama",
+                            text = strings.installWidget,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = SlotifyColors.KpmSkyBlue
@@ -765,13 +765,13 @@ fun SlotifyDrawerSheet(
                 HorizontalDivider(color = SlotifyColors.BorderSubtle, thickness = 0.8.dp)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "Slotify v1.1.0 • Xperia Edition",
-                    fontSize = 9.5.sp,
+                    text = "Slotify v${BuildConfig.VERSION_NAME}",
+                    fontSize = 10.sp,
                     color = SlotifyColors.TextTertiary
                 )
                 Text(
-                    text = "Android 8.0 (API 26) Compatible",
-                    fontSize = 8.5.sp,
+                    text = strings.compatibilityNote,
+                    fontSize = 10.sp,
                     color = SlotifyColors.TextTertiary
                 )
             }

@@ -251,7 +251,7 @@ fun DriverContactCard(
                         ) {
                             Text(
                                 text = "Aktif",
-                                fontSize = 8.5.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = SlotifyColors.SuccessMint,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
@@ -699,8 +699,9 @@ fun LogisticsMapScreen(
                         setMultiTouchControls(true)
 
                         // Keep map gestures from being intercepted by parent scroll containers
-                        setOnTouchListener { v, _ ->
+                        setOnTouchListener { v, event ->
                             v.parent.requestDisallowInterceptTouchEvent(true)
+                            if (event.action == android.view.MotionEvent.ACTION_UP) v.performClick()
                             false
                         }
 
@@ -833,7 +834,7 @@ fun LogisticsMapScreen(
                         Spacer(Modifier.width(6.dp))
                         IconButton(
                             onClick = { gpsStatusMessage = null },
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 Icons.Default.Close,
@@ -850,8 +851,8 @@ fun LogisticsMapScreen(
             Column(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 // 0. Quick-Snap "Saya di Rumah" Button
                 SmallFloatingActionButton(
@@ -875,7 +876,7 @@ fun LogisticsMapScreen(
                         rfCenterLabel = homePoi.name
                         gpsStatusMessage = "🏠 Dipusatkan ke ${homePoi.name} (Mod Rumah)"
                     },
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(48.dp),
                     containerColor = SlotifyColors.SurfaceCard.copy(alpha = 0.94f),
                     contentColor = SlotifyColors.ParentGreen,
                     shape = CircleShape
@@ -890,7 +891,7 @@ fun LogisticsMapScreen(
                             locateUserWithGps()
                         }
                     },
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(48.dp),
                     containerColor = if (isGpsLocating) SlotifyColors.ActionAmber else SlotifyColors.SurfaceCard.copy(
                         alpha = 0.94f
                     ),
@@ -920,7 +921,7 @@ fun LogisticsMapScreen(
                         precisePickerPoi = null
                         showPrecisePicker = true
                     },
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(48.dp),
                     containerColor = SlotifyColors.SurfaceCard.copy(alpha = 0.94f),
                     contentColor = SlotifyColors.ActionAmber,
                     shape = CircleShape
@@ -942,7 +943,7 @@ fun LogisticsMapScreen(
                             rfCenterLabel = if (userGpsFix != null) "GPS Semasa" else "Rumah Kediaman"
                         }
                     },
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(48.dp),
                     containerColor = if (isRfPulseActive) SlotifyColors.KpmSkyBlue else SlotifyColors.SurfaceCard.copy(
                         alpha = 0.94f
                     ),
@@ -971,7 +972,7 @@ fun LogisticsMapScreen(
                             }
                         }
                     },
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(48.dp),
                     containerColor = SlotifyColors.SurfaceCard.copy(alpha = 0.94f),
                     contentColor = SlotifyColors.KpmSkyBlue,
                     shape = CircleShape
@@ -1031,7 +1032,7 @@ fun LogisticsMapScreen(
                                         ) {
                                             Text(
                                                 text = selPoi.category.name,
-                                                fontSize = 8.5.sp,
+                                                fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = pColor,
                                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
@@ -1063,7 +1064,7 @@ fun LogisticsMapScreen(
 
                             IconButton(
                                 onClick = { selectedMapPoi = null },
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Close,
@@ -1208,7 +1209,7 @@ fun LogisticsMapScreen(
 
                             IconButton(
                                 onClick = { droppedMapPin = null },
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Close,
@@ -1361,7 +1362,7 @@ fun LogisticsMapScreen(
                                         ) {
                                             Text(
                                                 text = "${sim.speedKmh} km/j",
-                                                fontSize = 9.sp,
+                                                fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = SlotifyColors.ActionAmber,
                                                 modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
@@ -1736,7 +1737,7 @@ fun LogisticsMapScreen(
                             ) {
                                 Text(
                                     text = if (isOsrmLoading) "OSRM..." else "OSRM Live",
-                                    fontSize = 9.sp,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = SlotifyColors.SuccessMint,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -1747,7 +1748,7 @@ fun LogisticsMapScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(
                                 onClick = { viewModel.refreshRoute() },
-                                modifier = Modifier.size(30.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Refresh,
@@ -1971,7 +1972,7 @@ fun LogisticsMapScreen(
                         // Reset to default POIs
                         IconButton(
                             onClick = { showResetConfirm = true },
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 Icons.Default.RestartAlt,
@@ -2065,7 +2066,7 @@ fun LogisticsMapScreen(
                                         ) {
                                             Text(
                                                 text = poi.category.name,
-                                                fontSize = 8.sp,
+                                                fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = poiColor,
                                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
@@ -2736,7 +2737,7 @@ private fun PoiEditDialog(
                         ) {
                             Text(
                                 "📡 GPS (${userGpsFix.quality.label})",
-                                fontSize = 9.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = SlotifyColors.ActionAmber
                             )
@@ -2860,7 +2861,7 @@ private fun RouteTabCard(
             )
             Text(
                 text = subtitle,
-                fontSize = 8.5.sp,
+                fontSize = 10.sp,
                 color = if (isSelected) Color.White.copy(alpha = 0.85f) else SlotifyColors.TextSecondary,
                 maxLines = 1
             )

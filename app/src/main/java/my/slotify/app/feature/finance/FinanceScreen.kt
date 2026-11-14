@@ -153,7 +153,7 @@ fun FinanceScreen(
                                 color = SlotifyColors.TextPrimary
                             )
                         }
-                        IconButton(onClick = { celebrationMessage = null }, modifier = Modifier.size(24.dp)) {
+                        IconButton(onClick = { celebrationMessage = null }, modifier = Modifier.size(48.dp)) {
                             Icon(Icons.Default.Close, contentDescription = "Tutup", tint = SlotifyColors.TextSecondary)
                         }
                     }
@@ -254,7 +254,7 @@ fun FinanceScreen(
                             // - RM 0.50
                             FilledTonalIconButton(
                                 onClick = { viewModel.adjustSpentToday(-50) },
-                                modifier = Modifier.size(32.dp),
+                                modifier = Modifier.size(48.dp),
                                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = SlotifyColors.CanvasBase
                                 )
@@ -293,7 +293,7 @@ fun FinanceScreen(
                             // + RM 0.50
                             FilledTonalIconButton(
                                 onClick = { viewModel.adjustSpentToday(50) },
-                                modifier = Modifier.size(32.dp),
+                                modifier = Modifier.size(48.dp),
                                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = SlotifyColors.CanvasBase
                                 )

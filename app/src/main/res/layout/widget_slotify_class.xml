@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -27,7 +28,7 @@
                 android:id="@+id/widget_app_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="SLOTIFY"
+                android:text="@string/widget_brand"
                 android:textColor="#0052CC"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -36,7 +37,7 @@
                 android:id="@+id/widget_child_name"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Slotify"
+                android:text="@string/app_name"
                 android:textColor="#1E293B"
                 android:textSize="11sp"
                 android:textStyle="bold" />
@@ -53,9 +54,9 @@
             android:focusable="true"
             android:paddingHorizontal="7dp"
             android:paddingVertical="3dp"
-            android:text="⇄ Tukar"
+            android:text="@string/widget_switch"
             android:textColor="#0052CC"
-            android:textSize="10sp"
+            android:textSize="11sp"
             android:textStyle="bold" />
 
         <TextView
@@ -65,9 +66,9 @@
             android:background="@drawable/bg_widget_live"
             android:paddingHorizontal="6dp"
             android:paddingVertical="3dp"
-            android:text="● LIVE"
+            android:text="@string/widget_live"
             android:textColor="#137333"
-            android:textSize="10sp"
+            android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -92,7 +93,7 @@
             android:layout_weight="1"
             android:ellipsize="end"
             android:maxLines="1"
-            android:text="📍 Zon"
+            tools:text="📍 Zon"
             android:textColor="#0369A1"
             android:textSize="11sp"
             android:textStyle="bold" />
@@ -101,9 +102,9 @@
             android:id="@+id/widget_zone_btn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Peta 🗺️"
+            android:text="@string/widget_map"
             android:textColor="#0284C7"
-            android:textSize="10sp"
+            android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -118,7 +119,7 @@
         android:id="@+id/widget_current_class"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="⏳ Matematik (08:00 - 09:00)"
+        tools:text="⏳ Matematik (08:00 - 09:00)"
         android:textColor="#0F172A"
         android:textSize="13sp"
         android:textStyle="bold" />
@@ -129,7 +130,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
-        android:text="⏩ Seterusnya: Sains (09:00 - 10:00)"
+        tools:text="⏩ Seterusnya: Sains (09:00 - 10:00)"
         android:textColor="#475569"
         android:textSize="11sp" />
 
@@ -139,7 +140,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
-        android:text="📚 Bawa: Buku Teks Sains Jilid 1"
+        tools:text="📚 Bawa: Buku Teks Sains Jilid 1"
         android:textColor="#0052CC"
         android:textSize="11sp" />
 
@@ -156,7 +157,7 @@
         android:paddingVertical="3dp"
         android:text=""
         android:textColor="#475569"
-        android:textSize="9.5sp"
+        android:textSize="11sp"
         android:textStyle="bold" />
 
     <!-- Attire & Action Footer -->
@@ -172,18 +173,18 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="👕 Uniform Penuh KPM"
+            tools:text="👕 Uniform Penuh KPM"
             android:textColor="#64748B"
-            android:textSize="10sp"
+            android:textSize="11sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/widget_open_action"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Jadual ➔"
+            android:text="@string/widget_open_timetable"
             android:textColor="#0052CC"
-            android:textSize="10sp"
+            android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
 

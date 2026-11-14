@@ -77,4 +77,5 @@ Pelan penuh dan status terperinci: [MASTER_DOCUMENTATION.md §13](MASTER_DOCUMEN
 - [x] P3 — Pembetulan hari sekolah/hujung minggu, yuran berulang, geofens, OSRM luar talian, kitar hayat peta.
 - [x] P1-1 — Sejarah git dibersihkan & di-force-push.
 - [x] P4 — ViewModel + NavHost, wang dalam sen (migrasi 6→7), tetapan DataStore.
-- [ ] P5 — Penyatuan bahasa, aksesibiliti, CI.
+- [x] P5 — Satu sistem bahasa, aksesibiliti (sasaran sentuh 48dp), CI GitHub Actions.
+- [ ] P5 susulan — Pindahkan ~140 teks BM sebaris ke SlotifyStrings; naik taraf AGP/Kotlin/compileSdk untuk kebergantungan terkini.

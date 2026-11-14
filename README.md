@@ -11,7 +11,7 @@
 [![Database: Room](https://img.shields.io/badge/Storage-Room%20DB%20(Local--First)-F43F5E.svg)](https://developer.android.com/training/data-storage/room)
 [![Map: OpenStreetMap](https://img.shields.io/badge/Maps-OpenStreetMap%20(OSRM)-7EBC6F.svg?logo=openstreetmap&logoColor=white)](https://www.openstreetmap.org/)
 [![Design: 60:30:10 Rule](https://img.shields.io/badge/Design-60%3A30%3A10%20Neumorphic-FF7A00.svg)]()
-[![Status: Active Development](https://img.shields.io/badge/Version-v1.0.0--alpha01-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-v1.1.0-blue.svg)]() [![Android CI](https://github.com/manaphassan/Slotify/actions/workflows/android.yml/badge.svg)](https://github.com/manaphassan/Slotify/actions/workflows/android.yml)
 
 </div>
 
@@ -85,7 +85,7 @@ graph TD
   - **Jumaat:** Baju Melayu Putih Lengkap (Samping & Songkok) / Baju Kurung.
 
 ### 4. 🚐 Logistik Peta & Pengesanan Dua Aliran Van (OpenStreetMap OSRM)
-- **100% Percuma & Sumber Terbuka:** Menggunakan enjin **OSRM** dan **OpenStreetMap (OSMDroid / MapLibre)** tanpa kos API berbayar.
+- **100% Percuma & Sumber Terbuka:** Menggunakan enjin **OSRM** dan **OpenStreetMap (osmdroid)** tanpa kos API berbayar.
 - **Pengesanan Dua Aliran Van:**
   - **Van Sekolah A:** Menguruskan Adam (Rumah ➜ SRA ➜ Taska ➜ SK ➜ Rumah).
   - **Van Sekolah B:** Menguruskan Aisyah (Rumah ➜ SRAI ➜ Taska).
@@ -114,10 +114,10 @@ graph TD
 ┌──────────────────────────────────────────────────────────────────┐
 │                   SLOTIFY ANDROID ARCHITECTURE                   │
 ├──────────────────────────────────────────────────────────────────┤
-│  📱 Presentation Layer : Jetpack Compose + MVI Pattern           │
+│  📱 Presentation Layer : Jetpack Compose + Navigation Compose    │
 │  🎨 Design System      : NeumorphicModifier + 60:30:10 Tokens    │
-│  🧠 Domain Layer       : UseCases, AttireResolver, BagPackEngine │
-│  💾 Data Storage       : Room Database 2.6+ (Local-First SQLite) │
+│  🧠 State & Logic      : ViewModels (StateFlow) + Repositories   │
+│  💾 Data Storage       : Room 2.6 (v7) + DataStore (Local-First) │
 │  🗺️ Map & Routing      : OpenStreetMap (OSMDroid + OSRM Engine)  │
 │  ⏰ Background Engine  : AndroidX WorkManager (Alarms & Alerts)  │
 └──────────────────────────────────────────────────────────────────┘
@@ -181,6 +181,8 @@ Folder [`/drop`](drop/) disediakan khas untuk anda mencampakkan sebarang bahan m
 2. Buka folder projek dalam **Android Studio**.
 3. Biarkan Android Studio selesai menyelaraskan Gradle (*Sync Project with Gradle Files*).
 4. Tekan **Run (`Shift + F10`)** untuk melancarkan aplikasi pada telefon atau emulator!
+
+> **Profil keluarga:** klon baharu menggunakan keluarga contoh rekaan (`app/family-profile/demo/`). Untuk data keluarga sendiri, salin folder itu ke `app/family-profile/private/` (diabaikan oleh git) dan sunting `FamilyProfileData.kt`. Lihat [MASTER_DOCUMENTATION.md §11](MASTER_DOCUMENTATION.md#-11-family-profile-private-data-isolation).
 
 ---
 

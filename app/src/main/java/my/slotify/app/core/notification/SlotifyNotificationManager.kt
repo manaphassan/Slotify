@@ -29,39 +29,38 @@ object SlotifyNotificationManager {
     const val NOTIFICATION_ID_FINANCE = 1004
 
     fun createNotificationChannels(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-            val attireChannel = NotificationChannel(
-                CHANNEL_ATTIRE,
-                "Slotify: Peringatan Uniform Sekolah",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Peringatan jadual uniform KPM dan buku sekolah harian"
-                enableVibration(true)
-            }
-
-            val transitChannel = NotificationChannel(
-                CHANNEL_TRANSIT,
-                "Slotify: Transit & Logistik",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Peringatan drop beg transit dan jadual van sekolah"
-                enableVibration(true)
-            }
-
-            val financeChannel = NotificationChannel(
-                CHANNEL_FINANCE,
-                "Slotify: Peringatan Yuran",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Peringatan komitmen yuran bulanan dan belanja kantin"
-            }
-
-            notificationManager.createNotificationChannels(
-                listOf(attireChannel, transitChannel, financeChannel)
-            )
+        val attireChannel = NotificationChannel(
+            CHANNEL_ATTIRE,
+            "Slotify: Peringatan Uniform Sekolah",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Peringatan jadual uniform KPM dan buku sekolah harian"
+            enableVibration(true)
         }
+
+        val transitChannel = NotificationChannel(
+            CHANNEL_TRANSIT,
+            "Slotify: Transit & Logistik",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Peringatan drop beg transit dan jadual van sekolah"
+            enableVibration(true)
+        }
+
+        val financeChannel = NotificationChannel(
+            CHANNEL_FINANCE,
+            "Slotify: Peringatan Yuran",
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Peringatan komitmen yuran bulanan dan belanja kantin"
+        }
+
+        notificationManager.createNotificationChannels(
+            listOf(attireChannel, transitChannel, financeChannel)
+        )
+    
     }
 
     /**
@@ -85,11 +84,7 @@ object SlotifyNotificationManager {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         return PendingIntent.getActivity(context, 0, intent, flags)
     }
 
@@ -189,7 +184,7 @@ object SlotifyNotificationManager {
         createNotificationChannels(context)
 
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-        val immutableFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+        val immutableFlag = PendingIntent.FLAG_IMMUTABLE
 
         // Schedule Evening Attire Reminder at 8:30 PM (20:30)
         val eveningIntent = Intent(context, SlotifyAlarmReceiver::class.java).apply {

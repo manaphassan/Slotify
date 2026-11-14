@@ -294,9 +294,10 @@ erDiagram
 
 ## 🌐 10. Dual-Language Architecture (BM / ENG)
 
-- **In-app strings:** `SlotifyStrings.kt` exposes `strings.*` via `LocalAppLanguage`; switching language recomposes without restart.
-- **Android resources:** `res/values/strings.xml` (BM) and `res/values-en/strings.xml` (EN) follow the **device** locale, not the in-app switch.
-- **Known gap:** many BM literals are still hard-coded in Kotlin, and two systems coexist. Consolidation is tracked as **P5-3**.
+- **Single system:** all Compose UI text comes from `SlotifyStrings.kt` (`strings.*` via `LocalAppLanguage`), so the in-app BM/EN switch applies everywhere and recomposes without restart. Parameterised text uses lambdas (e.g. `strings.pinAttemptsLeft(2)`). Inside lambdas/coroutines capture `val str = strings` first, because `strings` is a `@Composable` getter.
+- **Android resources:** `res/values/strings.xml` now holds only text rendered outside Compose — the launcher label and home-screen widget labels. `values-en/` was removed.
+- **Checks:** `SlotifyStringsTest` fails if any BM or EN entry is blank.
+- **Remaining work (P5-3):** ~140 BM literals are still inline in screen code (largest: Logistics, Dashboard, Finance). Move them into `SlotifyStrings` when touching each screen.
 
 ---
 
@@ -382,11 +383,11 @@ Status legend: ✅ Done · 🔄 In progress · ⏳ Planned
 ### P5 — Quality
 | ID | Finding | Fix | Status |
 |---|---|---|:---:|
-| P5-1 | Unit tests assert re-implemented copies of logic, not production code | Extract pure functions and test them; add Room migration test | 🔄 |
+| P5-1 | Unit tests assert re-implemented copies of logic, not production code | Extract pure functions and test them; add Room migration test | ✅ |
 | P5-2 | ProGuard keeps all of Compose/osmdroid; `org.json` duplicated as a runtime dependency | Trim keep rules; `org.json` → `testImplementation` | ✅ |
-| P5-3 | Two localisation systems + hundreds of hard-coded BM strings | Consolidate on one system | ⏳ |
-| P5-4 | Touch targets < 48 dp, 7–9 sp text, missing toggle semantics | Accessibility pass | ⏳ |
-| P5-5 | No CI, outdated dependencies, README version badge stale | GitHub Actions running tests + lint; dependency bump | ⏳ |
+| P5-3 | Two localisation systems + hundreds of hard-coded BM strings | Consolidate on one system | 🔄 |
+| P5-4 | Touch targets < 48 dp, 7–9 sp text, missing toggle semantics | Accessibility pass | ✅ |
+| P5-5 | No CI, outdated dependencies, README version badge stale | GitHub Actions running tests + lint; dependency bump | 🔄 |
 
 ### Progress log
 **2026-11-14 — P1, P2, P3 implemented.** Verified with `./gradlew testDebugUnitTest lintDebug` (private profile) and `./gradlew -PslotifyProfile=demo testDebugUnitTest assembleRelease`:
@@ -409,6 +410,14 @@ Still open:
 - P4-5: theme, language and selected student persisted with DataStore.
 
 Remaining follow-ups: the Focus timer is still an in-screen overlay rather than a `Dialog`; screens are still long files (split into smaller composables opportunistically).
+
+**2026-11-14 — P5 implemented (partially).** Verified with `./gradlew testDebugUnitTest lintDebug` (private) and `./gradlew -PslotifyProfile=demo testDebugUnitTest lintDebug assembleRelease`:
+- Unit tests: **57/57 passing** (adds `SlotifyStringsTest`). Lint: **0 errors, 17 warnings** (was 93): the remaining warnings are dependency/target-SDK versions.
+- P5-1: tests exercise production code (pure helpers, migrations, ViewModel state classes).
+- P5-3: one localisation system; shell, PIN, reward, bag-checklist and dashboard section strings migrated with English translations. ~140 inline literals remain.
+- P5-4: icon buttons and map controls ≥ 48 dp; Compose text ≥ 10 sp, widget text ≥ 11 sp; homework and bag items use `toggleable(role = Checkbox)`; PIN dots announce digit count; current prayer time exposes a state description; MapView touch listener reports clicks.
+- P5-5: GitHub Actions (`.github/workflows/android.yml`) runs tests, lint and a release build on every push/PR (demo profile); `gradlew` marked executable; README badge/architecture corrected; lint `Typos` disabled (Malay UI copy); backup rules added for Android 11- and 12+.
+- **Dependency upgrade deferred:** the current AndroidX releases (core 1.19, lifecycle 2.11, activity 1.13, navigation 2.10, Room 2.8, DataStore 1.3) require AGP 8.9–9.1, compileSdk 36–37 and Kotlin 2.2. Upgrading needs a coordinated toolchain bump (AGP + Gradle wrapper + Kotlin + KSP + compileSdk/targetSdk) and on-device testing; tracked as the remaining part of P5-5.
 
 ### Execution order
 1. **P1 + P2** — privacy, security and data-loss fixes (blocking any further push).

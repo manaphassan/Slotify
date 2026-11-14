@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.designsystem.theme.SlotifyShapes
+import my.slotify.app.core.designsystem.theme.strings
 
 private val KEY_ROWS = listOf(
     listOf("1", "2", "3"),
@@ -55,6 +56,7 @@ internal fun PinEntryDialog(
     onPinComplete: (String) -> Unit
 ) {
     var enteredPin by remember(title) { mutableStateOf("") }
+    val str = strings
 
     Dialog(onDismissRequest = onDismiss) {
         Box(
@@ -88,7 +90,7 @@ internal fun PinEntryDialog(
                         )
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Tutup", tint = SlotifyColors.TextSecondary)
+                        Icon(Icons.Default.Close, contentDescription = str.close, tint = SlotifyColors.TextSecondary)
                     }
                 }
 
@@ -103,7 +105,7 @@ internal fun PinEntryDialog(
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                     modifier = Modifier
                         .padding(vertical = 8.dp)
-                        .semantics { contentDescription = "${enteredPin.length} daripada 4 digit dimasukkan" }
+                        .semantics { contentDescription = str.pinDigitsEntered(enteredPin.length) }
                 ) {
                     for (i in 0 until 4) {
                         Box(

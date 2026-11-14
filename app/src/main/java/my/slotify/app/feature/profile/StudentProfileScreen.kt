@@ -190,7 +190,7 @@ fun StudentProfileScreen(
                                 ) {
                                     Text(
                                         text = s.currentLevel,
-                                        fontSize = 9.sp,
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color.White
                                     )
@@ -285,7 +285,7 @@ fun StudentProfileScreen(
 
                             BiometricMetricItem(
                                 title = strings.bmiLabel,
-                                value = if (bmi > 0) String.format("%.1f", bmi) else "-"
+                                value = if (bmi > 0) String.format(java.util.Locale.US, "%.1f", bmi) else "-"
                             )
                         }
                     }
@@ -542,7 +542,7 @@ fun StudentProfileScreen(
                                                     ) {
                                                         Text(
                                                             text = assessment.subjectCode,
-                                                            fontSize = 9.sp,
+                                                            fontSize = 10.sp,
                                                             fontWeight = FontWeight.Bold,
                                                             color = subjectColor,
                                                             modifier = Modifier.padding(
