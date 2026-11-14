@@ -24,6 +24,13 @@ val keystoreProps = Properties().apply {
 fun signingValue(propKey: String, envKey: String): String? =
     keystoreProps.getProperty(propKey) ?: System.getenv(envKey)
 
+val hasReleaseSigning = listOf(
+    "storeFile" to "SLOTIFY_KEYSTORE_FILE",
+    "storePassword" to "SLOTIFY_KEYSTORE_PASSWORD",
+    "keyAlias" to "SLOTIFY_KEY_ALIAS",
+    "keyPassword" to "SLOTIFY_KEY_PASSWORD"
+).all { (prop, env) -> signingValue(prop, env) != null }
+
 android {
     namespace = "my.slotify.app"
     compileSdk = 35
@@ -52,19 +59,12 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            val storePath = signingValue("storeFile", "SLOTIFY_KEYSTORE_FILE")
-            val storePass = signingValue("storePassword", "SLOTIFY_KEYSTORE_PASSWORD")
-            val alias = signingValue("keyAlias", "SLOTIFY_KEY_ALIAS")
-            val keyPass = signingValue("keyPassword", "SLOTIFY_KEY_PASSWORD")
-            if (storePath != null && storePass != null && alias != null && keyPass != null) {
-                storeFile = rootProject.file(storePath)
-                storePassword = storePass
-                keyAlias = alias
-                keyPassword = keyPass
-            } else {
-                // No credentials: produce a debug-signed build that must not be published.
-                initWith(getByName("debug"))
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(signingValue("storeFile", "SLOTIFY_KEYSTORE_FILE")!!)
+                storePassword = signingValue("storePassword", "SLOTIFY_KEYSTORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "SLOTIFY_KEY_ALIAS")
+                keyPassword = signingValue("keyPassword", "SLOTIFY_KEY_PASSWORD")
             }
         }
     }
@@ -72,7 +72,9 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
-            signingConfig = signingConfigs.getByName("release")
+            // Without credentials the release build is left unsigned (app-release-unsigned.apk):
+            // nothing publishable is produced by accident, and CI needs no keystore.
+            signingConfig = if (hasReleaseSigning) signingConfigs.getByName("release") else null
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

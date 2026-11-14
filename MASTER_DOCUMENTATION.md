@@ -321,7 +321,7 @@ Stable IDs (e.g. `student-…`, `session-…`) must not change between releases,
 
 ## 📦 12. Build, Signing & Release
 
-- **Signing:** release signing reads `keystore.properties` in the repo root (git-ignored; keys `storeFile`, `storePassword`, `keyAlias`, `keyPassword`) or the environment variables `SLOTIFY_KEYSTORE_FILE`, `SLOTIFY_KEYSTORE_PASSWORD`, `SLOTIFY_KEY_ALIAS`, `SLOTIFY_KEY_PASSWORD`. There are **no password fallbacks** in the build script; without credentials the release build is signed with the debug key and must not be published.
+- **Signing:** release signing reads `keystore.properties` in the repo root (git-ignored; keys `storeFile`, `storePassword`, `keyAlias`, `keyPassword`) or the environment variables `SLOTIFY_KEYSTORE_FILE`, `SLOTIFY_KEYSTORE_PASSWORD`, `SLOTIFY_KEY_ALIAS`, `SLOTIFY_KEY_PASSWORD`. There are **no password fallbacks** in the build script; without credentials the release build is left **unsigned** (`app-release-unsigned.apk`), so nothing publishable is produced by accident and CI needs no keystore.
 - **R8:** enabled for release. Libraries ship their own consumer rules, so `proguard-rules.pro` only keeps app-specific reflection targets.
 - **Checks:** `./gradlew testDebugUnitTest lintDebug` must pass before tagging a release.
 
