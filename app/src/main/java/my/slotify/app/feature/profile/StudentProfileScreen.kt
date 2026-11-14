@@ -940,7 +940,7 @@ fun AddPbdAssessmentDialog(
                                 assessedDate = java.time.LocalDate.now().format(
                                     java.time.format.DateTimeFormatter.ofPattern(
                                         "MMM yyyy",
-                                        java.util.Locale("ms", "MY")
+                                        java.util.Locale.forLanguageTag("ms-MY")
                                     )
                                 )
                             )

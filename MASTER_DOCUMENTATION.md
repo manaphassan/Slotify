@@ -2,7 +2,7 @@
 
 > **Application Name:** **Slotify**
 > **Tagline:** *"Susun Waktu Anak, Tenang Sepanjang Hari"* / *"Slotify your day. Plan smarter, slot better."*
-> **Platform:** Native Android (Kotlin 2.0.21 & Jetpack Compose, Min SDK 26, Target SDK 35)
+> **Platform:** Native Android (Kotlin 2.4 & Jetpack Compose, Min SDK 26, Target SDK 36, Compile SDK 37)
 > **Package Name / Application ID:** `my.slotify.app`
 > **Architecture:** Single-module MVVM — Compose screens ➜ feature ViewModels (`StateFlow`) ➜ repositories ➜ Room / DataStore, with Navigation Compose
 > **Data Philosophy:** 🔒 Local-First, Privacy-Focused (user owns all data on-device; personal seed data never committed — see §11)
@@ -79,12 +79,14 @@ flowchart TD
 - **Still in the UI layer:** map rendering, GPS, TTS and the vehicle simulation in `LogisticsMapScreen` (Android-view and sensor bound); dialogs' local form state.
 
 ### 2.2 Technical Stack Matrix
-- **Language:** Kotlin 2.0.21 (Coroutines & Flow)
-- **UI Toolkit:** Jetpack Compose (Material3 + custom neumorphic modifiers)
+- **Build toolchain:** Gradle 9.9.1, AGP 9.5.1 with built-in Kotlin (no `kotlin-android` plugin), Kotlin/Compose compiler plugin 2.4.21, KSP 2.3.14, JDK 17. Family-profile sources are added with `kotlin.srcDir` (built-in Kotlin ignores `.kt` files in `java.srcDir`).
+- **Language:** Kotlin 2.4.21 (Coroutines 1.11 & Flow)
+- **UI Toolkit:** Jetpack Compose BOM 2026.09.00 (Material3 + custom neumorphic modifiers), edge-to-edge (`enableEdgeToEdge`, system-bar icons follow the in-app theme)
+- **Navigation:** Navigation Compose 2.10.2; Lifecycle 2.11.0; Activity Compose 1.13.0
 - **Dependency Injection:** Manual (`AppContainer` + `SlotifyViewModelFactory`)
-- **Settings:** Jetpack DataStore Preferences 1.1.1 (theme, language, selected student)
-- **Local Persistence:** Room 2.6.1 + SQLite (schema v7), schemas exported to `app/schemas/`
-- **Background Tasks:** WorkManager 2.10.0 (widget refresh, geofence monitor) + AlarmManager (daily reminders)
+- **Settings:** Jetpack DataStore Preferences 1.3.0 (theme, language, selected student)
+- **Local Persistence:** Room 2.8.5 + SQLite (schema v7), schemas exported to `app/schemas/`
+- **Background Tasks:** WorkManager 2.12.0 (widget refresh, geofence monitor) + AlarmManager (daily reminders)
 - **Routing & Distance:** OSRM driving API + OkHttp 4.12
 - **Map Rendering:** `osmdroid-android:6.1.20`
 
@@ -387,7 +389,7 @@ Status legend: ✅ Done · 🔄 In progress · ⏳ Planned
 | P5-2 | ProGuard keeps all of Compose/osmdroid; `org.json` duplicated as a runtime dependency | Trim keep rules; `org.json` → `testImplementation` | ✅ |
 | P5-3 | Two localisation systems + hundreds of hard-coded BM strings | Consolidate on one system | 🔄 |
 | P5-4 | Touch targets < 48 dp, 7–9 sp text, missing toggle semantics | Accessibility pass | ✅ |
-| P5-5 | No CI, outdated dependencies, README version badge stale | GitHub Actions running tests + lint; dependency bump | 🔄 |
+| P5-5 | No CI, outdated dependencies, README version badge stale | GitHub Actions running tests + lint; dependency bump | ✅ |
 
 ### Progress log
 **2026-11-14 — P1, P2, P3 implemented.** Verified with `./gradlew testDebugUnitTest lintDebug` (private profile) and `./gradlew -PslotifyProfile=demo testDebugUnitTest assembleRelease`:
@@ -417,7 +419,16 @@ Remaining follow-ups: the Focus timer is still an in-screen overlay rather than 
 - P5-3: one localisation system; shell, PIN, reward, bag-checklist and dashboard section strings migrated with English translations. ~140 inline literals remain.
 - P5-4: icon buttons and map controls ≥ 48 dp; Compose text ≥ 10 sp, widget text ≥ 11 sp; homework and bag items use `toggleable(role = Checkbox)`; PIN dots announce digit count; current prayer time exposes a state description; MapView touch listener reports clicks.
 - P5-5: GitHub Actions (`.github/workflows/android.yml`) runs tests, lint and a release build on every push/PR (demo profile); `gradlew` marked executable; README badge/architecture corrected; lint `Typos` disabled (Malay UI copy); backup rules added for Android 11- and 12+.
-- **Dependency upgrade deferred:** the current AndroidX releases (core 1.19, lifecycle 2.11, activity 1.13, navigation 2.10, Room 2.8, DataStore 1.3) require AGP 8.9–9.1, compileSdk 36–37 and Kotlin 2.2. Upgrading needs a coordinated toolchain bump (AGP + Gradle wrapper + Kotlin + KSP + compileSdk/targetSdk) and on-device testing; tracked as the remaining part of P5-5.
+- **Dependency upgrade deferred** (done below): the current AndroidX releases require AGP 8.9–9.1, compileSdk 36–37 and Kotlin 2.2, so the whole toolchain has to move together.
+
+**2026-11-14 — P5-5 toolchain upgrade.** Verified with `./gradlew testDebugUnitTest compileDebugAndroidTestKotlin lintDebug` (private) and `./gradlew -PslotifyProfile=demo testDebugUnitTest lintDebug assembleRelease`:
+- Unit tests: **57/57 passing**. Lint: **0 errors**; warnings are now mostly the new `UseKtx` style hints (47), plus `OldTargetApi` (target 36 < compile 37, deliberate) and OkHttp 5 being available.
+- Gradle 8.x ➜ 9.9.1, AGP 8.7 ➜ 9.5.1 (built-in Kotlin; `kotlin-android` plugin removed, `kotlinOptions` ➜ `kotlin { compilerOptions }`), Kotlin 2.0.21 ➜ 2.4.21, KSP 2.3.14, compileSdk 37 / targetSdk 36; AndroidX libraries per §2.2.
+- targetSdk 36 forces edge-to-edge: `enableEdgeToEdge()` with theme-aware bar icons, top bar pads for the status bar; `Scaffold` already pads content for the navigation bar.
+- Deprecations fixed: `LocalLifecycleOwner` (now `androidx.lifecycle.compose`), `Locale("ms","MY")` ➜ `Locale.forLanguageTag`, AutoMirrored volume icons, `fallbackToDestructiveMigrationFrom(dropAllTables = true, …)`.
+- Release build now shrinks resources; Google Fonts cert arrays renamed to `slotify_gms_fonts_certs*` so they no longer override the font library's private resources.
+- Not upgraded: OkHttp 4.12 ➜ 5.x (major version; do separately). `TabRow` ➜ `PrimaryTabRow` and `asFrameworkPaint` deprecations remain (warnings only).
+- **Before installing on the family phone:** run `./gradlew connectedDebugAndroidTest` (Room migration tests 5➜6, 6➜7) and smoke-test status-bar/navigation-bar overlap, exact-alarm reminders and notifications on an Android 15/16 device.
 
 ### Execution order
 1. **P1 + P2** — privacy, security and data-loss fixes (blocking any further push).

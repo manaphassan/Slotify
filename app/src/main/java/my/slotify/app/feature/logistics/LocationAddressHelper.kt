@@ -28,7 +28,7 @@ object LocationAddressHelper {
         // 1. Try Android Geocoder if available
         try {
             if (Geocoder.isPresent()) {
-                val geocoder = Geocoder(context, Locale("ms", "MY"))
+                val geocoder = Geocoder(context, Locale.forLanguageTag("ms-MY"))
                 val addresses: List<Address>? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     var resultList: List<Address>? = null
                     val latch = java.util.concurrent.CountDownLatch(1)

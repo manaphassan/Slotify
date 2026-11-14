@@ -39,7 +39,7 @@ fun TakwimCalendarDialog(
     var selectedTab by remember { mutableStateOf(0) } // 0: Semua, 1: Cuti Penggal, 2: Cuti Umum
 
     val dateFormatter = remember {
-        DateTimeFormatter.ofPattern("d MMM yyyy", Locale("ms", "MY"))
+        DateTimeFormatter.ofPattern("d MMM yyyy", Locale.forLanguageTag("ms-MY"))
     }
 
     val filteredHolidays = remember(selectedTab) {

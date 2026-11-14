@@ -78,4 +78,5 @@ Pelan penuh dan status terperinci: [MASTER_DOCUMENTATION.md §13](MASTER_DOCUMEN
 - [x] P1-1 — Sejarah git dibersihkan & di-force-push.
 - [x] P4 — ViewModel + NavHost, wang dalam sen (migrasi 6→7), tetapan DataStore.
 - [x] P5 — Satu sistem bahasa, aksesibiliti (sasaran sentuh 48dp), CI GitHub Actions.
-- [ ] P5 susulan — Pindahkan ~140 teks BM sebaris ke SlotifyStrings; naik taraf AGP/Kotlin/compileSdk untuk kebergantungan terkini.
+- [ ] P5 susulan — Pindahkan ~140 teks BM sebaris ke SlotifyStrings.
+- [x] P5-5 — Naik taraf AGP 9.5 / Kotlin 2.4 / compileSdk 37 / targetSdk 36 dan kebergantungan AndroidX terkini.

@@ -1,8 +1,10 @@
 import java.util.Properties
 
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    // No org.jetbrains.kotlin.android: AGP 9 provides built-in Kotlin compilation.
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
@@ -33,12 +35,12 @@ val hasReleaseSigning = listOf(
 
 android {
     namespace = "my.slotify.app"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "my.slotify.app"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 2
         versionName = "1.1.0"
 
@@ -50,7 +52,8 @@ android {
 
     sourceSets {
         getByName("main") {
-            java.srcDir(familyProfileDir.resolve("java"))
+            // AGP 9 built-in Kotlin only compiles .kt files from kotlin source dirs.
+            kotlin.srcDir(familyProfileDir.resolve("java"))
             assets.srcDir(familyProfileDir.resolve("assets"))
         }
         getByName("androidTest") {
@@ -72,6 +75,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             // Without credentials the release build is left unsigned (app-release-unsigned.apk):
             // nothing publishable is produced by accident, and CI needs no keystore.
             signingConfig = if (hasReleaseSigning) signingConfigs.getByName("release") else null
@@ -88,10 +92,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
     }
 
     buildFeatures {
@@ -113,20 +113,26 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
     // AndroidX Core & Lifecycle
-    implementation("androidx.core:core-ktx:1.15.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.core:core-ktx:1.19.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
+    implementation("androidx.activity:activity-compose:1.13.0")
 
     // Jetpack Compose BOM
-    val composeBom = platform("androidx.compose:compose-bom:2024.11.00")
+    val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
@@ -140,35 +146,35 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
     // Navigation Compose
-    implementation("androidx.navigation:navigation-compose:2.8.4")
+    implementation("androidx.navigation:navigation-compose:2.10.2")
 
     // Room Database
-    val roomVersion = "2.6.1"
+    val roomVersion = "2.8.5"
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
 
     // WorkManager
-    implementation("androidx.work:work-runtime-ktx:2.10.0")
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
 
     // Persisted settings (theme, language, selected student)
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.datastore:datastore-preferences:1.3.0")
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // JSON & Networking for OSRM Routing (org.json ships with Android; the artifact is only
     // needed so JVM unit tests get a real implementation instead of the android.jar stubs)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    testImplementation("org.json:json:20240303")
+    testImplementation("org.json:json:20260814")
 
     // OpenStreetMap (osmdroid) for zero-cost offline/online map rendering
     implementation("org.osmdroid:osmdroid-android:6.1.20")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.room:room-testing:$roomVersion")
 }

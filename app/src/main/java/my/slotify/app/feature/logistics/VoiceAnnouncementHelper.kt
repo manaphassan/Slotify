@@ -32,7 +32,7 @@ class VoiceAnnouncementHelper(private val context: Context) : TextToSpeech.OnIni
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             val ttsEngine = tts ?: return
-            val msLocale = Locale("ms", "MY")
+            val msLocale = Locale.forLanguageTag("ms-MY")
             val result = ttsEngine.setLanguage(msLocale)
 
             if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {

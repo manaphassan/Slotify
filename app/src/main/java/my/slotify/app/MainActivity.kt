@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -50,6 +53,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -141,13 +145,17 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         // Only schedule alarms if notification permission is already granted; the runtime
         // request is issued inside setContent.
         SlotifyNotificationManager.createNotificationChannels(this)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
         ) {
             SlotifyNotificationManager.scheduleDailyReminders(this)
         }
@@ -173,8 +181,14 @@ class MainActivity : ComponentActivity() {
 
             // FINE must be requested together with COARSE on Android 12+; either grant is enough.
             fun hasLocationPermission(): Boolean =
-                ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-                    ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                ContextCompat.checkSelfPermission(
+                    this@MainActivity,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED ||
+                        ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
 
             var locationGranted by remember { mutableStateOf(hasLocationPermission()) }
             val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -217,6 +231,17 @@ class MainActivity : ComponentActivity() {
                     }
 
                     val isDarkMode = ui.themeMode != AppThemeMode.LIGHT
+                    // targetSdk 35+ is always edge-to-edge: keep system-bar icons legible for the
+                    // in-app theme (which can differ from the system dark-mode setting).
+                    DisposableEffect(isDarkMode) {
+                        val style = if (isDarkMode) {
+                            SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                        } else {
+                            SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                        }
+                        enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                        onDispose { }
+                    }
                     ModalNavigationDrawer(
                         drawerState = drawerState,
                         drawerContent = {
@@ -337,6 +362,7 @@ fun SlotifyTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .statusBarsPadding()
                 .padding(horizontal = 10.dp, vertical = 5.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically

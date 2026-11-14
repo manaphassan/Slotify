@@ -39,7 +39,7 @@ abstract class SlotifyDatabase : RoomDatabase() {
                 )
                     .addMigrations(*SlotifyMigrations.ALL)
                     // Versions 1–4 were pre-release builds without exported schemas.
-                    .fallbackToDestructiveMigrationFrom(1, 2, 3, 4)
+                    .fallbackToDestructiveMigrationFrom(true, 1, 2, 3, 4)
                     .build()
                     .also { INSTANCE = it }
             }

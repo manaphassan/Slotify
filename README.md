@@ -6,7 +6,7 @@
 *“Slotify your day. Plan smarter, slot better.”*
 
 [![Platform: Android](https://img.shields.io/badge/Platform-Android%20Native%20(API%2026%2B)-3DDC84.svg?logo=android&logoColor=white)](https://developer.android.com/)
-[![Language: Kotlin](https://img.shields.io/badge/Language-Kotlin%202.0.21-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
+[![Language: Kotlin](https://img.shields.io/badge/Language-Kotlin%202.4-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![UI: Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%7C%20Neumorphic-4285F4.svg?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![Database: Room](https://img.shields.io/badge/Storage-Room%20DB%20(Local--First)-F43F5E.svg)](https://developer.android.com/training/data-storage/room)
 [![Map: OpenStreetMap](https://img.shields.io/badge/Maps-OpenStreetMap%20(OSRM)-7EBC6F.svg?logo=openstreetmap&logoColor=white)](https://www.openstreetmap.org/)
@@ -117,7 +117,7 @@ graph TD
 │  📱 Presentation Layer : Jetpack Compose + Navigation Compose    │
 │  🎨 Design System      : NeumorphicModifier + 60:30:10 Tokens    │
 │  🧠 State & Logic      : ViewModels (StateFlow) + Repositories   │
-│  💾 Data Storage       : Room 2.6 (v7) + DataStore (Local-First) │
+│  💾 Data Storage       : Room 2.8 (v7) + DataStore (Local-First) │
 │  🗺️ Map & Routing      : OpenStreetMap (OSMDroid + OSRM Engine)  │
 │  ⏰ Background Engine  : AndroidX WorkManager (Alarms & Alerts)  │
 └──────────────────────────────────────────────────────────────────┘
