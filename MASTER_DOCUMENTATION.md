@@ -328,7 +328,7 @@ Status legend: ✅ Done · 🔄 In progress · ⏳ Planned
 ### P1 — Security & privacy (critical)
 | ID | Finding | Fix | Status |
 |---|---|---|:---:|
-| P1-1 | Children's names, schools, home/office coordinates & address, car plate, phone numbers and daily location routine hard-coded in source (and already on `origin/main`) | Move all family data into `FamilyProfile`; commit a fictional demo profile; git-ignore the private profile; purge history before the next push | 🔄 |
+| P1-1 | Children's names, schools, home/office coordinates & address, car plate, phone numbers and daily location routine hard-coded in source (and already on `origin/main`) | Move all family data into `FamilyProfile`; commit a fictional demo profile; git-ignore the private profile; purge history before the next push | ✅ |
 | P1-2 | Keystore password fallback `"slotify2026"` committed in `app/build.gradle.kts` | Read credentials from `keystore.properties` / env only | ✅ |
 | P1-3 | PIN defaults to `1234`, `setPin()` never called, lockout held in `remember`, unsalted SHA-256 | First-run PIN setup, PBKDF2 + salt, persisted escalating lockout, change-PIN flow | ✅ |
 | P1-4 | Unlimited star farming (homework re-toggle, daily chest, bag pack ×2, savings conversion never deducts) | `reward_claims` table + `StarRewards.claimOnce`; savings conversions deduct from Tabung | ✅ |
@@ -389,7 +389,7 @@ Status legend: ✅ Done · 🔄 In progress · ⏳ Planned
 - `SlotifyMigrationTest` (Room 5 → 6) compiles but needs a device: `./gradlew connectedDebugAndroidTest`.
 
 Still open:
-- **P1-1:** history rewritten locally on 2026-11-14 with `git filter-repo` (names, places, coordinates, phone/MyKid numbers replaced in every revision and commit message; ICS timetables, screenshots and UI dumps removed). **Force-push to GitHub still pending.**
+- **P1-1:** history rewritten locally on 2026-11-14 with `git filter-repo` (names, places, coordinates, phone/MyKid numbers replaced in every revision and commit message; ICS timetables, screenshots and UI dumps removed). Force-pushed to GitHub on 2026-11-14 (`main` + tags). If the repo was ever public, request a cache purge from GitHub Support; old clones must be re-cloned.
 - **P3-12 follow-up:** the map still lives inside a `LazyColumn` item; overlays are now released correctly, but moving it out is part of P4-3.
 - **P3-9 follow-up:** background location is not requested; geofence/widget GPS stays off until a deliberate opt-in flow is built.
 
