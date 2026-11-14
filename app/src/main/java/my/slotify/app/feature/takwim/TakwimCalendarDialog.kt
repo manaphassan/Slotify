@@ -24,6 +24,7 @@ import my.slotify.app.core.designsystem.theme.NeumorphicElevation
 import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.designsystem.theme.SlotifyShapes
 import my.slotify.app.core.designsystem.theme.neumorphic
+import my.slotify.app.core.designsystem.theme.strings
 import my.slotify.app.core.takwim.HolidayType
 import my.slotify.app.core.takwim.KpmTakwimRepository
 import my.slotify.app.core.takwim.SchoolHoliday
@@ -36,6 +37,7 @@ fun TakwimCalendarDialog(
     onDismissRequest: () -> Unit
 ) {
     val today = remember { LocalDate.now() }
+    val ts = strings.timetableUi
     var selectedTab by remember { mutableStateOf(0) } // 0: Semua, 1: Cuti Penggal, 2: Cuti Umum
 
     val dateFormatter = remember {
@@ -84,12 +86,12 @@ fun TakwimCalendarDialog(
                         Spacer(Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "Takwim Persekolahan KPM",
+                                text = ts.takwimTitle,
                                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                 color = SlotifyColors.TextPrimary
                             )
                             Text(
-                                text = "Sesi 2026/2027 • Kumpulan B (Selangor)",
+                                text = ts.takwimSubtitle,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = SlotifyColors.KpmBlue
                             )
@@ -97,7 +99,7 @@ fun TakwimCalendarDialog(
                     }
 
                     IconButton(onClick = onDismissRequest) {
-                        Icon(Icons.Default.Close, contentDescription = "Tutup", tint = SlotifyColors.TextSecondary)
+                        Icon(Icons.Default.Close, contentDescription = strings.close, tint = SlotifyColors.TextSecondary)
                     }
                 }
 
@@ -117,12 +119,12 @@ fun TakwimCalendarDialog(
                     ) {
                         Column {
                             Text(
-                                text = "STATUS SESI AKADEMIK",
+                                text = ts.academicStatusLabel,
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = SlotifyColors.TextSecondary
                             )
                             Text(
-                                text = currentTerm?.let { "${it.name} (Sedang Berjalan)" } ?: "Sesi 2026/2027",
+                                text = currentTerm?.let { ts.currentTermOngoing(it.name) } ?: ts.sessionYearFallback,
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = SlotifyColors.ScienceGreen
                             )
@@ -133,7 +135,7 @@ fun TakwimCalendarDialog(
                             color = SlotifyColors.ScienceGreen.copy(alpha = 0.15f)
                         ) {
                             Text(
-                                text = "Kumpulan B",
+                                text = ts.groupBadge,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = SlotifyColors.ScienceGreen
@@ -152,17 +154,17 @@ fun TakwimCalendarDialog(
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        text = { Text("Semua", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                        text = { Text(ts.takwimTabAll, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                     )
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text("Cuti Penggal", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                        text = { Text(ts.takwimTabTermBreaks, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                     )
                     Tab(
                         selected = selectedTab == 2,
                         onClick = { selectedTab = 2 },
-                        text = { Text("Cuti Umum", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                        text = { Text(ts.takwimTabPublicHolidays, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                     )
                 }
 
@@ -193,10 +195,10 @@ fun TakwimCalendarDialog(
                         }
 
                         val badgeText = when {
-                            isOngoing -> "Sedang Berlangsung!"
-                            daysUntil == 0L -> "Hari Ini!"
-                            daysUntil > 0 -> "Lagi $daysUntil hari"
-                            else -> "Telah Lepas"
+                            isOngoing -> ts.holidayOngoing
+                            daysUntil == 0L -> ts.holidayToday
+                            daysUntil > 0 -> ts.holidayDaysUntil(daysUntil)
+                            else -> ts.holidayPast
                         }
 
                         Box(
@@ -269,7 +271,7 @@ fun TakwimCalendarDialog(
                         containerColor = SlotifyColors.KpmBlue
                     )
                 ) {
-                    Text("Tutup Takwim", fontWeight = FontWeight.Bold)
+                    Text(ts.closeTakwimButton, fontWeight = FontWeight.Bold)
                 }
             }
         }

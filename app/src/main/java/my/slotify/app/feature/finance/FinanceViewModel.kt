@@ -36,6 +36,12 @@ data class FinanceUiState(
     val canConvertSavings: Boolean get() = tabungSen >= StarRewards.SAVINGS_CONVERSION_SEN
 }
 
+/** One-shot finance messages; the UI maps them to text via `strings.financeUi`. */
+sealed interface FinanceMessage {
+    data object SavingsTooLow : FinanceMessage
+    data class SavingsConverted(val nickname: String) : FinanceMessage
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class FinanceViewModel(
     students: StudentRepository,
@@ -44,10 +50,10 @@ class FinanceViewModel(
 ) : ViewModel() {
 
     private val today = MutableStateFlow(LocalDate.now())
-    private val _message = MutableStateFlow<String?>(null)
+    private val _message = MutableStateFlow<FinanceMessage?>(null)
 
     /** One-shot user message (celebration / validation); clear with [consumeMessage]. */
-    val message: StateFlow<String?> = _message.asStateFlow()
+    val message: StateFlow<FinanceMessage?> = _message.asStateFlow()
 
     val uiState: StateFlow<FinanceUiState> =
         combine(students.selectedStudent, students.students, today) { s, all, d -> Triple(s, all, d) }
@@ -95,12 +101,12 @@ class FinanceViewModel(
         val state = uiState.value
         val student = state.student ?: return
         if (!state.canConvertSavings) {
-            _message.value = "Simpan sekurang-kurangnya RM 10 untuk menebus 10 ⭐ Bintang!"
+            _message.value = FinanceMessage.SavingsTooLow
             return
         }
         viewModelScope.launch {
             if (rewards.convertSavings(student.id, state.tabungSen)) {
-                _message.value = "🎉 Tahniah! RM 10 simpanan ditukarkan kepada +10 ⭐ Bintang untuk ${student.nickname}!"
+                _message.value = FinanceMessage.SavingsConverted(student.nickname)
             }
         }
     }

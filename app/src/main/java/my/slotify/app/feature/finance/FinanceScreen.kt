@@ -35,6 +35,9 @@ import my.slotify.app.core.time.rememberNow
 import my.slotify.app.core.designsystem.theme.NeumorphicElevation
 import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.designsystem.theme.SlotifyShapes
+import my.slotify.app.core.designsystem.theme.AppLanguage
+import my.slotify.app.core.designsystem.theme.FinanceStrings
+import my.slotify.app.core.designsystem.theme.LocalAppLanguage
 import my.slotify.app.core.designsystem.theme.neumorphic
 import my.slotify.app.core.designsystem.theme.strings
 import my.slotify.app.core.finance.FeeRepository
@@ -52,6 +55,7 @@ fun FinanceScreen(
     viewModel: FinanceViewModel = viewModel(factory = SlotifyViewModelFactory)
 ) {
     val context = LocalContext.current
+    val fs = strings.financeUi
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val vmMessage by viewModel.message.collectAsStateWithLifecycle()
 
@@ -68,7 +72,7 @@ fun FinanceScreen(
     var showAddFeeDialog by remember { mutableStateOf(false) }
     var showTakwimDialog by remember { mutableStateOf(false) }
     var feeFilter by remember { mutableStateOf(0) } // 0: Semua, 1: Belum Bayar, 2: Selesai
-    var celebrationMessage by remember { mutableStateOf<String?>(null) }
+    var celebrationMessage by remember { mutableStateOf<FinanceMessage?>(null) }
     var notificationSentSnack by remember { mutableStateOf(false) }
     LaunchedEffect(vmMessage) {
         vmMessage?.let { celebrationMessage = it; viewModel.consumeMessage() }
@@ -148,13 +152,17 @@ fun FinanceScreen(
                             Text("⭐", fontSize = 24.sp)
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = celebrationMessage ?: "",
+                                text = when (val msg = celebrationMessage) {
+                                    FinanceMessage.SavingsTooLow -> fs.savingsTooLow
+                                    is FinanceMessage.SavingsConverted -> fs.savingsConverted(msg.nickname)
+                                    null -> ""
+                                },
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                 color = SlotifyColors.TextPrimary
                             )
                         }
                         IconButton(onClick = { celebrationMessage = null }, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = "Tutup", tint = SlotifyColors.TextSecondary)
+                            Icon(Icons.Default.Close, contentDescription = strings.close, tint = SlotifyColors.TextSecondary)
                         }
                     }
                 }
@@ -193,7 +201,7 @@ fun FinanceScreen(
                             Spacer(Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "${strings.dailyPocketMoneyTitle} (${selectedStudent?.nickname ?: "Anak"})",
+                                    text = "${strings.dailyPocketMoneyTitle} (${selectedStudent?.nickname ?: strings.childFallback})",
                                     style = MaterialTheme.typography.titleLarge,
                                     color = SlotifyColors.TextPrimary
                                 )
@@ -261,7 +269,7 @@ fun FinanceScreen(
                             ) {
                                 Icon(
                                     Icons.Default.Remove,
-                                    contentDescription = "Kurang",
+                                    contentDescription = fs.decreaseSpent,
                                     modifier = Modifier.size(16.dp),
                                     tint = SlotifyColors.TextPrimary
                                 )
@@ -300,7 +308,7 @@ fun FinanceScreen(
                             ) {
                                 Icon(
                                     Icons.Default.Add,
-                                    contentDescription = "Tambah",
+                                    contentDescription = fs.increaseSpent,
                                     modifier = Modifier.size(16.dp),
                                     tint = SlotifyColors.TextPrimary
                                 )
@@ -338,12 +346,12 @@ fun FinanceScreen(
                             Spacer(Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "Tabung Maya Simpanan",
+                                    text = fs.tabungTitle,
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                     color = SlotifyColors.TextPrimary
                                 )
                                 Text(
-                                    text = "Jumlah penjimatan duit belanja kantin",
+                                    text = fs.tabungSubtitle,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = SlotifyColors.TextSecondary
                                 )
@@ -365,7 +373,7 @@ fun FinanceScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Tukar RM 10 simpanan kepada 10 Bintang ganjaran anak",
+                            text = fs.convertSavingsHint,
                             style = MaterialTheme.typography.labelSmall,
                             color = SlotifyColors.TextSecondary,
                             modifier = Modifier.weight(1f)
@@ -378,7 +386,7 @@ fun FinanceScreen(
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                             modifier = Modifier.heightIn(min = 48.dp)
                         ) {
-                            Text("+10 ⭐ Bintang", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(fs.convertSavingsButton, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -409,15 +417,17 @@ fun FinanceScreen(
                         Spacer(Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "Takwim KPM: ${currentTerm?.name ?: "Sesi 2026/2027"}",
+                                text = "Takwim KPM: ${currentTerm?.name ?: fs.takwimSessionFallback}",
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                 color = SlotifyColors.TextPrimary
                             )
                             if (upcomingHoliday != null) {
                                 val days = upcomingHoliday.daysUntil(todayDate)
-                                val daysText = if (days <= 0) "Sedang Berlangsung!" else "lagi $days hari"
+                                val daysText = if (days <= 0) fs.holidayOngoing else fs.holidayInDays(days)
+                                val holidayTitle =
+                                    if (LocalAppLanguage.current == AppLanguage.EN) upcomingHoliday.titleEn else upcomingHoliday.titleBm
                                 Text(
-                                    text = "${upcomingHoliday.titleBm} ($daysText)",
+                                    text = "$holidayTitle ($daysText)",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = SlotifyColors.KpmBlue
                                 )
@@ -427,7 +437,7 @@ fun FinanceScreen(
 
                     Icon(
                         Icons.Default.ChevronRight,
-                        contentDescription = "Buka Takwim",
+                        contentDescription = fs.openTakwim,
                         tint = SlotifyColors.TextSecondary,
                         modifier = Modifier.size(20.dp)
                     )
@@ -472,7 +482,7 @@ fun FinanceScreen(
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Tambah Yuran", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(fs.addFeeButton, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -498,7 +508,7 @@ fun FinanceScreen(
                             onClick = { feeFilter = 0 },
                             text = {
                                 Text(
-                                    "Semua (${commitmentList.size})",
+                                    "${strings.allTasks} (${commitmentList.size})",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -509,7 +519,7 @@ fun FinanceScreen(
                             onClick = { feeFilter = 1 },
                             text = {
                                 Text(
-                                    "Belum Bayar ($pendingCount)",
+                                    "${strings.pendingLabel} ($pendingCount)",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -520,7 +530,7 @@ fun FinanceScreen(
                             onClick = { feeFilter = 2 },
                             text = {
                                 Text(
-                                    "Selesai ($settledCount)",
+                                    "${strings.paidLabel} ($settledCount)",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -544,7 +554,7 @@ fun FinanceScreen(
                         Text("💰", style = MaterialTheme.typography.displayMedium)
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = if (commitmentList.isEmpty()) "Tiada yuran untuk bulan ini" else "Tiada rekod yuran dalam kategori ini",
+                            text = if (commitmentList.isEmpty()) fs.noFeesThisMonth else fs.noFeesInFilter,
                             style = MaterialTheme.typography.bodyMedium,
                             color = SlotifyColors.TextSecondary
                         )
@@ -599,12 +609,12 @@ fun FinanceScreen(
                                 )
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = fee.dueDateLabel,
+                                        text = fs.dueLabel(fee.dueDateLabel),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = SlotifyColors.TextSecondary
                                     )
                                     Text(
-                                        text = " • ${fee.childTarget}",
+                                        text = " • ${fs.childTargetLabel(fee.childTarget)}",
                                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                                         color = SlotifyColors.KpmBlue
                                     )
@@ -659,7 +669,7 @@ fun FinanceScreen(
                             ) {
                                 Icon(
                                     Icons.Default.DeleteOutline,
-                                    contentDescription = "Padam Yuran",
+                                    contentDescription = fs.deleteFee,
                                     tint = SlotifyColors.TextTertiary,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -702,7 +712,7 @@ fun FinanceScreen(
                                 color = SlotifyColors.TextPrimary
                             )
                             Text(
-                                text = "Uji notifikasi peringatan yuran & jadual",
+                                text = fs.testNotificationDesc,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = SlotifyColors.TextSecondary
                             )
@@ -714,10 +724,10 @@ fun FinanceScreen(
                             val unpaid = commitmentList.filter { !it.isPaid }
                             SlotifyNotificationManager.showTestNotification(
                                 context,
-                                "Slotify: Peringatan Yuran Bulanan",
-                                if (unpaid.isEmpty()) "Semua yuran bulan ini telah dijelaskan. ✓"
+                                fs.feeReminderNotificationTitle,
+                                if (unpaid.isEmpty()) fs.allFeesSettledNotification
                                 else unpaid.joinToString("\n") {
-                                    "${it.title} (${Money.format(it.amountSen)}) • ${it.dueDateLabel}"
+                                    "${it.title} (${Money.format(it.amountSen)}) • ${fs.dueLabel(it.dueDateLabel)}"
                                 }
                             )
                             notificationSentSnack = true
@@ -730,7 +740,7 @@ fun FinanceScreen(
                         modifier = Modifier.height(32.dp)
                     ) {
                         Text(
-                            "Uji Sekarang",
+                            fs.testNowButton,
                             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
                         )
                     }
@@ -748,7 +758,7 @@ fun FinanceScreen(
     if (showAddFeeDialog) {
         AddCommitmentFeeDialog(
             billingMonth = billingMonth,
-            childOptions = allStudents.map { it.nickname } + "Semua Anak",
+            childOptions = allStudents.map { it.nickname } + ALL_CHILDREN_KEY,
             onDismissRequest = { showAddFeeDialog = false },
             onSaveFee = { newFee ->
                 viewModel.saveFee(newFee)
@@ -771,15 +781,16 @@ fun AddCommitmentFeeDialog(
     onDismissRequest: () -> Unit,
     onSaveFee: (CommitmentFeeEntity) -> Unit
 ) {
+    val fs = strings.financeUi
     var title by remember { mutableStateOf("") }
     var amountText by remember { mutableStateOf("") }
-    var selectedChild by remember { mutableStateOf(childOptions.firstOrNull() ?: "Semua Anak") }
+    var selectedChild by remember { mutableStateOf(childOptions.firstOrNull() ?: ALL_CHILDREN_KEY) }
     var selectedCategoryEmoji by remember { mutableStateOf("🚌") }
-    var dueDateLabel by remember { mutableStateOf("1hb Setiap Bulan") }
+    var dueDateLabel by remember { mutableStateOf(DUE_FIRST_OF_MONTH) }
 
     val children = childOptions
     val emojis = listOf("🚌", "🏫", "📋", "🏊‍♂️", "🥋", "📚", "🎨", "💰")
-    val duePresets = listOf("1hb Setiap Bulan", "5hb Setiap Bulan", "10hb Setiap Bulan", "Hujung Bulan", "Sekali Bayar")
+    val duePresets = listOf(DUE_FIRST_OF_MONTH, DUE_FIFTH_OF_MONTH, DUE_TENTH_OF_MONTH, DUE_END_OF_MONTH, DUE_ONE_TIME)
 
     Dialog(onDismissRequest = onDismissRequest) {
         Surface(
@@ -794,7 +805,7 @@ fun AddCommitmentFeeDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Tambah Komitmen Yuran",
+                    text = fs.addFeeDialogTitle,
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = SlotifyColors.TextPrimary
                 )
@@ -803,8 +814,8 @@ fun AddCommitmentFeeDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Nama Yuran / Komitmen") },
-                    placeholder = { Text("Contoh: Yuran Kelas Renang") },
+                    label = { Text(fs.feeNameLabel) },
+                    placeholder = { Text(fs.feeNamePlaceholder) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp)
                 )
@@ -813,8 +824,8 @@ fun AddCommitmentFeeDialog(
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it },
-                    label = { Text("Jumlah (RM)") },
-                    placeholder = { Text("Contoh: 120.00") },
+                    label = { Text(fs.feeAmountLabel) },
+                    placeholder = { Text(fs.feeAmountPlaceholder) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp)
@@ -823,7 +834,7 @@ fun AddCommitmentFeeDialog(
                 // Target child selection
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        "Penerima / Anak:",
+                        fs.recipientLabel,
                         style = MaterialTheme.typography.labelMedium,
                         color = SlotifyColors.TextSecondary
                     )
@@ -832,7 +843,7 @@ fun AddCommitmentFeeDialog(
                             FilterChip(
                                 selected = selectedChild == child,
                                 onClick = { selectedChild = child },
-                                label = { Text(child, fontSize = 11.sp) }
+                                label = { Text(fs.childTargetLabel(child), fontSize = 11.sp) }
                             )
                         }
                     }
@@ -841,7 +852,7 @@ fun AddCommitmentFeeDialog(
                 // Category Emoji selection
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        "Kategori Ikon:",
+                        fs.categoryIconLabel,
                         style = MaterialTheme.typography.labelMedium,
                         color = SlotifyColors.TextSecondary
                     )
@@ -868,7 +879,7 @@ fun AddCommitmentFeeDialog(
                 // Due date preset selection
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        "Tarikh Bayaran:",
+                        fs.paymentDateLabel,
                         style = MaterialTheme.typography.labelMedium,
                         color = SlotifyColors.TextSecondary
                     )
@@ -877,7 +888,7 @@ fun AddCommitmentFeeDialog(
                             FilterChip(
                                 selected = dueDateLabel == due,
                                 onClick = { dueDateLabel = due },
-                                label = { Text(due, fontSize = 10.sp) }
+                                label = { Text(fs.dueLabel(due), fontSize = 10.sp) }
                             )
                         }
                     }
@@ -892,7 +903,7 @@ fun AddCommitmentFeeDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(onClick = onDismissRequest) {
-                        Text("Batal")
+                        Text(strings.cancelButton)
                     }
                     Spacer(Modifier.width(8.dp))
                     Button(
@@ -918,10 +929,31 @@ fun AddCommitmentFeeDialog(
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmBlue)
                     ) {
-                        Text("Simpan Yuran")
+                        Text(fs.saveFeeButton)
                     }
                 }
             }
         }
     }
+}
+
+// Persisted values: stored in Room and matched by FeeRepository.looksRecurring / migrations,
+// so they stay in BM and are only translated for display.
+private const val ALL_CHILDREN_KEY = "Semua Anak"
+private const val DUE_FIRST_OF_MONTH = "1hb Setiap Bulan"
+private const val DUE_FIFTH_OF_MONTH = "5hb Setiap Bulan"
+private const val DUE_TENTH_OF_MONTH = "10hb Setiap Bulan"
+private const val DUE_END_OF_MONTH = "Hujung Bulan"
+private const val DUE_ONE_TIME = "Sekali Bayar"
+
+private fun FinanceStrings.childTargetLabel(stored: String): String =
+    if (stored == ALL_CHILDREN_KEY) allChildren else stored
+
+private fun FinanceStrings.dueLabel(stored: String): String = when (stored) {
+    DUE_FIRST_OF_MONTH -> dueFirstOfMonth
+    DUE_FIFTH_OF_MONTH -> dueFifthOfMonth
+    DUE_TENTH_OF_MONTH -> dueTenthOfMonth
+    DUE_END_OF_MONTH -> dueEndOfMonth
+    DUE_ONE_TIME -> dueOneTime
+    else -> stored
 }

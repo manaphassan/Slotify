@@ -46,6 +46,8 @@ import my.slotify.app.core.designsystem.theme.strings
 import my.slotify.app.core.security.PinManager
 
 data class RewardCatalogItem(
+    /** Stable, non-localised identifier (list key); [title]/[description] are display copy. */
+    val id: String,
     val title: String,
     val description: String,
     val pointsCost: Int,
@@ -82,17 +84,19 @@ fun RewardVaultScreen(
         if (event != null) viewModel.consumeEvent()
     }
 
-    val rewardItems = remember {
+    val ss = str.shellUi
+    val rewardItems = remember(ss) {
         listOf(
             RewardCatalogItem(
-                "Main Roblox / iPad 1 Jam",
-                "Ganjaran bermain peranti dengan had waktu berjadual",
+                "screen_time_1h",
+                ss.rewardScreenTimeTitle,
+                ss.rewardScreenTimeDesc,
                 50,
                 "🎮"
             ),
-            RewardCatalogItem("Beli Mainan / Hot Wheels", "Tebus mainan kegemaran pilihan anak di kedai", 200, "🏎️"),
-            RewardCatalogItem("Keluar Makan Ais Krim", "Ais krim FamilyMart / Tealive hujung minggu", 30, "🍦"),
-            RewardCatalogItem("Tidur Lewat 30 Minit", "Kelonggaran waktu tidur hari Sabtu / cuti sekolah", 20, "🌙")
+            RewardCatalogItem("toy", ss.rewardToyTitle, ss.rewardToyDesc, 200, "🏎️"),
+            RewardCatalogItem("ice_cream", ss.rewardIceCreamTitle, ss.rewardIceCreamDesc, 30, "🍦"),
+            RewardCatalogItem("late_bedtime_30m", ss.rewardLateBedtimeTitle, ss.rewardLateBedtimeDesc, 20, "🌙")
         )
     }
 
@@ -210,7 +214,7 @@ fun RewardVaultScreen(
                                     shape = SlotifyShapes.XSmall
                                 ) {
                                     Text(
-                                        text = if (chestOpened) "Claimed" else "+15 ⭐",
+                                        text = if (chestOpened) ss.chestClaimedBadge else "+15 ⭐",
                                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                         color = if (chestOpened) SlotifyColors.ScienceGreen else SlotifyColors.MathAmber,
                                         modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
@@ -281,7 +285,7 @@ fun RewardVaultScreen(
         }
 
         // Reward Catalog Items
-        items(rewardItems, key = { it.title }) { item ->
+        items(rewardItems, key = { it.id }) { item ->
             val canAfford = (selectedStudent?.starCoinsBalance ?: 0) >= item.pointsCost
             Box(
                 modifier = Modifier

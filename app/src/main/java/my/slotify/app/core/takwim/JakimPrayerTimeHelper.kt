@@ -28,7 +28,7 @@ object JakimPrayerTimeHelper {
         val currentPrayer: String,
         val nextPrayerName: String,
         val countdownText: String,
-        val transitNote: String = "Solat Zohor & Transit SRA: 01:15 PM – 02:00 PM"
+        val minutesUntilNext: Int = 0
     )
 
     data class RawPrayerTimes(
@@ -159,7 +159,8 @@ object JakimPrayerTimeHelper {
             isyak = formatMinutesToTime(raw.isyakMinutes),
             currentPrayer = currentPrayer,
             nextPrayerName = nextPrayerName,
-            countdownText = countdownText
+            countdownText = countdownText,
+            minutesUntilNext = diffMinutes
         )
     }
 }

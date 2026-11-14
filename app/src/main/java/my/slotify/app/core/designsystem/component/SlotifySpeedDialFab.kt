@@ -148,7 +148,7 @@ fun SlotifySpeedDialFab(
         ) {
             Icon(
                 imageVector = if (isExpanded) Icons.Default.Close else Icons.Default.Widgets,
-                contentDescription = "Menu Tindakan Pantas",
+                contentDescription = strings.shellUi.quickActionsMenu,
                 tint = Color.White,
                 modifier = Modifier
                     .size(24.dp)

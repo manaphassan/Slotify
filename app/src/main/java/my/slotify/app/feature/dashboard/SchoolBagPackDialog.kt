@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import my.slotify.app.core.database.StudentEntity
 import my.slotify.app.core.database.TimetableSlotEntity
+import my.slotify.app.core.designsystem.theme.DashboardStrings
 import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.profile.FamilyProfileData
 import my.slotify.app.core.rewards.StarRewards
@@ -59,15 +60,19 @@ object SchoolBagHelper {
         prefs.edit().putBoolean("packed_${studentId}_$todayKey", packed).apply()
     }
 
-    fun getDefaultItemsForStudent(student: StudentEntity, slots: List<TimetableSlotEntity>): List<BagItem> {
+    fun getDefaultItemsForStudent(
+        student: StudentEntity,
+        slots: List<TimetableSlotEntity>,
+        ds: DashboardStrings
+    ): List<BagItem> {
         val subjectItems = slots
             .filter { !it.isRehat }
             .distinctBy { it.subjectCode }
             .map { slot ->
                 BagItem(
                     id = "sub-${slot.subjectCode}",
-                    title = "Buku Teks & Aktiviti ${slot.subjectName}",
-                    category = "Buku Pelajaran"
+                    title = ds.bagSubjectBooksItem(slot.subjectName),
+                    category = ds.bagCategoryStudyBooks
                 )
             }
 
@@ -90,9 +95,10 @@ fun SchoolBagPackDialog(
     onDismiss: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
+    val ds = strings.dashboardUi
 
-    val bagItems = remember(student.id, tomorrowSlots) {
-        SchoolBagHelper.getDefaultItemsForStudent(student, tomorrowSlots)
+    val bagItems = remember(student.id, tomorrowSlots, ds) {
+        SchoolBagHelper.getDefaultItemsForStudent(student, tomorrowSlots, ds)
     }
 
     val checkedStates = remember(student.id, bagItems) {
@@ -290,7 +296,7 @@ fun SchoolBagPackDialog(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        text = if (isAllChecked) "Selesai Mengemas ✓" else "Simpan & Tutup",
+                        text = if (isAllChecked) ds.bagDonePackingButton else ds.bagSaveAndCloseButton,
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                         color = Color.White
                     )

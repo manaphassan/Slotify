@@ -31,7 +31,7 @@ data class AppStrings(
 
     // Today Dashboard & In-Home Widget
     val realtimeWidgetTitle: String,
-    val todayDaySuffix: String,
+    val todayDaySuffix: (String) -> String,
     val ongoingClass: String,
     val nextClassPrefix: String,
     val requiredBookPrefix: String,
@@ -193,7 +193,16 @@ data class AppStrings(
     val chestOpenedBody: (Int) -> String,
     val thankYou: String,
     val done: String,
-    val childFallback: String
+    val childFallback: String,
+
+    // Per-feature groups (one file each)
+    val logisticsUi: LogisticsStrings,
+    val dashboardUi: DashboardStrings,
+    val profileUi: ProfileStrings,
+    val timetableUi: TimetableStrings,
+    val financeUi: FinanceStrings,
+    val shellUi: ShellStrings,
+    val locationPickerUi: LocationPickerStrings
 )
 
 val BmStrings = AppStrings(
@@ -216,7 +225,7 @@ val BmStrings = AppStrings(
     stars = "Bintang",
 
     realtimeWidgetTitle = "Widget Kelas Waktu Nyata",
-    todayDaySuffix = "Hari Ini (Isnin)",
+    todayDaySuffix = { day -> "Hari Ini ($day)" },
     ongoingClass = "SEDANG BERJALAN",
     nextClassPrefix = "Seterusnya:",
     requiredBookPrefix = "Perlu bawa:",
@@ -235,7 +244,7 @@ val BmStrings = AppStrings(
     ongoingStatus = "⏳ Sedang Berjalan",
     nextStatus = "⏩ Kelas Seterusnya",
     startPrefix = "Mula",
-    tomorrowAttireTitle = "Pakaian Hari Esok (Selasa)",
+    tomorrowAttireTitle = "Pakaian Hari Persekolahan Seterusnya",
     tomorrowBooksTitle = "Senarai Buku Mesti Dibawa Hari Esok",
     weeklyAttireSummaryTitle = "Ringkasan Mingguan Subjek & Uniform KPM",
     mondayAttire = "Uniform Penuh KPM (Kemeja Putih)",
@@ -372,7 +381,14 @@ val BmStrings = AppStrings(
     chestOpenedBody = { n -> "Hebat! Anda berjaya mengutip bonus harian +$n Bintang untuk tabung anda!" },
     thankYou = "Terima Kasih!",
     done = "Selesai",
-    childFallback = "Anak"
+    childFallback = "Anak",
+    logisticsUi = BmLogisticsStrings,
+    dashboardUi = BmDashboardStrings,
+    profileUi = BmProfileStrings,
+    timetableUi = BmTimetableStrings,
+    financeUi = BmFinanceStrings,
+    shellUi = BmShellStrings,
+    locationPickerUi = BmLocationPickerStrings
 )
 
 val EnStrings = AppStrings(
@@ -395,7 +411,7 @@ val EnStrings = AppStrings(
     stars = "Stars",
 
     realtimeWidgetTitle = "Real-time Class Widget",
-    todayDaySuffix = "Today (Monday)",
+    todayDaySuffix = { day -> "Today ($day)" },
     ongoingClass = "ONGOING CLASS",
     nextClassPrefix = "Next:",
     requiredBookPrefix = "Required book:",
@@ -414,7 +430,7 @@ val EnStrings = AppStrings(
     ongoingStatus = "⏳ Ongoing Class",
     nextStatus = "⏩ Next Class",
     startPrefix = "Starts at",
-    tomorrowAttireTitle = "Tomorrow's Attire (Tuesday)",
+    tomorrowAttireTitle = "Next School Day's Attire",
     tomorrowBooksTitle = "Books Required for Tomorrow",
     weeklyAttireSummaryTitle = "Weekly Schedule & Ministry Attire Guide",
     mondayAttire = "Full Official School Uniform (White Shirt)",
@@ -551,9 +567,18 @@ val EnStrings = AppStrings(
     chestOpenedBody = { n -> "Great! You collected today's +$n star bonus for your vault!" },
     thankYou = "Thank You!",
     done = "Done",
-    childFallback = "Child"
+    childFallback = "Child",
+    logisticsUi = EnLogisticsStrings,
+    dashboardUi = EnDashboardStrings,
+    profileUi = EnProfileStrings,
+    timetableUi = EnTimetableStrings,
+    financeUi = EnFinanceStrings,
+    shellUi = EnShellStrings,
+    locationPickerUi = EnLocationPickerStrings
 )
 
-val strings: AppStrings
-    @Composable get() = if (LocalAppLanguage.current == AppLanguage.EN) EnStrings else BmStrings
+/** Non-composable access (ViewModels, workers); prefer `strings` inside composition. */
+fun stringsFor(language: AppLanguage): AppStrings = if (language == AppLanguage.EN) EnStrings else BmStrings
 
+val strings: AppStrings
+    @Composable get() = stringsFor(LocalAppLanguage.current)

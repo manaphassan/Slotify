@@ -298,8 +298,12 @@ erDiagram
 
 - **Single system:** all Compose UI text comes from `SlotifyStrings.kt` (`strings.*` via `LocalAppLanguage`), so the in-app BM/EN switch applies everywhere and recomposes without restart. Parameterised text uses lambdas (e.g. `strings.pinAttemptsLeft(2)`). Inside lambdas/coroutines capture `val str = strings` first, because `strings` is a `@Composable` getter.
 - **Android resources:** `res/values/strings.xml` now holds only text rendered outside Compose — the launcher label and home-screen widget labels. `values-en/` was removed.
-- **Checks:** `SlotifyStringsTest` fails if any BM or EN entry is blank.
-- **Remaining work (P5-3):** ~140 BM literals are still inline in screen code (largest: Logistics, Dashboard, Finance). Move them into `SlotifyStrings` when touching each screen.
+- **Checks:** `SlotifyStringsTest` fails if any BM or EN entry is blank (recursing into the per-feature groups), if the BM and EN key sets differ, or if formatted strings drop their arguments.
+- **Per-feature groups:** screen copy lives in one file per feature under `core/designsystem/theme/` and is reached through `AppStrings`: `strings.logisticsUi`, `strings.locationPickerUi`, `strings.dashboardUi`, `strings.timetableUi`, `strings.profileUi`, `strings.financeUi`, `strings.shellUi`. Shared text (`close`, `cancelButton`, `saveButton`, …) stays at the top level.
+- **ViewModels** emit typed results (`FinanceMessage`, `PbdRecordResult`, `RedeemFailed`) that the screen turns into text, so messages follow a language switch. `stringsFor(language)` exists for non-Compose code.
+- **Persisted values stay Malay:** strings that are stored and compared (fee due-date presets such as "1hb Setiap Bulan", "Semua Anak", homework due-date "Hari Ini", PBD subject names) are kept as storage keys and only mapped to a display label.
+- **Deliberately not translated:** data and content (child/school/POI names, subject names, KPM holiday and term names, seeded reward/fee titles typed by the family), TTS phrases (the voice is fixed to ms-MY), language self-names ("🇲🇾 Melayu" / "🇬🇧 English").
+- **Remaining work:** the home-screen widget (`SlotifyAppWidgetProvider`), notifications (`SlotifyNotificationManager`, `SlotifyAlarmReceiver`) and the geocoder fallback addresses (`LocationAddressHelper`) run outside Compose and are still BM-only; they would read the language from `SettingsRepository` and use `stringsFor`. KPM term/holiday data has `titleEn` for holidays but no English term names.
 
 ---
 
@@ -387,7 +391,7 @@ Status legend: ✅ Done · 🔄 In progress · ⏳ Planned
 |---|---|---|:---:|
 | P5-1 | Unit tests assert re-implemented copies of logic, not production code | Extract pure functions and test them; add Room migration test | ✅ |
 | P5-2 | ProGuard keeps all of Compose/osmdroid; `org.json` duplicated as a runtime dependency | Trim keep rules; `org.json` → `testImplementation` | ✅ |
-| P5-3 | Two localisation systems + hundreds of hard-coded BM strings | Consolidate on one system | 🔄 |
+| P5-3 | Two localisation systems + hundreds of hard-coded BM strings | Consolidate on one system | ✅ |
 | P5-4 | Touch targets < 48 dp, 7–9 sp text, missing toggle semantics | Accessibility pass | ✅ |
 | P5-5 | No CI, outdated dependencies, README version badge stale | GitHub Actions running tests + lint; dependency bump | ✅ |
 
@@ -429,6 +433,12 @@ Remaining follow-ups: the Focus timer is still an in-screen overlay rather than 
 - Release build now shrinks resources; Google Fonts cert arrays renamed to `slotify_gms_fonts_certs*` so they no longer override the font library's private resources.
 - Not upgraded: OkHttp 4.12 ➜ 5.x (major version; do separately). `TabRow` ➜ `PrimaryTabRow` and `asFrameworkPaint` deprecations remain (warnings only).
 - **Before installing on the family phone:** run `./gradlew connectedDebugAndroidTest` (Room migration tests 5➜6, 6➜7) and smoke-test status-bar/navigation-bar overlap, exact-alarm reminders and notifications on an Android 15/16 device.
+
+**2026-11-15 — P5-3 screen strings migrated.** Verified with `./gradlew testDebugUnitTest compileDebugAndroidTestKotlin lintDebug` (private) and `./gradlew -PslotifyProfile=demo testDebugUnitTest lintDebug assembleRelease`:
+- Unit tests: **61/61 passing** (`SlotifyStringsTest` now recurses into feature groups and checks BM/EN key parity, the prayer countdown format and the bilingual attire guide). Lint: **0 errors**.
+- About 350 BM/EN entries added across seven per-feature string files (§10); every screen, dialog, toast and content description in `feature/*`, `MainActivity` and the speed-dial now follows the in-app language. BM text is unchanged.
+- Fixed along the way: the dashboard's "Hari Ini (Isnin)" badge and the timetable's "Pakaian Hari Esok (Selasa)" title had hard-coded weekdays; the attire guide, prayer countdown/transit note and GPS accuracy labels are now bilingual; the Takwim banner shows the holiday's English title in EN; map markers rebuild when the language changes; the reward catalogue uses a stable `id` instead of its title as the list key.
+- Still BM-only (outside Compose): widget, notifications, geocoder fallback addresses — see §10.
 
 ### Execution order
 1. **P1 + P2** — privacy, security and data-loss fixes (blocking any further push).

@@ -56,6 +56,7 @@ import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
 import my.slotify.app.core.routing.OsrmRoutingService
 import my.slotify.app.core.routing.OsrmRouteResponse
 import my.slotify.app.core.notification.SlotifyNotificationManager
+import my.slotify.app.core.designsystem.theme.LogisticsStrings
 import my.slotify.app.core.designsystem.theme.NeumorphicElevation
 import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.designsystem.theme.SlotifyShapes
@@ -98,6 +99,15 @@ fun poiCategoryColor(category: PoiCategory): Color = when (category) {
     PoiCategory.TRANSIT -> SlotifyColors.ActionAmber
     PoiCategory.PEJABAT -> SlotifyColors.TextSecondary
     PoiCategory.ALL -> SlotifyColors.KpmSkyBlue
+}
+
+@Composable
+fun poiCategoryLabel(category: PoiCategory): String = when (category) {
+    PoiCategory.RUMAH -> strings.poiHome
+    PoiCategory.SEKOLAH -> strings.poiSchool
+    PoiCategory.TRANSIT -> strings.poiTransit
+    PoiCategory.PEJABAT -> strings.poiOffice
+    PoiCategory.ALL -> strings.poiAll
 }
 
 enum class RouteSelection {
@@ -215,6 +225,7 @@ fun DriverContactCard(
     onCallClick: (phone: String) -> Unit
 ) {
     val contact = FamilyProfileData.routes[selectedRoute]?.driver ?: return
+    val ls = strings.logisticsUi
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -252,7 +263,7 @@ fun DriverContactCard(
                             color = SlotifyColors.SuccessMint.copy(alpha = 0.15f)
                         ) {
                             Text(
-                                text = "Aktif",
+                                text = ls.driverActiveBadge,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = SlotifyColors.SuccessMint,
@@ -289,7 +300,7 @@ fun DriverContactCard(
                 ) {
                     Icon(
                         Icons.Default.Call,
-                        contentDescription = "Panggil",
+                        contentDescription = ls.callDriver,
                         tint = SlotifyColors.KpmSkyBlue,
                         modifier = Modifier.size(14.dp)
                     )
@@ -306,6 +317,9 @@ fun LogisticsMapScreen(
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    // State-backed so long-running effects and map callbacks always see the current language.
+    val ls by rememberUpdatedState(strings.logisticsUi)
+    val ps by rememberUpdatedState(strings.locationPickerUi)
     val logisticsState by viewModel.uiState.collectAsStateWithLifecycle()
     val selectedRoute = logisticsState.selectedRoute
     var selectedPoiCategory by remember { mutableStateOf(PoiCategory.ALL) }
@@ -381,7 +395,7 @@ fun LogisticsMapScreen(
         var alerted1km = startKm <= 1.0
         var alerted300m = startKm <= 0.35
         var alertedArrived = false
-        val simTag = "[Simulasi]"
+        val simTag = ls.simNotificationTag
 
         for (idx in animPoints.indices) {
             if (!isSimulating) break
@@ -392,11 +406,11 @@ fun LogisticsMapScreen(
             val progressPercent = ((idx.toDouble() / (animPoints.size - 1).coerceAtLeast(1)) * 100).toInt()
 
             val status = when {
-                idx == animPoints.lastIndex -> "Tiba di Destinasi"
-                distToHomeKm <= 0.35 -> "Menghampiri Destinasi"
-                distToHomeKm <= 1.0 -> "Dalam Jarak 1.0km"
-                distToHomeKm <= 3.0 -> "Dalam Jarak 3.0km"
-                else -> "Dalam Perjalanan ($progressPercent%)"
+                idx == animPoints.lastIndex -> ls.simStatusArrived
+                distToHomeKm <= 0.35 -> ls.simStatusApproaching
+                distToHomeKm <= 1.0 -> ls.simStatusWithin1km
+                distToHomeKm <= 3.0 -> ls.simStatusWithin3km
+                else -> ls.simStatusEnRoute(progressPercent)
             }
 
             // Proximity alerts with haptic, Malay voice TTS, & a notification clearly marked as simulation
@@ -407,7 +421,7 @@ fun LogisticsMapScreen(
                 SlotifyNotificationManager.showTransitAlert(
                     context = context,
                     childName = "$simTag $vanName",
-                    transitMsg = "🚨 Radar 3,000m: Baki 3.0km ke destinasi • Bersedia!"
+                    transitMsg = ls.simAlert3km
                 )
                 if (!isVoiceMuted) {
                     voiceHelper.speak("Simulasi: $vanName kini berada tiga kilometer dari destinasi.")
@@ -420,7 +434,7 @@ fun LogisticsMapScreen(
                 SlotifyNotificationManager.showTransitAlert(
                     context = context,
                     childName = "$simTag $vanName",
-                    transitMsg = "🚨 Radar 1,000m: $vanName sedang menghampiri destinasi!"
+                    transitMsg = ls.simAlert1km(vanName)
                 )
                 if (!isVoiceMuted) {
                     voiceHelper.speak("Simulasi: $vanName kini berada satu kilometer dari destinasi.")
@@ -433,7 +447,7 @@ fun LogisticsMapScreen(
                 SlotifyNotificationManager.showTransitAlert(
                     context = context,
                     childName = "$simTag $vanName",
-                    transitMsg = "🚨 Radar 300m: Ketibaan dalam 300m!"
+                    transitMsg = ls.simAlert300m
                 )
                 if (!isVoiceMuted) {
                     voiceHelper.speak("Simulasi: $vanName menghampiri destinasi. Baki tiga ratus meter.")
@@ -445,7 +459,7 @@ fun LogisticsMapScreen(
                 SlotifyNotificationManager.showTransitAlert(
                     context = context,
                     childName = "$simTag $vanName",
-                    transitMsg = "✅ Selamat Tiba: $vanName telah sampai ke destinasi!"
+                    transitMsg = ls.simAlertArrived(vanName)
                 )
                 if (!isVoiceMuted) {
                     voiceHelper.speak("Simulasi: $vanName telah selamat tiba di destinasi.")
@@ -480,7 +494,7 @@ fun LogisticsMapScreen(
     // RF Range Pulse States (3.0 km)
     var isRfPulseActive by remember { mutableStateOf(false) }
     var rfCenterGeoPoint by remember { mutableStateOf<GeoPoint?>(defaultHomeGeo) }
-    var rfCenterLabel by remember { mutableStateOf("Rumah Kediaman") }
+    var rfCenterLabel by remember { mutableStateOf(ls.rfCenterHome) }
 
     // Interactive Map Selected POI & Dropped Pin States
     var selectedMapPoi by remember { mutableStateOf<PoiItem?>(null) }
@@ -515,13 +529,13 @@ fun LogisticsMapScreen(
     val locateUserWithGps: suspend () -> Unit = {
         if (!GpsLocationHelper.hasLocationPermission(context)) {
             hasLocationPermission = false
-            gpsStatusMessage = "Kebenaran GPS diperlukan"
+            gpsStatusMessage = ls.gpsPermissionRequired
         } else if (!GpsLocationHelper.isLocationServiceEnabled(context)) {
-            gpsStatusMessage = "Sila aktifkan perkhidmatan GPS dalam tetapan peranti"
+            gpsStatusMessage = ls.gpsEnableService
             GpsLocationHelper.openLocationSettings(context)
         } else {
             isGpsLocating = true
-            gpsStatusMessage = "Mendapatkan isyarat satelit GPS..."
+            gpsStatusMessage = ls.gpsAcquiring
             val fix = GpsLocationHelper.getAccurateLocation(context, timeoutMs = 8000L)
             isGpsLocating = false
 
@@ -535,7 +549,10 @@ fun LogisticsMapScreen(
 
                 if (targetEvent != null) {
                     val statusText =
-                        if (targetEvent.eventType == GeofenceEventType.ENTERED) "Tiba di ${targetEvent.target.name}" else "Menghampiri ${targetEvent.target.name} (${targetEvent.distanceMeters.toInt()}m)"
+                        if (targetEvent.eventType == GeofenceEventType.ENTERED) ls.geofenceArrivedAt(targetEvent.target.name) else ls.geofenceApproaching(
+                            targetEvent.target.name,
+                            targetEvent.distanceMeters.toInt()
+                        )
                     gpsStatusMessage = "${targetEvent.target.iconEmoji} $statusText • ±${
                         String.format(
                             Locale.US,
@@ -550,7 +567,7 @@ fun LogisticsMapScreen(
                             "%.1f",
                             fix.accuracyMeters
                         )
-                    }m (${fix.quality.label})"
+                    }m (${fix.quality.localizedLabel(ps)})"
                 }
 
                 mapViewRef?.controller?.apply {
@@ -558,7 +575,7 @@ fun LogisticsMapScreen(
                     animateTo(GeoPoint(fix.latitude, fix.longitude))
                 }
             } else {
-                gpsStatusMessage = "Isyarat GPS lemah. Memusatkan pada Rumah Kediaman."
+                gpsStatusMessage = ls.gpsWeakCenteringHome
                 mapViewRef?.controller?.apply {
                     setZoom(16.5)
                     animateTo(defaultHomeGeo)
@@ -578,7 +595,10 @@ fun LogisticsMapScreen(
                         proximityEvents.firstOrNull { it.eventType == GeofenceEventType.ENTERED || it.eventType == GeofenceEventType.APPROACHING }
                     if (targetEvent != null) {
                         val statusText =
-                            if (targetEvent.eventType == GeofenceEventType.ENTERED) "Tiba di ${targetEvent.target.name}" else "Menghampiri ${targetEvent.target.name} (${targetEvent.distanceMeters.toInt()}m)"
+                            if (targetEvent.eventType == GeofenceEventType.ENTERED) ls.geofenceArrivedAt(targetEvent.target.name) else ls.geofenceApproaching(
+                                targetEvent.target.name,
+                                targetEvent.distanceMeters.toInt()
+                            )
                         gpsStatusMessage = "${targetEvent.target.iconEmoji} $statusText • ±${
                             String.format(
                                 Locale.US,
@@ -593,7 +613,7 @@ fun LogisticsMapScreen(
                                 "%.1f",
                                 fix.accuracyMeters
                             )
-                        }m (${fix.quality.label})"
+                        }m (${fix.quality.localizedLabel(ps)})"
                     }
                 }
         }
@@ -652,7 +672,7 @@ fun LogisticsMapScreen(
                 locateUserWithGps()
             }
         } else {
-            gpsStatusMessage = "Kebenaran GPS diperlukan untuk menentukan lokasi semasa"
+            gpsStatusMessage = ls.gpsPermissionRequiredForLocation
         }
     }
 
@@ -723,6 +743,7 @@ fun LogisticsMapScreen(
                             selectedRoute = selectedRoute,
                             osrmRoute = osrmRoute,
                             simulatedVehicle = simulatedVehicleState,
+                            ls = ls,
                             onMapTapped = handleMapTap,
                             onPoiSelected = handlePoiSelected
                         )
@@ -787,7 +808,7 @@ fun LogisticsMapScreen(
                     // tick only the vehicle marker is moved.
                     val key = MapOverlayKey(
                         filteredPois, rfCenterGeoPoint, isRfPulseActive, droppedMapPin,
-                        selectedMapPoi?.id, selectedRoute, osrmRoute
+                        selectedMapPoi?.id, selectedRoute, osrmRoute, ls
                     )
                     if (key != overlayKeyHolder.lastKey) {
                         overlayKeyHolder.lastKey = key
@@ -803,12 +824,13 @@ fun LogisticsMapScreen(
                             selectedRoute = selectedRoute,
                             osrmRoute = osrmRoute,
                             simulatedVehicle = simulatedVehicleState,
+                            ls = ls,
                             onMapTapped = handleMapTap,
                             onPoiSelected = handlePoiSelected
                         )
                     } else if (simulatedVehicleState != overlayKeyHolder.lastVehicle) {
                         overlayKeyHolder.lastVehicle = simulatedVehicleState
-                        updateVehicleMarker(context, mapView, simulatedVehicleState, selectedRoute)
+                        updateVehicleMarker(context, mapView, simulatedVehicleState, selectedRoute, ls)
                     }
                 }
             )
@@ -840,7 +862,7 @@ fun LogisticsMapScreen(
                         ) {
                             Icon(
                                 Icons.Default.Close,
-                                contentDescription = "Tutup",
+                                contentDescription = strings.close,
                                 tint = SlotifyColors.TextSecondary,
                                 modifier = Modifier.size(14.dp)
                             )
@@ -862,7 +884,7 @@ fun LogisticsMapScreen(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         val homePoi = pois.find { it.category == PoiCategory.RUMAH } ?: PoiItem(
                             "poi-home",
-                            "Rumah",
+                            ls.poiHomeFallbackName,
                             PoiCategory.RUMAH,
                             "🏠",
                             FamilyProfileData.mapCenter.lat,
@@ -876,7 +898,7 @@ fun LogisticsMapScreen(
                         }
                         rfCenterGeoPoint = homePoint
                         rfCenterLabel = homePoi.name
-                        gpsStatusMessage = "🏠 Dipusatkan ke ${homePoi.name} (Mod Rumah)"
+                        gpsStatusMessage = ls.centeredOnHome(homePoi.name)
                     },
                     modifier = Modifier.size(48.dp),
                     containerColor = SlotifyColors.SurfaceCard.copy(alpha = 0.94f),
@@ -909,7 +931,7 @@ fun LogisticsMapScreen(
                     } else {
                         Icon(
                             Icons.Default.MyLocation,
-                            contentDescription = "Kunci Lokasi GPS",
+                            contentDescription = ls.lockGpsLocation,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -930,7 +952,7 @@ fun LogisticsMapScreen(
                 ) {
                     Icon(
                         Icons.Default.PinDrop,
-                        contentDescription = "Pilih Lokasi Tepat",
+                        contentDescription = ls.pickPreciseLocation,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -942,7 +964,7 @@ fun LogisticsMapScreen(
                         if (isRfPulseActive && rfCenterGeoPoint == null) {
                             rfCenterGeoPoint =
                                 userGpsFix?.let { GeoPoint(it.latitude, it.longitude) } ?: defaultHomeGeo
-                            rfCenterLabel = if (userGpsFix != null) "GPS Semasa" else "Rumah Kediaman"
+                            rfCenterLabel = if (userGpsFix != null) ls.rfCenterCurrentGps else ls.rfCenterHome
                         }
                     },
                     modifier = Modifier.size(48.dp),
@@ -961,14 +983,14 @@ fun LogisticsMapScreen(
                         mapViewRef?.let { mv ->
                             if (mv.mapOrientation != 0f) {
                                 mv.mapOrientation = 0f
-                                gpsStatusMessage = "🧭 Peta Dilaras ke Arah Utara"
+                                gpsStatusMessage = ls.mapAlignedNorth
                             } else {
                                 compassOverlayRef?.let { comp ->
                                     if (!comp.isCompassEnabled) {
                                         comp.enableCompass()
-                                        gpsStatusMessage = "🧭 Kompas Sensor Diaktifkan"
+                                        gpsStatusMessage = ls.compassEnabled
                                     } else {
-                                        gpsStatusMessage = "🧭 Arah Utara Dikunci (0°)"
+                                        gpsStatusMessage = ls.northLocked
                                     }
                                 }
                             }
@@ -981,7 +1003,7 @@ fun LogisticsMapScreen(
                 ) {
                     Icon(
                         Icons.Default.Explore,
-                        contentDescription = "Kompas & Orientasi",
+                        contentDescription = ls.compassOrientation,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -1033,7 +1055,7 @@ fun LogisticsMapScreen(
                                             color = pColor.copy(alpha = 0.15f)
                                         ) {
                                             Text(
-                                                text = selPoi.category.name,
+                                                text = poiCategoryLabel(selPoi.category),
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = pColor,
@@ -1051,13 +1073,7 @@ fun LogisticsMapScreen(
                                         )
                                     }
                                     Text(
-                                        text = String.format(
-                                            Locale.US,
-                                            "%.5f° U, %.5f° T • %.1f km dari Rumah",
-                                            selPoi.lat,
-                                            selPoi.lng,
-                                            selPoi.distanceKm
-                                        ),
+                                        text = ls.coordsFromHome(selPoi.lat, selPoi.lng, selPoi.distanceKm),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = SlotifyColors.KpmSkyBlue
                                     )
@@ -1070,7 +1086,7 @@ fun LogisticsMapScreen(
                             ) {
                                 Icon(
                                     Icons.Default.Close,
-                                    contentDescription = "Tutup",
+                                    contentDescription = strings.close,
                                     tint = SlotifyColors.TextSecondary,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -1097,7 +1113,12 @@ fun LogisticsMapScreen(
                                     tint = Color.White
                                 )
                                 Spacer(Modifier.width(4.dp))
-                                Text("Arah", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(
+                                    ls.directionsButton,
+                                    fontSize = 11.sp,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
 
                             OutlinedButton(
@@ -1111,7 +1132,7 @@ fun LogisticsMapScreen(
                                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
                             ) {
                                 Text(
-                                    "📡 Pusat RF",
+                                    ls.setRfCenterButton,
                                     fontSize = 11.sp,
                                     color = SlotifyColors.KpmSkyBlue,
                                     fontWeight = FontWeight.Bold
@@ -1129,7 +1150,7 @@ fun LogisticsMapScreen(
                                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
                             ) {
                                 Text(
-                                    "🎯 Laras",
+                                    ls.adjustButton,
                                     fontSize = 11.sp,
                                     color = SlotifyColors.TextPrimary,
                                     fontWeight = FontWeight.Bold
@@ -1147,7 +1168,7 @@ fun LogisticsMapScreen(
                             ) {
                                 Icon(
                                     Icons.Default.Edit,
-                                    contentDescription = "Edit",
+                                    contentDescription = ls.editButton,
                                     tint = SlotifyColors.KpmSkyBlue,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -1191,18 +1212,12 @@ fun LogisticsMapScreen(
                                 Spacer(Modifier.width(8.dp))
                                 Column {
                                     Text(
-                                        text = "Nod Ditandakan Pada Peta",
+                                        text = ls.droppedPinTitle,
                                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                         color = SlotifyColors.TextPrimary
                                     )
                                     Text(
-                                        text = String.format(
-                                            Locale.US,
-                                            "%.5f° U, %.5f° T • %.1f km dari Rumah",
-                                            dropPt.latitude,
-                                            dropPt.longitude,
-                                            dist
-                                        ),
+                                        text = ls.coordsFromHome(dropPt.latitude, dropPt.longitude, dist),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = SlotifyColors.KpmSkyBlue
                                     )
@@ -1215,7 +1230,7 @@ fun LogisticsMapScreen(
                             ) {
                                 Icon(
                                     Icons.Default.Close,
-                                    contentDescription = "Tutup",
+                                    contentDescription = strings.close,
                                     tint = SlotifyColors.TextSecondary,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -1261,7 +1276,7 @@ fun LogisticsMapScreen(
                                 )
                                 Spacer(Modifier.width(4.dp))
                                 Text(
-                                    "Simpan POI",
+                                    ls.savePoiButton,
                                     fontSize = 11.sp,
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold
@@ -1279,7 +1294,7 @@ fun LogisticsMapScreen(
                                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
                             ) {
                                 Text(
-                                    "🎯 Laras",
+                                    ls.adjustButton,
                                     fontSize = 11.sp,
                                     color = SlotifyColors.TextPrimary,
                                     fontWeight = FontWeight.Bold
@@ -1289,14 +1304,14 @@ fun LogisticsMapScreen(
                             OutlinedButton(
                                 onClick = {
                                     rfCenterGeoPoint = dropPt
-                                    rfCenterLabel = "Titik Peta (${
+                                    rfCenterLabel = ls.rfCenterMapPoint(
                                         String.format(
                                             Locale.US,
                                             "%.4f, %.4f",
                                             dropPt.latitude,
                                             dropPt.longitude
                                         )
-                                    })"
+                                    )
                                     isRfPulseActive = true
                                 },
                                 modifier = Modifier.weight(1f),
@@ -1363,7 +1378,7 @@ fun LogisticsMapScreen(
                                             color = SlotifyColors.ActionAmber.copy(alpha = 0.2f)
                                         ) {
                                             Text(
-                                                text = "${sim.speedKmh} km/j",
+                                                text = ls.speedKmh(sim.speedKmh),
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = SlotifyColors.ActionAmber,
@@ -1372,13 +1387,7 @@ fun LogisticsMapScreen(
                                         }
                                     }
                                     Text(
-                                        text = "Baki ${
-                                            String.format(
-                                                Locale.US,
-                                                "%.1f",
-                                                sim.distanceRemainingKm
-                                            )
-                                        } km • ETA ~${sim.etaMinutes} min",
+                                        text = ls.simRemainingEta(sim.distanceRemainingKm, sim.etaMinutes),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = SlotifyColors.SuccessMint,
                                         fontWeight = FontWeight.SemiBold
@@ -1397,7 +1406,7 @@ fun LogisticsMapScreen(
                                 ) {
                                     Icon(
                                         if (isVoiceMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                                        contentDescription = if (isVoiceMuted) "Buka Suara" else "Senyapkan Suara",
+                                        contentDescription = if (isVoiceMuted) ls.unmuteVoice else ls.muteVoice,
                                         tint = if (isVoiceMuted) SlotifyColors.TextSecondary else SlotifyColors.SuccessMint,
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -1411,7 +1420,7 @@ fun LogisticsMapScreen(
                                 ) {
                                     Icon(
                                         if (vehicleFollowCamera) Icons.Default.Videocam else Icons.Default.VideocamOff,
-                                        contentDescription = "Ikut Kamera",
+                                        contentDescription = ls.followCamera,
                                         tint = if (vehicleFollowCamera) SlotifyColors.KpmSkyBlue else SlotifyColors.TextSecondary,
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -1428,7 +1437,7 @@ fun LogisticsMapScreen(
                                 ) {
                                     Icon(
                                         Icons.Default.StopCircle,
-                                        contentDescription = "Henti Simulasi",
+                                        contentDescription = ls.stopSimulation,
                                         tint = Color(0xFFEF4444),
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -1462,7 +1471,7 @@ fun LogisticsMapScreen(
                             Text("⚠️", fontSize = 18.sp)
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = "Kebenaran GPS diperlukan untuk paparan lokasi tepat pada peta.",
+                                text = ls.gpsPermissionBanner,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = SlotifyColors.TextSecondary
                             )
@@ -1481,7 +1490,7 @@ fun LogisticsMapScreen(
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                             modifier = Modifier.height(30.dp)
                         ) {
-                            Text("Beri", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(ls.grantButton, fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -1556,12 +1565,12 @@ fun LogisticsMapScreen(
                                     Spacer(Modifier.width(8.dp))
                                     Column {
                                         Text(
-                                            text = "Liputan Gelombang RF (3.0 km)",
+                                            text = ls.rfCoverageTitle,
                                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                             color = SlotifyColors.TextPrimary
                                         )
                                         Text(
-                                            text = "Simulasi liputan LoRa / Radio Paging / Tracker",
+                                            text = ls.rfCoverageSubtitle,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = SlotifyColors.TextSecondary
                                         )
@@ -1574,7 +1583,7 @@ fun LogisticsMapScreen(
                                         .padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
                                     Text(
-                                        text = "3.0 km PULSE",
+                                        text = ls.rfPulseBadge,
                                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                         color = SlotifyColors.KpmSkyBlue
                                     )
@@ -1583,25 +1592,31 @@ fun LogisticsMapScreen(
 
                             // Transmitter Center Switcher
                             Text(
-                                text = "Pusat Pemancar RF: $rfCenterLabel",
+                                text = ls.rfTransmitterCenter(rfCenterLabel),
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = SlotifyColors.KpmSkyBlue
                             )
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 val quickBases = listOfNotNull(
-                                    Triple("🏠 Rumah", defaultHomeGeo, "Rumah Kediaman"),
+                                    Triple(ls.rfBaseHome, defaultHomeGeo, ls.rfCenterHome),
                                     pois.firstOrNull { it.category == PoiCategory.PEJABAT }
-                                        ?.let { Triple("🏢 Pejabat", GeoPoint(it.lat, it.lng), it.name) },
+                                        ?.let { Triple(ls.rfBaseOffice, GeoPoint(it.lat, it.lng), it.name) },
                                     pois.firstOrNull { it.category == PoiCategory.SEKOLAH }
-                                        ?.let { Triple("${it.iconEmoji} Sekolah", GeoPoint(it.lat, it.lng), it.name) },
+                                        ?.let {
+                                            Triple(
+                                                "${it.iconEmoji} ${ls.rfBaseSchool}",
+                                                GeoPoint(it.lat, it.lng),
+                                                it.name
+                                            )
+                                        },
                                     userGpsFix?.let { fix ->
                                         Triple(
                                             "📡 GPS",
                                             GeoPoint(fix.latitude, fix.longitude),
-                                            "Lokasi GPS (${fix.quality.label})"
+                                            ls.rfGpsLocation(fix.quality.localizedLabel(ps))
                                         )
                                     },
-                                    Triple("🎯 Pilih Peta", null, "Sentuh mana-mana pada peta")
+                                    Triple(ls.rfBasePickOnMap, null, ls.rfTapAnywhere)
                                 )
                                 items(quickBases) { (btnLabel, geo, name) ->
                                     val isSelected = if (geo == null) {
@@ -1639,7 +1654,7 @@ fun LogisticsMapScreen(
                             // Analysis of all POIs against the 3.0 km radius
                             rfCenterGeoPoint?.let { center ->
                                 Text(
-                                    text = "Analisis Liputan Nod Lokasi:",
+                                    text = ls.rfAnalysisTitle,
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                     color = SlotifyColors.TextSecondary
                                 )
@@ -1678,10 +1693,10 @@ fun LogisticsMapScreen(
                                                     )
                                                     Text(
                                                         text = if (inRange) {
-                                                            if (dist <= 1.5) "Sinyal Sangat Kuat • Direct RF"
-                                                            else "Sinyal Sederhana • Dalam 3.0 km"
+                                                            if (dist <= 1.5) ls.rfSignalStrong
+                                                            else ls.rfSignalModerate
                                                         } else {
-                                                            "Luar Jarak 3.0 km • Perlu Selular"
+                                                            ls.rfOutOfRange
                                                         },
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = if (inRange) SlotifyColors.SuccessMint else Color(
@@ -1755,7 +1770,7 @@ fun LogisticsMapScreen(
                                 ) {
                                     Icon(
                                         Icons.Default.Refresh,
-                                        contentDescription = "Kira Semula OSRM",
+                                        contentDescription = ls.recalculateRoute,
                                         tint = SlotifyColors.KpmSkyBlue,
                                         modifier = Modifier.size(16.dp)
                                     )
@@ -1779,7 +1794,7 @@ fun LogisticsMapScreen(
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                                 ) {
                                     Text(
-                                        text = if (isSimulating) "⏹️ Henti Simu" else "▶️ Mula Simu",
+                                        text = if (isSimulating) ls.stopSimShort else ls.startSimShort,
                                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                         color = Color.White
                                     )
@@ -1793,15 +1808,12 @@ fun LogisticsMapScreen(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             val abahSubtitle =
-                                if (isOsrmLoading && selectedRoute == RouteSelection.PARENT_PICKUP) "Mengira..."
-                                else if (osrmRoute != null && selectedRoute == RouteSelection.PARENT_PICKUP) "ETA ~${osrmRoute!!.totalDurationMinutes.toInt()} min (${
-                                    String.format(
-                                        Locale.US,
-                                        "%.1f",
-                                        osrmRoute!!.totalDistanceKm
-                                    )
-                                } km)"
-                                else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.PARENT_PICKUP) "Luar talian • tiada ETA"
+                                if (isOsrmLoading && selectedRoute == RouteSelection.PARENT_PICKUP) ls.routeCalculating
+                                else if (osrmRoute != null && selectedRoute == RouteSelection.PARENT_PICKUP) ls.routeEta(
+                                    osrmRoute!!.totalDurationMinutes.toInt(),
+                                    osrmRoute!!.totalDistanceKm
+                                )
+                                else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.PARENT_PICKUP) ls.routeOffline
                                 else FamilyProfileData.routes[RouteSelection.PARENT_PICKUP]?.passengerLabel ?: ""
                             RouteTabCard(
                                 title = FamilyProfileData.routes[RouteSelection.PARENT_PICKUP]?.tabTitle
@@ -1812,15 +1824,12 @@ fun LogisticsMapScreen(
                             ) { viewModel.selectRoute(RouteSelection.PARENT_PICKUP) }
 
                             val vanPrimarySubtitle =
-                                if (isOsrmLoading && selectedRoute == RouteSelection.VAN_PRIMARY) "Mengira..."
-                                else if (osrmRoute != null && selectedRoute == RouteSelection.VAN_PRIMARY) "ETA ~${osrmRoute!!.totalDurationMinutes.toInt()} min (${
-                                    String.format(
-                                        Locale.US,
-                                        "%.1f",
-                                        osrmRoute!!.totalDistanceKm
-                                    )
-                                } km)"
-                                else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.VAN_PRIMARY) "Luar talian • tiada ETA"
+                                if (isOsrmLoading && selectedRoute == RouteSelection.VAN_PRIMARY) ls.routeCalculating
+                                else if (osrmRoute != null && selectedRoute == RouteSelection.VAN_PRIMARY) ls.routeEta(
+                                    osrmRoute!!.totalDurationMinutes.toInt(),
+                                    osrmRoute!!.totalDistanceKm
+                                )
+                                else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.VAN_PRIMARY) ls.routeOffline
                                 else FamilyProfileData.routes[RouteSelection.VAN_PRIMARY]?.passengerLabel ?: ""
                             RouteTabCard(
                                 title = FamilyProfileData.routes[RouteSelection.VAN_PRIMARY]?.tabTitle ?: "VAN_PRIMARY",
@@ -1830,15 +1839,12 @@ fun LogisticsMapScreen(
                             ) { viewModel.selectRoute(RouteSelection.VAN_PRIMARY) }
 
                             val vanSecondarySubtitle =
-                                if (isOsrmLoading && selectedRoute == RouteSelection.VAN_SECONDARY) "Mengira..."
-                                else if (osrmRoute != null && selectedRoute == RouteSelection.VAN_SECONDARY) "ETA ~${osrmRoute!!.totalDurationMinutes.toInt()} min (${
-                                    String.format(
-                                        Locale.US,
-                                        "%.1f",
-                                        osrmRoute!!.totalDistanceKm
-                                    )
-                                } km)"
-                                else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.VAN_SECONDARY) "Luar talian • tiada ETA"
+                                if (isOsrmLoading && selectedRoute == RouteSelection.VAN_SECONDARY) ls.routeCalculating
+                                else if (osrmRoute != null && selectedRoute == RouteSelection.VAN_SECONDARY) ls.routeEta(
+                                    osrmRoute!!.totalDurationMinutes.toInt(),
+                                    osrmRoute!!.totalDistanceKm
+                                )
+                                else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.VAN_SECONDARY) ls.routeOffline
                                 else FamilyProfileData.routes[RouteSelection.VAN_SECONDARY]?.passengerLabel ?: ""
                             RouteTabCard(
                                 title = FamilyProfileData.routes[RouteSelection.VAN_SECONDARY]?.tabTitle
@@ -1959,12 +1965,12 @@ fun LogisticsMapScreen(
                     ) {
                         Column {
                             Text(
-                                text = "Senarai Nod Lokasi (${filteredPois.size} POI)",
+                                text = ls.poiListTitle(filteredPois.size),
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = SlotifyColors.TextPrimary
                             )
                             Text(
-                                text = "Ketik kad untuk fokus peta • Urus nod lokasi",
+                                text = ls.poiListSubtitle,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = SlotifyColors.TextSecondary
                             )
@@ -1981,7 +1987,7 @@ fun LogisticsMapScreen(
                             ) {
                                 Icon(
                                     Icons.Default.RestartAlt,
-                                    contentDescription = "Set Semula Asal",
+                                    contentDescription = ls.resetDefaults,
                                     tint = SlotifyColors.TextSecondary,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -2005,7 +2011,7 @@ fun LogisticsMapScreen(
                                     tint = Color.White
                                 )
                                 Spacer(Modifier.width(4.dp))
-                                Text("Tambah", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(ls.addButton, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }
                     }
@@ -2070,7 +2076,7 @@ fun LogisticsMapScreen(
                                                 color = poiColor.copy(alpha = 0.15f)
                                             ) {
                                                 Text(
-                                                    text = poi.category.name,
+                                                    text = poiCategoryLabel(poi.category),
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = poiColor,
@@ -2088,12 +2094,10 @@ fun LogisticsMapScreen(
                                             )
                                         }
                                         Text(
-                                            text = String.format(
-                                                Locale.US,
-                                                "%.5f° U, %.5f° T • %s",
+                                            text = ls.poiCoordsWithDistance(
                                                 poi.lat,
                                                 poi.lng,
-                                                if (poi.distanceKm > 0) "${poi.distanceKm} km" else "Pusat"
+                                                if (poi.distanceKm > 0) "${poi.distanceKm} km" else ls.distanceCenter
                                             ),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = SlotifyColors.KpmSkyBlue
@@ -2117,7 +2121,7 @@ fun LogisticsMapScreen(
                                     ) {
                                         Icon(
                                             Icons.Default.Navigation,
-                                            contentDescription = "Navigasi",
+                                            contentDescription = ls.navigate,
                                             tint = SlotifyColors.KpmSkyBlue,
                                             modifier = Modifier.size(16.dp)
                                         )
@@ -2136,7 +2140,7 @@ fun LogisticsMapScreen(
                                     ) {
                                         Icon(
                                             Icons.Default.PinDrop,
-                                            contentDescription = "Laras Tepat",
+                                            contentDescription = ls.adjustPrecise,
                                             tint = SlotifyColors.ActionAmber,
                                             modifier = Modifier.size(16.dp)
                                         )
@@ -2154,7 +2158,7 @@ fun LogisticsMapScreen(
                                     ) {
                                         Icon(
                                             Icons.Default.Edit,
-                                            contentDescription = "Edit POI",
+                                            contentDescription = ls.editPoi,
                                             tint = SlotifyColors.KpmSkyBlue,
                                             modifier = Modifier.size(16.dp)
                                         )
@@ -2171,7 +2175,7 @@ fun LogisticsMapScreen(
                                     ) {
                                         Icon(
                                             Icons.Default.DeleteOutline,
-                                            contentDescription = "Padam POI",
+                                            contentDescription = ls.deletePoi,
                                             tint = Color(0xFFEF4444),
                                             modifier = Modifier.size(16.dp)
                                         )
@@ -2229,7 +2233,7 @@ fun LogisticsMapScreen(
                 ?: FamilyProfileData.mapCenter.lat)),
             initialLng = precisePickerTarget?.longitude ?: (editingPoi?.lng ?: (home?.lng
                 ?: FamilyProfileData.mapCenter.lng)),
-            title = if (precisePickerPoi != null) "Laras Lokasi: ${precisePickerPoi!!.name}" else "Pilih Lokasi Tepat di Peta",
+            title = if (precisePickerPoi != null) ls.adjustLocationTitle(precisePickerPoi!!.name) else ls.pickPreciseLocationTitle,
             homeLat = home?.lat ?: FamilyProfileData.mapCenter.lat,
             homeLng = home?.lng ?: FamilyProfileData.mapCenter.lng,
             onDismiss = {
@@ -2267,7 +2271,8 @@ fun LogisticsMapScreen(
                 }
 
                 rfCenterGeoPoint = GeoPoint(confirmedLat, confirmedLng)
-                rfCenterLabel = "Titik Dipilih (${String.format(Locale.US, "%.4f, %.4f", confirmedLat, confirmedLng)})"
+                rfCenterLabel =
+                    ls.rfCenterSelectedPoint(String.format(Locale.US, "%.4f, %.4f", confirmedLat, confirmedLng))
                 mapViewRef?.controller?.apply {
                     setZoom(15.5)
                     animateTo(GeoPoint(confirmedLat, confirmedLng))
@@ -2283,14 +2288,14 @@ fun LogisticsMapScreen(
             onDismissRequest = { poiToDelete = null },
             title = {
                 Text(
-                    text = "Padam Nod POI?",
+                    text = ls.deletePoiTitle,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = SlotifyColors.TextPrimary
                 )
             },
             text = {
                 Text(
-                    text = "Adakah anda pasti mahu memadam '${poiToDelete?.name}' daripada senarai dan peta logistik?",
+                    text = ls.deletePoiMessage(poiToDelete?.name.orEmpty()),
                     style = MaterialTheme.typography.bodyMedium,
                     color = SlotifyColors.TextSecondary
                 )
@@ -2306,12 +2311,12 @@ fun LogisticsMapScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
                 ) {
-                    Text("Padam", color = Color.White)
+                    Text(ls.deleteButton, color = Color.White)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { poiToDelete = null }) {
-                    Text("Batal", color = SlotifyColors.TextSecondary)
+                    Text(strings.cancelButton, color = SlotifyColors.TextSecondary)
                 }
             }
         )
@@ -2323,14 +2328,14 @@ fun LogisticsMapScreen(
             onDismissRequest = { showResetConfirm = false },
             title = {
                 Text(
-                    text = "Set Semula Senarai POI?",
+                    text = ls.resetPoisTitle,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = SlotifyColors.TextPrimary
                 )
             },
             text = {
                 Text(
-                    text = "Tindakan ini akan mengembalikan semua nod lokasi kepada senarai asal profil keluarga.",
+                    text = ls.resetPoisMessage,
                     style = MaterialTheme.typography.bodyMedium,
                     color = SlotifyColors.TextSecondary
                 )
@@ -2343,12 +2348,12 @@ fun LogisticsMapScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.ActionAmber)
                 ) {
-                    Text("Set Semula", color = Color.White)
+                    Text(ls.resetButton, color = Color.White)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showResetConfirm = false }) {
-                    Text("Batal", color = SlotifyColors.TextSecondary)
+                    Text(strings.cancelButton, color = SlotifyColors.TextSecondary)
                 }
             }
         )
@@ -2377,7 +2382,8 @@ private data class MapOverlayKey(
     val pickedPoint: GeoPoint?,
     val selectedPoiId: String?,
     val selectedRoute: RouteSelection,
-    val osrmRoute: OsrmRouteResponse?
+    val osrmRoute: OsrmRouteResponse?,
+    val ls: LogisticsStrings
 )
 
 /** Non-observable holder: written from AndroidView.update without triggering recomposition. */
@@ -2390,19 +2396,18 @@ private fun addVehicleMarker(
     context: Context,
     mapView: MapView,
     simulatedVehicle: VehicleSimState,
-    selectedRoute: RouteSelection
+    selectedRoute: RouteSelection,
+    ls: LogisticsStrings
 ) {
     val vehicleMarker = Marker(mapView).apply {
         id = VEHICLE_MARKER_ID
         position = simulatedVehicle.point
         title = FamilyProfileData.routes[selectedRoute]?.let { "${it.vehicleEmoji} ${it.vehicleLabel}" } ?: "🚐"
-        snippet = "${simulatedVehicle.speedKmh} km/j • Baki ${
-            String.format(
-                Locale.US,
-                "%.1f",
-                simulatedVehicle.distanceRemainingKm
-            )
-        } km (~${simulatedVehicle.etaMinutes} min)"
+        snippet = ls.vehicleMarkerSnippet(
+            simulatedVehicle.speedKmh,
+            simulatedVehicle.distanceRemainingKm,
+            simulatedVehicle.etaMinutes
+        )
         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
         icon = PoiMarkerHelper.getVehicleMarker(context, simulatedVehicle.vehicleEmoji)
     }
@@ -2415,10 +2420,11 @@ private fun updateVehicleMarker(
     context: Context,
     mapView: MapView,
     vehicle: VehicleSimState?,
-    selectedRoute: RouteSelection
+    selectedRoute: RouteSelection,
+    ls: LogisticsStrings
 ) {
     mapView.overlays.removeAll { it is Marker && it.id == VEHICLE_MARKER_ID }
-    if (vehicle != null) addVehicleMarker(context, mapView, vehicle, selectedRoute)
+    if (vehicle != null) addVehicleMarker(context, mapView, vehicle, selectedRoute, ls)
     mapView.invalidate()
 }
 
@@ -2433,6 +2439,7 @@ private fun setupMapOverlays(
     selectedRoute: RouteSelection,
     osrmRoute: OsrmRouteResponse?,
     simulatedVehicle: VehicleSimState? = null,
+    ls: LogisticsStrings,
     onMapTapped: (GeoPoint) -> Unit,
     onPoiSelected: (PoiItem) -> Unit
 ) {
@@ -2450,7 +2457,7 @@ private fun setupMapOverlays(
         center = if (isRfActive) rfCenter else null,
         isPulseActive = isRfActive,
         maxRadiusMeters = 3000.0,
-        centerLabel = "Pusat RF 3.0 km",
+        centerLabel = ls.rfOverlayCenterLabel,
         onMapTapped = onMapTapped,
         onMapLongPressed = onMapTapped
     )
@@ -2485,9 +2492,9 @@ private fun setupMapOverlays(
             position = GeoPoint(poi.lat, poi.lng)
             title = poi.name
             snippet = if (poi.address.isNotBlank()) {
-                "${poi.iconEmoji} ${poi.address} (${if (poi.distanceKm > 0) "${poi.distanceKm} km" else "Pusat"})"
+                "${poi.iconEmoji} ${poi.address} (${if (poi.distanceKm > 0) "${poi.distanceKm} km" else ls.distanceCenter})"
             } else {
-                "${poi.iconEmoji} • ${if (poi.distanceKm > 0) "${poi.distanceKm} km" else "Pusat"}"
+                "${poi.iconEmoji} • ${if (poi.distanceKm > 0) "${poi.distanceKm} km" else ls.distanceCenter}"
             }
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
             icon = PoiMarkerHelper.getPoiMarker(context, poi, isSelected)
@@ -2505,7 +2512,7 @@ private fun setupMapOverlays(
         val pickMarker = Marker(mapView).apply {
             id = "temp_picked_pin"
             position = pickedPoint
-            title = "📍 Titik Dipilih Pada Peta"
+            title = ls.pickedPointMarkerTitle
             snippet = String.format(Locale.US, "%.5f, %.5f", pickedPoint.latitude, pickedPoint.longitude)
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
             icon = PoiMarkerHelper.getTargetPin(context, "🎯")
@@ -2519,7 +2526,7 @@ private fun setupMapOverlays(
     }
 
     // 5. Simulated Animated Vehicle Marker (Van / Car)
-    if (simulatedVehicle != null) addVehicleMarker(context, mapView, simulatedVehicle, selectedRoute)
+    if (simulatedVehicle != null) addVehicleMarker(context, mapView, simulatedVehicle, selectedRoute, ls)
 
     mapView.invalidate()
 }
@@ -2537,6 +2544,7 @@ private fun PoiEditDialog(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val ls = strings.logisticsUi
     val isEdit = poi != null
     var name by remember { mutableStateOf(poi?.name ?: "") }
     var category by remember { mutableStateOf(poi?.category ?: PoiCategory.SEKOLAH) }
@@ -2573,17 +2581,17 @@ private fun PoiEditDialog(
 
     val presetEmojis = listOf("🏢", "🏫", "🎒", "🏠", "🕌", "🧒", "📚", "🏬", "🩺", "🚌", "📍")
     val categories = listOf(
-        PoiCategory.SEKOLAH to "Sekolah",
-        PoiCategory.TRANSIT to "Transit",
-        PoiCategory.RUMAH to "Rumah",
-        PoiCategory.PEJABAT to "Pejabat"
+        PoiCategory.SEKOLAH to ls.categorySchool,
+        PoiCategory.TRANSIT to ls.categoryTransit,
+        PoiCategory.RUMAH to ls.categoryHome,
+        PoiCategory.PEJABAT to ls.categoryOffice
     )
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = if (isEdit) "Kemaskini Nod POI" else "Tambah Nod POI Baru",
+                text = if (isEdit) ls.editPoiTitle else ls.addPoiTitle,
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = SlotifyColors.TextPrimary
             )
@@ -2599,15 +2607,15 @@ private fun PoiEditDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Nama Lokasi / POI") },
-                    placeholder = { Text("cth: Pejabat / Tadika") },
+                    label = { Text(ls.poiNameLabel) },
+                    placeholder = { Text(ls.poiNamePlaceholder) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 // Category Selection
                 Text(
-                    text = "Kategori Lokasi:",
+                    text = ls.categoryLabel,
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                     color = SlotifyColors.TextSecondary
                 )
@@ -2640,7 +2648,7 @@ private fun PoiEditDialog(
 
                 // Emoji Selection
                 Text(
-                    text = "Pilih Ikon Emoji:",
+                    text = ls.emojiLabel,
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                     color = SlotifyColors.TextSecondary
                 )
@@ -2666,8 +2674,8 @@ private fun PoiEditDialog(
                 OutlinedTextField(
                     value = address,
                     onValueChange = { address = it },
-                    label = { Text("Alamat / Keterangan Lokasi") },
-                    placeholder = { Text("cth: No 1, Jalan Contoh, Taman Contoh") },
+                    label = { Text(ls.addressLabel) },
+                    placeholder = { Text(ls.addressPlaceholder) },
                     singleLine = false,
                     maxLines = 2,
                     modifier = Modifier.fillMaxWidth()
@@ -2678,7 +2686,7 @@ private fun PoiEditDialog(
                     OutlinedTextField(
                         value = latText,
                         onValueChange = { latText = it },
-                        label = { Text("Latitude") },
+                        label = { Text(ls.latitudeLabel) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         modifier = Modifier.weight(1f)
@@ -2686,7 +2694,7 @@ private fun PoiEditDialog(
                     OutlinedTextField(
                         value = lngText,
                         onValueChange = { lngText = it },
-                        label = { Text("Longitude") },
+                        label = { Text(ls.longitudeLabel) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         modifier = Modifier.weight(1f)
@@ -2715,7 +2723,7 @@ private fun PoiEditDialog(
                         contentColor = SlotifyColors.KpmSkyBlue
                     )
                 ) {
-                    Text("🎯 Pilih Tepat di Peta (Grab-Style Reticle)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(ls.pickOnMapButton, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
 
                 // Preset Quick Chips (including live GPS if available)
@@ -2751,7 +2759,7 @@ private fun PoiEditDialog(
                             )
                         ) {
                             Text(
-                                "📡 GPS (${userGpsFix.quality.label})",
+                                "📡 GPS (${userGpsFix.quality.localizedLabel(strings.locationPickerUi)})",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = SlotifyColors.ActionAmber
@@ -2773,7 +2781,7 @@ private fun PoiEditDialog(
                             .weight(1f)
                             .height(28.dp)
                     ) {
-                        Text("📍 Pejabat", fontSize = 10.sp)
+                        Text(ls.presetOffice, fontSize = 10.sp)
                     }
 
                     FilledTonalButton(
@@ -2787,7 +2795,7 @@ private fun PoiEditDialog(
                             .weight(1f)
                             .height(28.dp)
                     ) {
-                        Text("📍 Rumah", fontSize = 10.sp)
+                        Text(ls.presetHome, fontSize = 10.sp)
                     }
                 }
 
@@ -2795,7 +2803,7 @@ private fun PoiEditDialog(
                 OutlinedTextField(
                     value = distanceText,
                     onValueChange = { distanceText = it },
-                    label = { Text("Jarak Anggaran dari Rumah (km)") },
+                    label = { Text(ls.distanceLabel) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -2818,11 +2826,11 @@ private fun PoiEditDialog(
                     val distVal = distanceText.toDoubleOrNull() ?: 0.0
 
                     if (name.isBlank()) {
-                        errorMessage = "Sila masukkan nama lokasi"
+                        errorMessage = ls.errorNameRequired
                         return@Button
                     }
                     if (latVal == null || lngVal == null) {
-                        errorMessage = "Koordinat latitude & longitude tidak sah"
+                        errorMessage = ls.errorInvalidCoordinates
                         return@Button
                     }
 
@@ -2840,12 +2848,12 @@ private fun PoiEditDialog(
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue)
             ) {
-                Text(if (isEdit) "Simpan" else "Tambah POI", color = Color.White)
+                Text(if (isEdit) strings.saveButton else ls.addPoiButton, color = Color.White)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Batal", color = SlotifyColors.TextSecondary)
+                Text(strings.cancelButton, color = SlotifyColors.TextSecondary)
             }
         }
     )

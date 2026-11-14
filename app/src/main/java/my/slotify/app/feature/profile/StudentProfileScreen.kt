@@ -28,6 +28,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import my.slotify.app.core.di.SlotifyViewModelFactory
 import my.slotify.app.core.database.PbdAssessmentEntity
 import my.slotify.app.core.model.KpmSubjectCatalog
+import my.slotify.app.core.designsystem.theme.AppStrings
 import my.slotify.app.core.designsystem.theme.NeumorphicElevation
 import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.designsystem.theme.SlotifyShapes
@@ -43,14 +44,14 @@ private fun String.maskMyKid(): String {
     return "••••-••-${takeLast(4)}"
 }
 
-// Fix 4.2: Map raw database enum strings to human-readable Bahasa Melayu labels
-private fun String.toSessionTypeLabel(): String = when (this) {
-    "DUAL_SRA_SK" -> "Sesi Dual (SRA + SK)"
-    "INTEGRATED_SRAISM" -> "Sesi Bersepadu Islam"
-    "TADIKA_DAYCARE" -> "Tadika & Daycare"
-    "FULL_DAY" -> "Sesi Penuh"
-    "MORNING" -> "Sesi Pagi"
-    "AFTERNOON" -> "Sesi Petang"
+// Fix 4.2: Map raw database enum strings to human-readable localised labels
+private fun String.toSessionTypeLabel(str: AppStrings): String = when (this) {
+    "DUAL_SRA_SK" -> str.profileUi.sessionDual
+    "INTEGRATED_SRAISM" -> str.profileUi.sessionIntegratedIslamic
+    "TADIKA_DAYCARE" -> str.profileUi.sessionTadikaDaycare
+    "FULL_DAY" -> str.sessionFull
+    "MORNING" -> str.sessionMorning
+    "AFTERNOON" -> str.sessionAfternoon
     else -> this
 }
 
@@ -65,7 +66,7 @@ fun StudentProfileScreen(
     val selectedStudent = state.student
     var showEditDialog by remember { mutableStateOf(false) }
     var showAddPbdDialog by remember { mutableStateOf(false) }
-    var pbdCelebrationMessage by remember { mutableStateOf<String?>(null) }
+    var pbdCelebrationMessage by remember { mutableStateOf<PbdRecordResult?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
     // Fix 1.4: Show/hide toggle for MyKid number — hidden by default for privacy
@@ -74,6 +75,16 @@ fun StudentProfileScreen(
     val assessments = state.assessments
     LaunchedEffect(vmMessage) {
         vmMessage?.let { pbdCelebrationMessage = it; viewModel.consumeMessage() }
+    }
+
+    val str = strings
+    val ps = str.profileUi
+    val pbdCelebrationText = pbdCelebrationMessage?.let { r ->
+        if (r.starsAwarded > 0) {
+            ps.pbdRecordedWithStars(r.tahapPenguasaan, r.subjectName, r.starsAwarded)
+        } else {
+            ps.pbdUpdated(r.tahapPenguasaan, r.subjectName)
+        }
     }
 
     LazyColumn(
@@ -113,7 +124,7 @@ fun StudentProfileScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit Profile",
+                        contentDescription = strings.editProfileTitle,
                         tint = SlotifyColors.KpmSkyBlue,
                         modifier = Modifier.size(18.dp)
                     )
@@ -197,7 +208,7 @@ fun StudentProfileScreen(
                                 }
                                 Spacer(Modifier.width(6.dp))
                                 Text(
-                                    text = if (s.className.isNotBlank()) "Kelas: ${s.className}" else "Kelas KPM",
+                                    text = if (s.className.isNotBlank()) ps.classWithName(s.className) else ps.classFallback,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = SlotifyColors.TextSecondary
                                 )
@@ -251,7 +262,7 @@ fun StudentProfileScreen(
                                 Spacer(Modifier.width(4.dp))
                                 Icon(
                                     imageVector = if (showMyKid) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = if (showMyKid) "Sembunyikan" else "Tunjukkan",
+                                    contentDescription = if (showMyKid) ps.hideMyKid else ps.showMyKid,
                                     tint = SlotifyColors.TextTertiary,
                                     modifier = Modifier.size(14.dp)
                                 )
@@ -337,7 +348,7 @@ fun StudentProfileScreen(
                             }
                             // Fix 4.2: Resolve raw DB sessionType string to readable label
                             Text(
-                                text = s.sessionType.toSessionTypeLabel(),
+                                text = s.sessionType.toSessionTypeLabel(str),
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = SlotifyColors.ScienceGreen
                             )
@@ -353,7 +364,7 @@ fun StudentProfileScreen(
                             ) {
                                 Column {
                                     Text(
-                                        text = "Sekolah Agama / Transit:",
+                                        text = ps.secondarySchoolLabel,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = SlotifyColors.TextSecondary
                                     )
@@ -398,12 +409,12 @@ fun StudentProfileScreen(
                             Spacer(Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = s.vanDriverName ?: "Dihantar Ibu Bapa",
+                                    text = s.vanDriverName ?: ps.dropOffByParents,
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                     color = SlotifyColors.TextPrimary
                                 )
                                 Text(
-                                    text = s.vanDriverPhone ?: "Kenderaan Sendiri",
+                                    text = s.vanDriverPhone ?: ps.ownVehicle,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = SlotifyColors.TextSecondary
                                 )
@@ -415,7 +426,7 @@ fun StudentProfileScreen(
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                text = "Pengangkutan Aktif",
+                                text = ps.transportActive,
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = SlotifyColors.SuccessMint
                             )
@@ -444,12 +455,12 @@ fun StudentProfileScreen(
                                 Spacer(Modifier.width(8.dp))
                                 Column {
                                     Text(
-                                        text = "Pentaksiran Bilik Darjah (PBD)",
+                                        text = ps.pbdTitle,
                                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                         color = SlotifyColors.TextPrimary
                                     )
                                     Text(
-                                        text = "Tahap Penguasaan TP1 – TP6 KPM",
+                                        text = ps.pbdSubtitle,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = SlotifyColors.TextSecondary
                                     )
@@ -470,11 +481,16 @@ fun StudentProfileScreen(
                                     tint = Color.White
                                 )
                                 Spacer(Modifier.width(4.dp))
-                                Text("Rekod TP", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(
+                                    ps.recordTpButton,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
                             }
                         }
 
-                        if (pbdCelebrationMessage != null) {
+                        if (pbdCelebrationText != null) {
                             Surface(
                                 shape = SlotifyShapes.Small,
                                 color = SlotifyColors.SuccessMint.copy(alpha = 0.15f),
@@ -487,7 +503,7 @@ fun StudentProfileScreen(
                                     Text("⭐", fontSize = 16.sp)
                                     Spacer(Modifier.width(6.dp))
                                     Text(
-                                        text = pbdCelebrationMessage!!,
+                                        text = pbdCelebrationText,
                                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                         color = SlotifyColors.SuccessMint
                                     )
@@ -497,7 +513,7 @@ fun StudentProfileScreen(
 
                         if (assessments.isEmpty()) {
                             Text(
-                                text = "Belum ada rekod PBD untuk ${s.nickname}. Ketik 'Rekod TP' untuk memasukkan tahap penguasaan.",
+                                text = ps.pbdEmpty(s.nickname),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = SlotifyColors.TextSecondary
                             )
@@ -506,12 +522,12 @@ fun StudentProfileScreen(
                                 assessments.forEach { assessment ->
                                     val subjectColor = SlotifyColors.subjectColor(assessment.subjectCode)
                                     val tpLabel = when (assessment.tahapPenguasaan) {
-                                        6 -> "TP 6 • Cemerlang"
-                                        5 -> "TP 5 • Terpuji"
-                                        4 -> "TP 4 • Baik"
-                                        3 -> "TP 3 • Memuaskan"
-                                        2 -> "TP 2 • Asas"
-                                        else -> "TP 1 • Permulaan"
+                                        6 -> ps.tpLevel6
+                                        5 -> ps.tpLevel5
+                                        4 -> ps.tpLevel4
+                                        3 -> ps.tpLevel3
+                                        2 -> ps.tpLevel2
+                                        else -> ps.tpLevel1
                                     }
                                     val tpColor = when (assessment.tahapPenguasaan) {
                                         6 -> Color(0xFF8B5CF6)
@@ -596,7 +612,7 @@ fun StudentProfileScreen(
 
                                             if (assessment.teacherComment.isNotBlank()) {
                                                 Text(
-                                                    text = "Ulasan: \"${assessment.teacherComment}\"",
+                                                    text = ps.teacherCommentQuote(assessment.teacherComment),
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = SlotifyColors.TextSecondary
                                                 )
@@ -640,10 +656,10 @@ fun StudentProfileScreen(
         )
     }
 
-    pbdCelebrationMessage?.let { msg ->
+    pbdCelebrationText?.let { msg ->
         AlertDialog(
             onDismissRequest = { pbdCelebrationMessage = null },
-            confirmButton = { TextButton(onClick = { pbdCelebrationMessage = null }) { Text("OK") } },
+            confirmButton = { TextButton(onClick = { pbdCelebrationMessage = null }) { Text(str.ok) } },
             text = { Text(msg) }
         )
     }
@@ -815,6 +831,7 @@ fun AddPbdAssessmentDialog(
     var selectedSubject by remember { mutableStateOf(subjects.first()) }
     var selectedTp by remember { mutableIntStateOf(5) }
     var comment by remember { mutableStateOf("") }
+    val ps = strings.profileUi
 
     Dialog(onDismissRequest = onDismiss) {
         Box(
@@ -826,18 +843,18 @@ fun AddPbdAssessmentDialog(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "Rekod Tahap Penguasaan (PBD)",
+                    text = ps.addPbdTitle,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = SlotifyColors.TextPrimary
                 )
                 Text(
-                    text = "Pilih subjek KPM dan Tahap Penguasaan (TP1-TP6) untuk ${student.nickname}",
+                    text = ps.addPbdSubtitle(student.nickname),
                     style = MaterialTheme.typography.labelSmall,
                     color = SlotifyColors.TextSecondary
                 )
 
                 Text(
-                    text = "Subjek:",
+                    text = ps.subjectLabel,
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                     color = SlotifyColors.TextPrimary
                 )
@@ -862,7 +879,7 @@ fun AddPbdAssessmentDialog(
                 }
 
                 Text(
-                    text = "Tahap Penguasaan (TP 1 - 6):",
+                    text = ps.masteryLevelLabel,
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                     color = SlotifyColors.TextPrimary
                 )
@@ -898,7 +915,7 @@ fun AddPbdAssessmentDialog(
                 OutlinedTextField(
                     value = comment,
                     onValueChange = { comment = it },
-                    label = { Text("Ulasan Guru / Catatan", style = MaterialTheme.typography.bodySmall) },
+                    label = { Text(ps.teacherCommentLabel, style = MaterialTheme.typography.bodySmall) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = false,
                     maxLines = 3
@@ -911,7 +928,7 @@ fun AddPbdAssessmentDialog(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "⭐ Ganjaran Bonus: Pencapaian TP$selectedTp melayakkan +15 Bintang!",
+                            text = ps.bonusRewardHint(selectedTp),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = SlotifyColors.MathAmber,
@@ -925,7 +942,7 @@ fun AddPbdAssessmentDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("Batal", color = SlotifyColors.TextSecondary)
+                        Text(strings.cancelButton, color = SlotifyColors.TextSecondary)
                     }
                     Spacer(Modifier.width(8.dp))
                     Button(
@@ -948,7 +965,7 @@ fun AddPbdAssessmentDialog(
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue)
                     ) {
-                        Text("Simpan TP", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(ps.saveTpButton, color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }

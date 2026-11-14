@@ -701,9 +701,10 @@ fun SlotifyDrawerSheet(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
+                    val ss = strings.shellUi
                     val themeOptions = listOf(
-                        Triple(AppThemeMode.LIGHT, "☀️", if (appLanguage == AppLanguage.BM) "Cerah" else "Light"),
-                        Triple(AppThemeMode.DARK, "🌙", if (appLanguage == AppLanguage.BM) "Gelap" else "Dark"),
+                        Triple(AppThemeMode.LIGHT, "☀️", ss.themeLightShort),
+                        Triple(AppThemeMode.DARK, "🌙", ss.themeDarkShort),
                         Triple(AppThemeMode.NORD, "❄️", "Nord")
                     )
 
@@ -748,6 +749,7 @@ fun SlotifyDrawerSheet(
 
                 // Quick Widget Installation Button
                 val context = LocalContext.current
+                val shellStr = strings.shellUi
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -758,12 +760,12 @@ fun SlotifyDrawerSheet(
                             val myProvider = ComponentName(context, SlotifyAppWidgetProvider::class.java)
                             if (appWidgetManager.isRequestPinAppWidgetSupported) {
                                 appWidgetManager.requestPinAppWidget(myProvider, null, null)
-                                Toast.makeText(context, "Membuka pengesahan widget skrin utama...", Toast.LENGTH_SHORT)
+                                Toast.makeText(context, shellStr.widgetPinRequesting, Toast.LENGTH_SHORT)
                                     .show()
                             } else {
                                 Toast.makeText(
                                     context,
-                                    "Sila tekan lama pada skrin utama dan pilih Widgets ➔ Slotify",
+                                    shellStr.widgetPinUnsupported,
                                     Toast.LENGTH_LONG
                                 ).show()
                             }

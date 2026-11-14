@@ -31,6 +31,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import my.slotify.app.core.di.SlotifyViewModelFactory
 import my.slotify.app.core.database.StudentEntity
 import my.slotify.app.core.database.TimetableSlotEntity
+import my.slotify.app.core.designsystem.theme.LocalAppLanguage
 import my.slotify.app.core.designsystem.theme.NeumorphicElevation
 import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.designsystem.theme.SlotifyShapes
@@ -73,7 +74,8 @@ fun TimetableScreen(
     // Optional time preview (null = live clock).
     var simulatedMinutes by remember { mutableStateOf<Int?>(null) }
 
-    val days = listOf("Isnin" to 1, "Selasa" to 2, "Rabu" to 3, "Khamis" to 4, "Jumaat" to 5)
+    val ts = strings.timetableUi
+    val days = listOf(ts.dayMonday to 1, ts.dayTuesday to 2, ts.dayWednesday to 3, ts.dayThursday to 4, ts.dayFriday to 5)
 
     val allSlots = slots
     val currentSlots = allSlots.filter { it.dayOfWeek == selectedDay }
@@ -122,15 +124,15 @@ fun TimetableScreen(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                text = "${selectedStudent?.nickname ?: "Murid"} • ${selectedStudent?.currentLevel ?: "KPM"}",
+                                text = "${selectedStudent?.nickname ?: ts.studentFallback} • ${selectedStudent?.currentLevel ?: "KPM"}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = SlotifyColors.TextSecondary
                             )
                             // Session badge — shows active session context (SRA Pagi / SK Petang)
                             if (session != null) {
                                 val sessionLabel = when (session.sessionTimeType) {
-                                    "PAGI" -> "🌅 ${session.schoolName.substringBefore(" ").take(3)} Pagi"
-                                    "PETANG" -> "🌆 ${session.schoolName.substringBefore(" ").take(3)} Petang"
+                                    "PAGI" -> ts.sessionBadgeMorning(session.schoolName.substringBefore(" ").take(3))
+                                    "PETANG" -> ts.sessionBadgeAfternoon(session.schoolName.substringBefore(" ").take(3))
                                     "FULL_DAY" -> "🏫 ${session.schoolName.substringBefore(" ").take(4)}"
                                     else -> session.sessionTimeType
                                 }
@@ -170,7 +172,7 @@ fun TimetableScreen(
                             ) {
                                 Icon(
                                     Icons.Default.Add,
-                                    contentDescription = "Tambah Slot",
+                                    contentDescription = ts.addSlotDesc,
                                     tint = Color.White,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -246,7 +248,7 @@ fun TimetableScreen(
                         currentSimMinutes / 60,
                         currentSimMinutes % 60
                     ) +
-                            if (simulatedMinutes == null) " (kini)" else " (pratonton)",
+                            if (simulatedMinutes == null) " (${ts.clockLiveTag})" else " (${ts.clockPreviewTag})",
                     onSimulateMorning = { simulatedMinutes = 8 * 60 + 15 },
                     onSimulateNoon = { simulatedMinutes = 10 * 60 + 15 },
                     onSimulateAfternoon = { simulatedMinutes = 14 * 60 + 30 },
@@ -299,7 +301,7 @@ fun TimetableScreen(
                                 Text("📅", fontSize = 36.sp)
                                 Spacer(Modifier.height(8.dp))
                                 Text(
-                                    "Tiada slot untuk hari ini.\nTekan + untuk tambah waktu belajar.",
+                                    ts.emptyDaySlots,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = SlotifyColors.TextSecondary,
                                     textAlign = TextAlign.Center
@@ -357,7 +359,8 @@ private fun AddSlotDialog(
     onDismiss: () -> Unit,
     onConfirm: (TimetableSlotEntity) -> Unit
 ) {
-    val days = listOf("Isnin" to 1, "Selasa" to 2, "Rabu" to 3, "Khamis" to 4, "Jumaat" to 5)
+    val ts = strings.timetableUi
+    val days = listOf(ts.dayMonday to 1, ts.dayTuesday to 2, ts.dayWednesday to 3, ts.dayThursday to 4, ts.dayFriday to 5)
     val subjects = KpmSubjectCatalog.subjects.values.toList()
 
     var selectedDay by remember { mutableIntStateOf(preselectedDay) }
@@ -389,19 +392,19 @@ private fun AddSlotDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "➕ Tambah Waktu Belajar",
+                        text = ts.addSlotTitle,
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = SlotifyColors.TextPrimary
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Tutup", tint = SlotifyColors.TextSecondary)
+                        Icon(Icons.Default.Close, contentDescription = strings.close, tint = SlotifyColors.TextSecondary)
                     }
                 }
 
                 HorizontalDivider(color = SlotifyColors.BorderSubtle)
 
                 // Day Selector
-                Text("Hari", style = MaterialTheme.typography.labelMedium, color = SlotifyColors.TextSecondary)
+                Text(ts.dayLabel, style = MaterialTheme.typography.labelMedium, color = SlotifyColors.TextSecondary)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(days) { (dayName, dayIdx) ->
                         val isSel = selectedDay == dayIdx
@@ -425,7 +428,7 @@ private fun AddSlotDialog(
                 }
 
                 // Subject Picker
-                Text("Subjek", style = MaterialTheme.typography.labelMedium, color = SlotifyColors.TextSecondary)
+                Text(ts.subjectLabel, style = MaterialTheme.typography.labelMedium, color = SlotifyColors.TextSecondary)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -489,7 +492,7 @@ private fun AddSlotDialog(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "Mula (HH:MM)",
+                            ts.startTimeLabel,
                             style = MaterialTheme.typography.labelMedium,
                             color = SlotifyColors.TextSecondary
                         )
@@ -510,7 +513,7 @@ private fun AddSlotDialog(
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "Tamat (HH:MM)",
+                            ts.endTimeLabel,
                             style = MaterialTheme.typography.labelMedium,
                             color = SlotifyColors.TextSecondary
                         )
@@ -533,14 +536,14 @@ private fun AddSlotDialog(
 
                 // Teacher name
                 Text(
-                    "Nama Guru (pilihan)",
+                    ts.teacherNameLabel,
                     style = MaterialTheme.typography.labelMedium,
                     color = SlotifyColors.TextSecondary
                 )
                 OutlinedTextField(
                     value = teacherName,
                     onValueChange = { teacherName = it },
-                    placeholder = { Text("cth: Cikgu Rosli") },
+                    placeholder = { Text(ts.teacherNamePlaceholder) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = SlotifyShapes.Small,
@@ -569,7 +572,7 @@ private fun AddSlotDialog(
                         ) {
                             Checkbox(checked = requiresTextbook, onCheckedChange = { requiresTextbook = it })
                             Text(
-                                "📘 Buku Teks",
+                                ts.textbookToggle,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = SlotifyColors.TextPrimary
                             )
@@ -585,7 +588,7 @@ private fun AddSlotDialog(
                         ) {
                             Checkbox(checked = requiresWorkbook, onCheckedChange = { requiresWorkbook = it })
                             Text(
-                                "📙 Buku Aktiviti",
+                                ts.workbookToggle,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = SlotifyColors.TextPrimary
                             )
@@ -599,7 +602,7 @@ private fun AddSlotDialog(
                 val timesValid = normalizedStart != null && normalizedEnd != null && normalizedStart < normalizedEnd
                 if (!timesValid && startTime.isNotBlank() && endTime.isNotBlank()) {
                     Text(
-                        "Masa tidak sah: gunakan format HH:MM dan pastikan masa mula sebelum masa tamat.",
+                        ts.invalidTimeMessage,
                         style = MaterialTheme.typography.labelSmall,
                         color = SlotifyColors.EnglishRed
                     )
@@ -630,7 +633,7 @@ private fun AddSlotDialog(
                     Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "Simpan Waktu",
+                        ts.saveSlotButton,
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = Color.White
                     )
@@ -714,7 +717,7 @@ private fun RealtimeClassTrackerCard(
 
                 // Time Simulation Chips
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    SimTimeChip("Kini", onClick = onLive)
+                    SimTimeChip(strings.timetableUi.simLiveChip, onClick = onLive)
                     SimTimeChip("08:15", onClick = onSimulateMorning)
                     SimTimeChip("10:15", onClick = onSimulateNoon)
                     SimTimeChip("14:30", onClick = onSimulateAfternoon)
@@ -754,7 +757,7 @@ private fun RealtimeClassTrackerCard(
                             )
                         } else {
                             Text(
-                                text = "Tiada Kelas / Rehat",
+                                text = strings.timetableUi.noClassOrBreak,
                                 style = MaterialTheme.typography.labelLarge,
                                 color = SlotifyColors.TextSecondary
                             )
@@ -790,7 +793,7 @@ private fun RealtimeClassTrackerCard(
                             )
                         } else {
                             Text(
-                                text = "Sesi Selesai",
+                                text = strings.timetableUi.sessionFinished,
                                 style = MaterialTheme.typography.labelLarge,
                                 color = SlotifyColors.TextSecondary
                             )
@@ -863,7 +866,7 @@ private fun TimetableSlotCard(
                             color = SlotifyColors.TextPrimary
                         )
                         Text(
-                            text = slot.teacherName ?: if (slot.isRehat) "Kantin / Rehat" else "Guru Subjek",
+                            text = slot.teacherName ?: if (slot.isRehat) strings.timetableUi.breakFallbackLabel else strings.timetableUi.subjectTeacherFallback,
                             style = MaterialTheme.typography.labelSmall,
                             color = SlotifyColors.TextSecondary
                         )
@@ -893,7 +896,7 @@ private fun TimetableSlotCard(
                         ) {
                             Icon(
                                 if (showDeleteConfirm) Icons.Default.ExpandLess else Icons.Default.MoreVert,
-                                contentDescription = "Opsyen",
+                                contentDescription = strings.timetableUi.slotOptionsDesc,
                                 tint = SlotifyColors.TextTertiary,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -912,7 +915,7 @@ private fun TimetableSlotCard(
                     TextButton(
                         onClick = { showDeleteConfirm = false },
                         colors = ButtonDefaults.textButtonColors(contentColor = SlotifyColors.TextSecondary)
-                    ) { Text("Batal") }
+                    ) { Text(strings.cancelButton) }
                     Spacer(Modifier.width(8.dp))
                     Button(
                         onClick = onDelete,
@@ -927,7 +930,7 @@ private fun TimetableSlotCard(
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text("Padam Slot", style = MaterialTheme.typography.bodySmall, color = Color.White)
+                        Text(strings.timetableUi.deleteSlotButton, style = MaterialTheme.typography.bodySmall, color = Color.White)
                     }
                 }
             }
@@ -937,12 +940,14 @@ private fun TimetableSlotCard(
 
 @Composable
 private fun WeekOverviewView(slots: List<TimetableSlotEntity>) {
+    val ts = strings.timetableUi
+    val appLanguage = LocalAppLanguage.current
     val days = listOf(
-        Triple("Isnin", 1, AttireGuide.forSchoolDay(1)),
-        Triple("Selasa", 2, AttireGuide.forSchoolDay(2)),
-        Triple("Rabu", 3, AttireGuide.forSchoolDay(3)),
-        Triple("Khamis", 4, AttireGuide.forSchoolDay(4)),
-        Triple("Jumaat", 5, AttireGuide.forSchoolDay(5))
+        Triple(ts.dayMonday, 1, AttireGuide.forSchoolDay(1, appLanguage)),
+        Triple(ts.dayTuesday, 2, AttireGuide.forSchoolDay(2, appLanguage)),
+        Triple(ts.dayWednesday, 3, AttireGuide.forSchoolDay(3, appLanguage)),
+        Triple(ts.dayThursday, 4, AttireGuide.forSchoolDay(4, appLanguage)),
+        Triple(ts.dayFriday, 5, AttireGuide.forSchoolDay(5, appLanguage))
     )
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
@@ -996,7 +1001,7 @@ private fun WeekOverviewView(slots: List<TimetableSlotEntity>) {
                         }
                     } else {
                         Text(
-                            "Tiada slot lagi",
+                            ts.noSlotsYet,
                             style = MaterialTheme.typography.labelSmall,
                             color = SlotifyColors.TextTertiary
                         )
@@ -1009,6 +1014,7 @@ private fun WeekOverviewView(slots: List<TimetableSlotEntity>) {
 
 @Composable
 private fun TomorrowViewSection(tomorrowSlots: List<TimetableSlotEntity>, tomorrowDow: Int) {
+    val ts = strings.timetableUi
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Box(
             modifier = Modifier
@@ -1027,7 +1033,7 @@ private fun TomorrowViewSection(tomorrowSlots: List<TimetableSlotEntity>, tomorr
                         color = SlotifyColors.TextPrimary
                     )
                     Text(
-                        AttireGuide.label(tomorrowDow),
+                        AttireGuide.label(tomorrowDow, LocalAppLanguage.current),
                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
                         color = SlotifyColors.ScienceGreen
                     )
@@ -1047,15 +1053,15 @@ private fun TomorrowViewSection(tomorrowSlots: List<TimetableSlotEntity>, tomorr
                 .filter { !it.isRehat && (it.requiresTextbook || it.requiresWorkbook) }
                 .map { slot ->
                     val type = buildString {
-                        if (slot.requiresTextbook) append("Buku Teks")
+                        if (slot.requiresTextbook) append(ts.bookTypeTextbook)
                         if (slot.requiresTextbook && slot.requiresWorkbook) append(" + ")
-                        if (slot.requiresWorkbook) append("Buku Aktiviti")
+                        if (slot.requiresWorkbook) append(ts.bookTypeWorkbook)
                     }
                     "📚 ${slot.subjectName} (${slot.subjectCode}) — $type"
                 }
                 .distinct()
                 .ifEmpty {
-                    listOf("✅ Semua buku sudah disemak untuk esok!")
+                    listOf(ts.allBooksChecked)
                 }
         } else {
             listOf(

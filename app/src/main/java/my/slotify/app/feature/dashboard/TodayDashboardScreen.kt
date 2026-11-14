@@ -41,6 +41,8 @@ import my.slotify.app.core.database.SchoolSessionEntity
 import my.slotify.app.core.database.SlotifyDao
 import my.slotify.app.core.database.StudentEntity
 import my.slotify.app.core.database.TimetableSlotEntity
+import my.slotify.app.core.designsystem.theme.AppLanguage
+import my.slotify.app.core.designsystem.theme.LocalAppLanguage
 import my.slotify.app.core.designsystem.theme.NeumorphicElevation
 import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.designsystem.theme.SlotifyShapes
@@ -82,6 +84,11 @@ fun TodayDashboardScreen(
 
     val now by rememberNow()
     LaunchedEffect(now.toLocalDate()) { viewModel.setToday(now.toLocalDate()) }
+
+    val str = strings
+    val ds = str.dashboardUi
+    val appLanguage = LocalAppLanguage.current
+    val isEnglish = appLanguage == AppLanguage.EN
 
     val selectedStudent = state.student
     val tasks = state.tasks
@@ -188,22 +195,28 @@ fun TodayDashboardScreen(
                             Column {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = if (currentHoliday != null) "Cuti: ${currentHoliday.titleBm}" else "Takwim KPM • ${currentTerm?.name ?: "Sesi 2026/2027"}",
+                                        text = if (currentHoliday != null) ds.holidayBannerTitle(if (isEnglish) currentHoliday.titleEn else currentHoliday.titleBm) else ds.takwimBannerTitle(
+                                            currentTerm?.name ?: ds.takwimSessionFallback
+                                        ),
                                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                         color = if (currentHoliday != null) SlotifyColors.ScienceGreen else SlotifyColors.TextPrimary
                                     )
                                 }
                                 if (currentHoliday != null) {
                                     Text(
-                                        text = "Tiada sesi persekolahan hari ini • Selamat bercuti!",
+                                        text = ds.holidayNoSchoolToday,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = SlotifyColors.ScienceGreen
                                     )
                                 } else if (nextHoliday != null) {
                                     val days = nextHoliday.daysUntil(todayDate)
-                                    val text = if (days <= 0) "Hari Ini!" else "lagi $days hari"
+                                    val text =
+                                        if (days <= 0) ds.holidayCountdownToday else ds.holidayCountdownDays(days)
                                     Text(
-                                        text = "Cuti seterusnya: ${nextHoliday.titleBm} ($text)",
+                                        text = ds.nextHolidayLabel(
+                                            if (isEnglish) nextHoliday.titleEn else nextHoliday.titleBm,
+                                            text
+                                        ),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = SlotifyColors.KpmBlue
                                     )
@@ -216,7 +229,7 @@ fun TodayDashboardScreen(
                             color = SlotifyColors.KpmBlue.copy(alpha = 0.12f)
                         ) {
                             Text(
-                                text = "Kumpulan B",
+                                text = ds.schoolGroupBadge,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = SlotifyColors.KpmBlue
@@ -249,7 +262,7 @@ fun TodayDashboardScreen(
                                 Spacer(Modifier.width(6.dp))
                                 Column {
                                     Text(
-                                        text = "Waktu Solat • Zon SGR01",
+                                        text = ds.prayerTimesTitle("SGR01"),
                                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                         color = SlotifyColors.TextPrimary
                                     )
@@ -266,7 +279,7 @@ fun TodayDashboardScreen(
                                 color = SlotifyColors.SuccessMint.copy(alpha = 0.15f)
                             ) {
                                 Text(
-                                    text = "${prayerSchedule.nextPrayerName}: ${prayerSchedule.countdownText}",
+                                    text = "${prayerSchedule.nextPrayerName}: ${ds.prayerCountdown(prayerSchedule.minutesUntilNext)}",
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                     color = SlotifyColors.SuccessMint,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -298,7 +311,7 @@ fun TodayDashboardScreen(
                                         .weight(1f)
                                         .padding(horizontal = 2.dp)
                                         .semantics(mergeDescendants = true) {
-                                            if (isCurrent) stateDescription = "Waktu solat semasa"
+                                            if (isCurrent) stateDescription = ds.currentPrayerStateDescription
                                         }
                                 ) {
                                     Column(
@@ -332,7 +345,7 @@ fun TodayDashboardScreen(
                             Text("🕒", fontSize = 11.sp)
                             Spacer(Modifier.width(4.dp))
                             Text(
-                                text = prayerSchedule.transitNote,
+                                text = ds.prayerTransitNote,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = SlotifyColors.ActionAmber,
                                 fontWeight = FontWeight.Medium
@@ -384,12 +397,12 @@ fun TodayDashboardScreen(
                             Spacer(Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = if (isPacked) "Beg Sekolah Siap Dikemas! ✨" else "Kemas Beg Sekolah Esok",
+                                    text = if (isPacked) ds.bagCardPackedTitle else ds.bagCardPendingTitle,
                                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                     color = if (isPacked) successColor else primaryTextColor
                                 )
                                 Text(
-                                    text = if (isPacked) "Semua buku & kelengkapan telah dimasukkan" else "Semak jadual & masukkan buku mengikut subjek",
+                                    text = if (isPacked) ds.bagCardPackedSubtitle else ds.bagCardPendingSubtitle,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = secondaryTextColor
                                 )
@@ -401,7 +414,7 @@ fun TodayDashboardScreen(
                             color = if (isPacked) successColor.copy(alpha = 0.2f) else skyBlueColor.copy(alpha = 0.15f)
                         ) {
                             Text(
-                                text = if (isPacked) "Lengkap ✓" else "Kemas ➔",
+                                text = if (isPacked) ds.bagCardPackedBadge else ds.bagCardPendingBadge,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = if (isPacked) successColor else skyBlueColor
@@ -453,7 +466,7 @@ fun TodayDashboardScreen(
                                 ) {
                                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(12.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("Tugasan", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text(ds.addTaskButton, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Spacer(Modifier.width(6.dp))
                                 Surface(
@@ -463,7 +476,7 @@ fun TodayDashboardScreen(
                                     shape = SlotifyShapes.Small
                                 ) {
                                     Text(
-                                        text = if (pendingCount > 0) "$pendingCount ${strings.pendingTasks}" else "Semua Siap! 🎉",
+                                        text = if (pendingCount > 0) "$pendingCount ${strings.pendingTasks}" else ds.allTasksDone,
                                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                         color = if (pendingCount > 0) SlotifyColors.ActionAmber else SlotifyColors.SuccessMint,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -511,9 +524,9 @@ fun TodayDashboardScreen(
                                 SlotifyEmptyState(
                                     emoji = if (selectedFilter == TaskFilter.COMPLETED) "🎉" else "📚",
                                     message = if (selectedFilter == TaskFilter.COMPLETED)
-                                        "Belum ada tugasan yang siap lagi. Teruskan!"
+                                        ds.emptyCompletedTasks
                                     else
-                                        "Tiada tugasan buat masa ini. Syabas! ⭐"
+                                        ds.emptyPendingTasks
                                 )
                             }
                             filteredTasks.forEach { task ->
@@ -658,7 +671,7 @@ fun TodayDashboardScreen(
                             }
 
                             Text(
-                                text = "${exams.size} Ujian Dikesan",
+                                text = ds.examsDetectedCount(exams.size),
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                                 color = SlotifyColors.TextSecondary
                             )
@@ -668,7 +681,7 @@ fun TodayDashboardScreen(
                             if (exams.isEmpty()) {
                                 SlotifyEmptyState(
                                     emoji = "🎉",
-                                    message = "Tiada ujian berdaftar. Teruskan usaha!"
+                                    message = ds.emptyExams
                                 )
                             }
                             exams.forEach { exam ->
@@ -713,7 +726,7 @@ fun TodayDashboardScreen(
                                                         color = if (daysLeft <= 4) SlotifyColors.EnglishRed else SlotifyColors.ActionAmber
                                                     )
                                                     Text(
-                                                        text = "HARI",
+                                                        text = ds.examDaysUnit,
                                                         fontSize = 10.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         color = if (daysLeft <= 4) SlotifyColors.EnglishRed else SlotifyColors.ActionAmber
@@ -746,10 +759,13 @@ fun TodayDashboardScreen(
                                                         text = exam.title
                                                             .replace(
                                                                 "Ujian Akhir Sesi Akademik (UASA)",
-                                                                "Peperiksaan Besar"
+                                                                ds.examFriendlyUasa
                                                             )
-                                                            .replace("Pentaksiran Bilik Darjah (PBD)", "Ujian Kelas")
-                                                            .replace("Pentaksiran", "Ujian"),
+                                                            .replace(
+                                                                "Pentaksiran Bilik Darjah (PBD)",
+                                                                ds.examFriendlyPbd
+                                                            )
+                                                            .replace("Pentaksiran", ds.examFriendlyAssessment),
                                                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                                         color = SlotifyColors.TextPrimary
                                                     )
@@ -826,7 +842,7 @@ fun TodayDashboardScreen(
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                text = "Mula Fokus",
+                                text = strings.startFocus,
                                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
                                 color = Color.White
                             )
@@ -876,7 +892,7 @@ fun TodayDashboardScreen(
 
             // Ongoing Session Card with 10% Radiant Accent & Van Status
             item {
-                val vanName = selectedStudent?.vanDriverName ?: "Van Sekolah"
+                val vanName = selectedStudent?.vanDriverName ?: ds.vanFallback
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -917,14 +933,14 @@ fun TodayDashboardScreen(
                             ?: todaySlots.firstOrNull { it.startTime > nowText }
                         Text(
                             text = activeSlot?.subjectName
-                                ?: if (todayDayOfWeek == null) "Hujung minggu — tiada kelas" else "Tiada kelas lagi hari ini",
+                                ?: if (todayDayOfWeek == null) ds.weekendNoClass else ds.noMoreClassesToday,
                             style = MaterialTheme.typography.headlineSmall,
                             color = SlotifyColors.TextPrimary
                         )
                         if (activeSlot != null) {
                             Text(
                                 text = "${activeSlot.startTime} – ${activeSlot.endTime}" +
-                                        if (activeSlot.startTime > nowText) " (seterusnya)" else " (sedang berlangsung)",
+                                        if (activeSlot.startTime > nowText) " (${ds.slotUpcoming})" else " (${ds.slotInProgress})",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = SlotifyColors.TextSecondary
                             )
@@ -952,7 +968,7 @@ fun TodayDashboardScreen(
                                 color = SlotifyColors.TextPrimary
                             )
                             Text(
-                                text = AttireGuide.label(todayDayOfWeek ?: nextSchoolDayOfWeek),
+                                text = AttireGuide.label(todayDayOfWeek ?: nextSchoolDayOfWeek, appLanguage),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = SlotifyColors.TextSecondary
                             )
@@ -983,9 +999,9 @@ fun TodayDashboardScreen(
                                 .filter { !it.isRehat && (it.requiresTextbook || it.requiresWorkbook) }
                                 .map { slot ->
                                     val type = buildString {
-                                        if (slot.requiresTextbook) append("Buku Teks")
+                                        if (slot.requiresTextbook) append(ds.textbook)
                                         if (slot.requiresTextbook && slot.requiresWorkbook) append(" + ")
-                                        if (slot.requiresWorkbook) append("Buku Aktiviti")
+                                        if (slot.requiresWorkbook) append(ds.activityBook)
                                     }
                                     "📚 ${slot.subjectName} (${slot.subjectCode}) — $type"
                                 }
@@ -993,10 +1009,10 @@ fun TodayDashboardScreen(
                         } else {
                             // Fallback when DB has no slots yet
                             listOf(
-                                "📘 Buku Teks Bahasa Melayu Jilid 1",
-                                "📙 Buku Aktiviti Matematik",
-                                "📗 Buku Latihan Sains",
-                                "📕 Buku Teks English"
+                                ds.fallbackBookMalay,
+                                ds.fallbackBookMaths,
+                                ds.fallbackBookScience,
+                                ds.fallbackBookEnglish
                             )
                         }
                         books.forEach { book ->
@@ -1061,12 +1077,12 @@ fun TodayDashboardScreen(
                                 Spacer(Modifier.width(8.dp))
                                 Column {
                                     Text(
-                                        text = "Automasi & Notifikasi Rutin",
+                                        text = ds.routineAutomationTitle,
                                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                         color = SlotifyColors.TextPrimary
                                     )
                                     Text(
-                                        text = "Jadual harian penggera & peringatan telefon",
+                                        text = ds.routineAutomationSubtitle,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = SlotifyColors.TextSecondary
                                     )
@@ -1078,7 +1094,7 @@ fun TodayDashboardScreen(
                                 color = SlotifyColors.SuccessMint.copy(alpha = 0.15f)
                             ) {
                                 Text(
-                                    text = "Aktif",
+                                    text = ds.routineActiveBadge,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = SlotifyColors.SuccessMint,
@@ -1111,11 +1127,12 @@ fun TodayDashboardScreen(
                                 onClick = {
                                     my.slotify.app.core.notification.SlotifyNotificationManager.showTransitAlert(
                                         context = context,
-                                        childName = students.joinToString(" & ") { it.nickname }.ifBlank { "Anak" },
+                                        childName = students.joinToString(" & ") { it.nickname }
+                                            .ifBlank { str.childFallback },
                                         transitMsg = FamilyProfileData.morningTransitReminder
-                                            ?: "Semak beg transit anak-anak."
+                                            ?: ds.transitMessageFallback
                                     )
-                                    notifFeedback = "Notifikasi 07:00 AM telah dihantar ke bar notifikasi!"
+                                    notifFeedback = ds.transitTestSent
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.ActionAmber),
                                 shape = SlotifyShapes.Small,
@@ -1123,7 +1140,7 @@ fun TodayDashboardScreen(
                                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
                             ) {
                                 Text(
-                                    "🔔 Uji 07:00 AM\nBeg Transit",
+                                    ds.testTransitButton,
                                     fontSize = 11.sp,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                     fontWeight = FontWeight.Bold
@@ -1134,12 +1151,12 @@ fun TodayDashboardScreen(
                                 onClick = {
                                     my.slotify.app.core.notification.SlotifyNotificationManager.showAttireReminder(
                                         context = context,
-                                        childName = selectedStudent?.nickname ?: "Anak",
-                                        attire = AttireGuide.forSchoolDay(nextSchoolDayOfWeek),
+                                        childName = selectedStudent?.nickname ?: str.childFallback,
+                                        attire = AttireGuide.forSchoolDay(nextSchoolDayOfWeek, appLanguage),
                                         books = tomorrowSlots.filter { !it.isRehat }.map { it.subjectName }.distinct()
-                                            .joinToString(", ").ifBlank { "Semak jadual" }
+                                            .joinToString(", ").ifBlank { ds.attireBooksFallback }
                                     )
-                                    notifFeedback = "Notifikasi 08:30 PM pakaian esok telah dihantar!"
+                                    notifFeedback = ds.attireTestSent
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue),
                                 shape = SlotifyShapes.Small,
@@ -1147,7 +1164,7 @@ fun TodayDashboardScreen(
                                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
                             ) {
                                 Text(
-                                    "👕 Uji 08:30 PM\nUniform Esok",
+                                    ds.testAttireButton,
                                     fontSize = 11.sp,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                     fontWeight = FontWeight.Bold
@@ -1169,7 +1186,7 @@ fun TodayDashboardScreen(
         // ============================================================
         if (showFocusDialog) {
             FocusTimerModalDialog(
-                childName = selectedStudent?.nickname ?: "Anak",
+                childName = selectedStudent?.nickname ?: str.childFallback,
                 onDismiss = { showFocusDialog = false },
                 onComplete = {
                     showFocusDialog = false
@@ -1245,6 +1262,7 @@ fun InHomeRealtimeClassWidget(
     val nextSlot = todaySlots.firstOrNull { slot ->
         !slot.isRehat && parseTime(slot.startTime) > nowHHMM
     }
+    val ds = strings.dashboardUi
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1280,7 +1298,9 @@ fun InHomeRealtimeClassWidget(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = strings.todayDaySuffix,
+                        text = strings.todayDaySuffix(
+                            AttireGuide.dayName(SchoolDay.of(java.time.LocalDate.now()), LocalAppLanguage.current)
+                        ),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = SlotifyColors.KpmSkyBlue
@@ -1308,7 +1328,7 @@ fun InHomeRealtimeClassWidget(
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                text = "${activeSlot.startTime} – ${activeSlot.endTime} (Baki: ${baki}min)",
+                                text = "${activeSlot.startTime} – ${activeSlot.endTime} (${ds.minutesRemaining(baki)})",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = SlotifyColors.TextSecondary
                             )
@@ -1322,7 +1342,8 @@ fun InHomeRealtimeClassWidget(
                         Text(
                             text = buildString {
                                 activeSlot.teacherName?.let { append("$it • ") }
-                                append(selectedStudent?.className?.ifBlank { "Bilik Darjah" } ?: "Bilik Darjah")
+                                append(selectedStudent?.className?.ifBlank { ds.classroomFallback }
+                                    ?: ds.classroomFallback)
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = SlotifyColors.TextSecondary
@@ -1336,7 +1357,7 @@ fun InHomeRealtimeClassWidget(
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            text = if (todaySlots.isEmpty()) "Jadual belum disediakan" else "Tiada kelas sekarang",
+                            text = if (todaySlots.isEmpty()) ds.timetableNotSet else ds.noClassNow,
                             style = MaterialTheme.typography.titleLarge,
                             color = SlotifyColors.TextPrimary
                         )
@@ -1388,13 +1409,13 @@ fun InHomeRealtimeClassWidget(
                                 text = if (nextSlot != null)
                                     "${strings.nextClassPrefix} ${nextSlot.subjectName} (${nextSlot.subjectCode}) • ${nextSlot.startTime}"
                                 else
-                                    "${strings.nextClassPrefix} ${if (todaySlots.isEmpty()) "(jadual belum ada)" else "Tiada kelas seterusnya"}",
+                                    "${strings.nextClassPrefix} ${if (todaySlots.isEmpty()) ds.nextTimetableMissing else ds.noNextClass}",
                                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
                                 color = SlotifyColors.TextPrimary
                             )
                             if (nextSlot != null && nextSlot.requiresTextbook) {
                                 Text(
-                                    text = "${strings.requiredBookPrefix} Buku Teks ${nextSlot.subjectName}",
+                                    text = "${strings.requiredBookPrefix} ${ds.textbookFor(nextSlot.subjectName)}",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = SlotifyColors.ActionAmber
                                 )
@@ -1450,6 +1471,7 @@ fun FocusTimerModalDialog(
     var secondsRemaining by remember { mutableStateOf(selectedMinutes * 60) }
     var isRunning by remember { mutableStateOf(false) }
     var isFinished by remember { mutableStateOf(false) }
+    val ds = strings.dashboardUi
 
     // Reset the seconds when a new duration is selected (only when not running)
     LaunchedEffect(selectedMinutes) {
@@ -1516,13 +1538,17 @@ fun FocusTimerModalDialog(
 
                     // Fix 3.2: Removed size(24.dp) override — IconButton is natively 48×48dp
                     IconButton(onClick = safeDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Tutup", tint = SlotifyColors.TextSecondary)
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = strings.close,
+                            tint = SlotifyColors.TextSecondary
+                        )
                     }
                 }
 
                 if (!isFinished) {
                     Text(
-                        text = "Sesi ulangkaji berjadual untuk $childName",
+                        text = ds.focusSessionFor(childName),
                         style = MaterialTheme.typography.bodySmall,
                         color = SlotifyColors.TextSecondary
                     )
@@ -1548,7 +1574,7 @@ fun FocusTimerModalDialog(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "$mins Minit",
+                                    text = ds.focusMinutesOption(mins),
                                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
                                     color = if (isSel) Color.White else SlotifyColors.TextPrimary
                                 )
@@ -1576,7 +1602,7 @@ fun FocusTimerModalDialog(
                                 color = SlotifyColors.TextPrimary
                             )
                             Text(
-                                text = if (isRunning) "SEDANG BERJALAN" else "BERSEDIA",
+                                text = if (isRunning) ds.focusStatusRunning else ds.focusStatusReady,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isRunning) SlotifyColors.SuccessMint else SlotifyColors.ActionAmber
@@ -1648,7 +1674,7 @@ fun FocusTimerModalDialog(
                             shape = SlotifyShapes.Medium,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Tuntut Bintang!", fontWeight = FontWeight.Bold)
+                            Text(ds.claimStarsButton, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -1668,9 +1694,16 @@ fun AddHomeworkTaskDialog(
     var dueDateDesc by remember { mutableStateOf("Hari Ini") }
     var notes by remember { mutableStateOf("") }
     var hasPhotoProof by remember { mutableStateOf(false) }
+    val ds = strings.dashboardUi
 
     val subjects = listOf("BM", "MT", "SN", "BI", "PI", "BA", "SEJ", "RBT")
-    val dueDates = listOf("Hari Ini", "Esok", "Isnin", "Khamis")
+    // Stored value (persisted & matched elsewhere) to display label.
+    val dueDates = listOf(
+        "Hari Ini" to ds.dueToday,
+        "Esok" to ds.dueTomorrow,
+        "Isnin" to ds.dueMonday,
+        "Khamis" to ds.dueThursday
+    )
 
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismissRequest) {
         Surface(
@@ -1690,19 +1723,23 @@ fun AddHomeworkTaskDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Tambah Tugasan & Kerja Rumah",
+                        text = ds.addHomeworkTitle,
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = SlotifyColors.TextPrimary
                     )
                     IconButton(onClick = onDismissRequest, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Tutup", tint = SlotifyColors.TextSecondary)
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = strings.close,
+                            tint = SlotifyColors.TextSecondary
+                        )
                     }
                 }
 
                 // Subject Selector
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        "Subjek KPM:",
+                        ds.subjectSelectorLabel,
                         style = MaterialTheme.typography.labelSmall,
                         color = SlotifyColors.TextSecondary
                     )
@@ -1721,8 +1758,8 @@ fun AddHomeworkTaskDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Nama Tugasan / Muka Surat") },
-                    placeholder = { Text("Contoh: Buku Aktiviti Jilid 1 M/S 30") },
+                    label = { Text(ds.taskTitleLabel) },
+                    placeholder = { Text(ds.taskTitlePlaceholder) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
                 )
@@ -1730,16 +1767,16 @@ fun AddHomeworkTaskDialog(
                 // Due date selector
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        "Tarikh Hantar:",
+                        ds.dueDateLabel,
                         style = MaterialTheme.typography.labelSmall,
                         color = SlotifyColors.TextSecondary
                     )
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(dueDates) { due ->
+                        items(dueDates) { (due, dueLabel) ->
                             FilterChip(
                                 selected = dueDateDesc == due,
                                 onClick = { dueDateDesc = due },
-                                label = { Text(due, fontSize = 11.sp) }
+                                label = { Text(dueLabel, fontSize = 11.sp) }
                             )
                         }
                     }
@@ -1764,12 +1801,12 @@ fun AddHomeworkTaskDialog(
                             Spacer(Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    text = if (hasPhotoProof) "Gambar Lembaran Kerja Dilampirkan" else "Tangkap Gambar Lembaran Kerja",
+                                    text = if (hasPhotoProof) ds.photoAttachedTitle else ds.photoCaptureTitle,
                                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
                                     color = if (hasPhotoProof) SlotifyColors.ScienceGreen else SlotifyColors.TextPrimary
                                 )
                                 Text(
-                                    text = if (hasPhotoProof) "lembaran_kerja_aktiviti.jpg (Disahkan)" else "Sentuh untuk simulasi kamera tangkapan",
+                                    text = if (hasPhotoProof) ds.photoAttachedFile else ds.photoCaptureHint,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = SlotifyColors.TextSecondary
                                 )
@@ -1791,8 +1828,8 @@ fun AddHomeworkTaskDialog(
                 OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
-                    label = { Text("Nota Tambahan (Pilihan)") },
-                    placeholder = { Text("Contoh: Semak bersama Ibu sebelum tidur") },
+                    label = { Text(ds.notesLabel) },
+                    placeholder = { Text(ds.notesPlaceholder) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
                 )
@@ -1804,7 +1841,7 @@ fun AddHomeworkTaskDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(onClick = onDismissRequest) {
-                        Text("Batal")
+                        Text(strings.cancelButton)
                     }
                     Spacer(Modifier.width(8.dp))
                     Button(
@@ -1827,7 +1864,7 @@ fun AddHomeworkTaskDialog(
                         shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue)
                     ) {
-                        Text("Simpan Tugasan (+5 ⭐)", fontWeight = FontWeight.Bold)
+                        Text(ds.saveTaskButton, fontWeight = FontWeight.Bold)
                     }
                 }
             }

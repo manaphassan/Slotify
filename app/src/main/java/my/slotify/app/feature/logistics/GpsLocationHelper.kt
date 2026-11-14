@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.os.CancellationSignal
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import my.slotify.app.core.designsystem.theme.LocationPickerStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.coroutineScope
@@ -59,11 +60,18 @@ enum class GpsPowerProfile(val label: String, val minIntervalMs: Long, val minDi
 /**
  * Categorized GPS accuracy levels with user-friendly descriptions and indicator colors.
  */
-enum class GpsAccuracyQuality(val label: String, val colorHex: Long, val badgeEmoji: String) {
-    EXCELLENT("Tepat (Pintu/Pagar)", 0xFF22C55E, "🟢"),   // <= 6m (Door/Gate precision)
-    GOOD("Baik (Jalan/Lorong)", 0xFF0284C7, "🔵"),        // <= 15m (Street level)
-    MODERATE("Sederhana", 0xFFF59E0B, "🟡"),              // <= 35m (Neighborhood)
-    COARSE("Kasar (Mencari Satelit)", 0xFFEF4444, "🔴")   // > 35m (Acquiring lock)
+enum class GpsAccuracyQuality(val colorHex: Long, val badgeEmoji: String) {
+    EXCELLENT(0xFF22C55E, "🟢"),   // <= 6m (Door/Gate precision)
+    GOOD(0xFF0284C7, "🔵"),        // <= 15m (Street level)
+    MODERATE(0xFFF59E0B, "🟡"),    // <= 35m (Neighborhood)
+    COARSE(0xFFEF4444, "🔴");      // > 35m (Acquiring lock)
+
+    fun localizedLabel(ps: LocationPickerStrings): String = when (this) {
+        EXCELLENT -> ps.gpsQualityExcellent
+        GOOD -> ps.gpsQualityGood
+        MODERATE -> ps.gpsQualityModerate
+        COARSE -> ps.gpsQualityCoarse
+    }
 }
 
 /**

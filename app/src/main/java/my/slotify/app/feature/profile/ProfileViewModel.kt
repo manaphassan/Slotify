@@ -21,14 +21,21 @@ data class ProfileUiState(
     val assessments: List<PbdAssessmentEntity> = emptyList()
 )
 
+/** Outcome of saving a PBD record; the UI turns it into localised text. [starsAwarded] is 0 on re-record. */
+data class PbdRecordResult(
+    val tahapPenguasaan: Int,
+    val subjectName: String,
+    val starsAwarded: Int
+)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProfileViewModel(
     private val students: StudentRepository,
     private val schoolwork: SchoolworkRepository
 ) : ViewModel() {
 
-    private val _message = MutableStateFlow<String?>(null)
-    val message: StateFlow<String?> = _message.asStateFlow()
+    private val _message = MutableStateFlow<PbdRecordResult?>(null)
+    val message: StateFlow<PbdRecordResult?> = _message.asStateFlow()
 
     val uiState: StateFlow<ProfileUiState> = students.selectedStudent
         .flatMapLatest { student -> schoolwork.assessments(student?.id).map { ProfileUiState(student, it) } }
@@ -42,11 +49,7 @@ class ProfileViewModel(
     fun recordAssessment(assessment: PbdAssessmentEntity) {
         viewModelScope.launch {
             val stars = schoolwork.recordAssessment(assessment)
-            _message.value = if (stars > 0) {
-                "🎉 TP${assessment.tahapPenguasaan} ${assessment.subjectName} direkodkan! +$stars ⭐"
-            } else {
-                "TP${assessment.tahapPenguasaan} ${assessment.subjectName} dikemas kini."
-            }
+            _message.value = PbdRecordResult(assessment.tahapPenguasaan, assessment.subjectName, stars)
         }
     }
 

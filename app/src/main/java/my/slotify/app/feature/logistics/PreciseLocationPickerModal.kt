@@ -45,10 +45,12 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import my.slotify.app.core.designsystem.theme.LocationPickerStrings
 import my.slotify.app.core.designsystem.theme.NeumorphicElevation
 import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.designsystem.theme.SlotifyShapes
 import my.slotify.app.core.designsystem.theme.neumorphic
+import my.slotify.app.core.designsystem.theme.strings
 import my.slotify.app.core.profile.FamilyProfileData
 import java.util.Locale
 
@@ -74,7 +76,7 @@ enum class NudgeStepSize(val label: String, val deltaDeg: Double) {
 fun PreciseLocationPickerModal(
     initialLat: Double,
     initialLng: Double,
-    title: String = "Pilih Lokasi Tepat di Peta",
+    title: String = strings.locationPickerUi.defaultTitle,
     homeLat: Double = FamilyProfileData.mapCenter.lat,
     homeLng: Double = FamilyProfileData.mapCenter.lng,
     onDismiss: () -> Unit,
@@ -83,12 +85,14 @@ fun PreciseLocationPickerModal(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
+    val ps = strings.locationPickerUi
+    val str = strings
 
     var centerLat by remember { mutableDoubleStateOf(if (initialLat != 0.0) initialLat else homeLat) }
     var centerLng by remember { mutableDoubleStateOf(if (initialLng != 0.0) initialLng else homeLng) }
 
     var selectedStep by remember { mutableStateOf(NudgeStepSize.STEP_10M) }
-    var resolvedAddress by remember { mutableStateOf("Memuat alamat...") }
+    var resolvedAddress by remember { mutableStateOf(ps.loadingAddress) }
     var isGeocoding by remember { mutableStateOf(false) }
 
     // Real Hardware GPS Location States
@@ -118,8 +122,8 @@ fun PreciseLocationPickerModal(
     }
 
     // Preset jumps: home plus the user's saved points of interest
-    val landmarks = remember(context) {
-        listOf(Triple("🏠 Rumah", homeLat, homeLng)) +
+    val landmarks = remember(context, ps) {
+        listOf(Triple("🏠 ${ps.homeLandmark}", homeLat, homeLng)) +
                 PoiStorage.loadPois(context)
                     .filter { it.category != PoiCategory.RUMAH }
                     .map { Triple("${it.iconEmoji} ${it.name.substringBefore(" (")}", it.lat, it.lng) }
@@ -128,18 +132,18 @@ fun PreciseLocationPickerModal(
     // Hardware GPS Location Fetching Function
     suspend fun fetchGpsLocation() {
         if (!GpsLocationHelper.hasLocationPermission(context)) {
-            gpsNotification = "Kebenaran GPS diperlukan"
+            gpsNotification = ps.gpsPermissionRequired
             return
         }
 
         if (!GpsLocationHelper.isLocationServiceEnabled(context)) {
-            gpsNotification = "Sila aktifkan GPS dalam tetapan peranti"
+            gpsNotification = ps.gpsEnableInSettings
             GpsLocationHelper.openLocationSettings(context)
             return
         }
 
         isGpsFetching = true
-        gpsNotification = "Mendapatkan isyarat satelit GPS..."
+        gpsNotification = ps.gpsAcquiringSatellites
         val fix = GpsLocationHelper.getAccurateLocation(context, timeoutMs = 8000L)
         isGpsFetching = false
 
@@ -153,13 +157,13 @@ fun PreciseLocationPickerModal(
                     "%.1f",
                     fix.accuracyMeters
                 )
-            }m (${fix.quality.label})"
+            }m (${fix.quality.localizedLabel(ps)})"
             mapViewRef?.controller?.apply {
                 setZoom(18.0) // 1-meter ground resolution
                 animateTo(GeoPoint(fix.latitude, fix.longitude))
             }
         } else {
-            gpsNotification = "Isyarat GPS lemah. Sila pastikan berada di kawasan lapang."
+            gpsNotification = ps.gpsSignalWeak
         }
     }
 
@@ -188,7 +192,7 @@ fun PreciseLocationPickerModal(
                 fetchGpsLocation()
             }
         } else {
-            gpsNotification = "Kebenaran GPS diperlukan untuk menentukan lokasi semasa"
+            gpsNotification = ps.gpsPermissionRequiredForCurrent
         }
     }
 
@@ -232,7 +236,7 @@ fun PreciseLocationPickerModal(
                             ) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Kembali",
+                                    contentDescription = ps.back,
                                     tint = SlotifyColors.TextPrimary
                                 )
                             }
@@ -245,7 +249,7 @@ fun PreciseLocationPickerModal(
                                     maxLines = 1
                                 )
                                 Text(
-                                    text = "Gerakkan peta • Laras D-Pad • Kunci GPS",
+                                    text = ps.headerHint,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = SlotifyColors.TextSecondary,
                                     maxLines = 1
@@ -291,7 +295,7 @@ fun PreciseLocationPickerModal(
                                 }
                                 Spacer(Modifier.width(4.dp))
                                 Text(
-                                    text = if (isGpsFetching) "Mengesan" else "GPS",
+                                    text = if (isGpsFetching) ps.gpsLocating else "GPS",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (activeGpsResult != null) SlotifyColors.ParentGreen else SlotifyColors.KpmSkyBlue
@@ -312,7 +316,7 @@ fun PreciseLocationPickerModal(
                             ) {
                                 Icon(Icons.Default.PinDrop, contentDescription = null, modifier = Modifier.size(15.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("Manual", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text(ps.manualButton, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -431,7 +435,7 @@ fun PreciseLocationPickerModal(
                                     Text("🎯", fontSize = 14.sp)
                                     Spacer(Modifier.width(4.dp))
                                     Text(
-                                        text = "Sasaran Tepat",
+                                        text = ps.preciseTarget,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color.White
@@ -468,7 +472,7 @@ fun PreciseLocationPickerModal(
                                 Text("📍", fontSize = 14.sp)
                                 Spacer(Modifier.width(6.dp))
                                 Text(
-                                    text = String.format(Locale.US, "%.5f° U, %.5f° T", centerLat, centerLng),
+                                    text = ps.coordinatesBadge(centerLat, centerLng),
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                     color = SlotifyColors.KpmSkyBlue
                                 )
@@ -504,7 +508,7 @@ fun PreciseLocationPickerModal(
                                                 "%.1f",
                                                 activeGpsResult!!.accuracyMeters
                                             )
-                                        }m (${activeGpsResult!!.quality.label})",
+                                        }m (${activeGpsResult!!.quality.localizedLabel(ps)})",
                                         fontSize = 10.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = if (activeGpsResult != null) Color(activeGpsResult!!.quality.colorHex) else SlotifyColors.TextPrimary
@@ -576,7 +580,7 @@ fun PreciseLocationPickerModal(
                                 ) {
                                     Icon(
                                         Icons.Default.KeyboardArrowUp,
-                                        contentDescription = "Utara",
+                                        contentDescription = ps.nudgeNorth,
                                         tint = SlotifyColors.KpmSkyBlue
                                     )
                                 }
@@ -594,7 +598,7 @@ fun PreciseLocationPickerModal(
                                     ) {
                                         Icon(
                                             Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                                            contentDescription = "Barat",
+                                            contentDescription = ps.nudgeWest,
                                             tint = SlotifyColors.KpmSkyBlue
                                         )
                                     }
@@ -626,7 +630,7 @@ fun PreciseLocationPickerModal(
                                     ) {
                                         Icon(
                                             Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                            contentDescription = "Timur",
+                                            contentDescription = ps.nudgeEast,
                                             tint = SlotifyColors.KpmSkyBlue
                                         )
                                     }
@@ -644,7 +648,7 @@ fun PreciseLocationPickerModal(
                                 ) {
                                     Icon(
                                         Icons.Default.KeyboardArrowDown,
-                                        contentDescription = "Selatan",
+                                        contentDescription = ps.nudgeSouth,
                                         tint = SlotifyColors.KpmSkyBlue
                                     )
                                 }
@@ -687,7 +691,7 @@ fun PreciseLocationPickerModal(
                             } else {
                                 Icon(
                                     Icons.Default.MyLocation,
-                                    contentDescription = "Kunci GPS Semasa",
+                                    contentDescription = ps.lockCurrentGps,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -701,7 +705,7 @@ fun PreciseLocationPickerModal(
                             contentColor = SlotifyColors.KpmSkyBlue,
                             shape = CircleShape
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "Zum Masuk", modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Add, contentDescription = ps.zoomIn, modifier = Modifier.size(20.dp))
                         }
 
                         // Zoom Out (-)
@@ -714,7 +718,7 @@ fun PreciseLocationPickerModal(
                         ) {
                             Icon(
                                 Icons.Default.Remove,
-                                contentDescription = "Zum Keluar",
+                                contentDescription = ps.zoomOut,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -751,7 +755,7 @@ fun PreciseLocationPickerModal(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                text = "Tampal / Masukkan Koordinat Manual:",
+                                text = ps.manualInputTitle,
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = SlotifyColors.TextPrimary
                             )
@@ -762,7 +766,7 @@ fun PreciseLocationPickerModal(
                                 OutlinedTextField(
                                     value = manualLatInput,
                                     onValueChange = { manualLatInput = it },
-                                    label = { Text("Latitude") },
+                                    label = { Text(ps.latitudeLabel) },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                     singleLine = true,
                                     modifier = Modifier.weight(1f)
@@ -770,7 +774,7 @@ fun PreciseLocationPickerModal(
                                 OutlinedTextField(
                                     value = manualLngInput,
                                     onValueChange = { manualLngInput = it },
-                                    label = { Text("Longitude") },
+                                    label = { Text(ps.longitudeLabel) },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                     singleLine = true,
                                     modifier = Modifier.weight(1f)
@@ -789,14 +793,14 @@ fun PreciseLocationPickerModal(
                                             showManualInput = false
                                             manualInputError = null
                                         } else {
-                                            manualInputError = "Koordinat tidak sah (cth: 3.13900, 101.68690)"
+                                            manualInputError = ps.invalidCoordinates
                                         }
                                     },
                                     shape = SlotifyShapes.Small,
                                     colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue),
                                     modifier = Modifier.align(Alignment.CenterVertically)
                                 ) {
-                                    Text("Pergi", color = Color.White)
+                                    Text(ps.goButton, color = Color.White)
                                 }
                             }
                             if (manualInputError != null) {
@@ -817,7 +821,7 @@ fun PreciseLocationPickerModal(
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
                         Text(
-                            text = "Lompat Pantas ke Nod Tumpuan:",
+                            text = ps.quickJumpTitle,
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             color = SlotifyColors.TextSecondary
                         )
@@ -877,19 +881,13 @@ fun PreciseLocationPickerModal(
                             Spacer(Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = if (isGeocoding) "Mengesahkan alamat sekitar..." else resolvedAddress,
+                                    text = if (isGeocoding) ps.verifyingAddress else resolvedAddress,
                                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
                                     color = SlotifyColors.TextPrimary,
                                     maxLines = 2
                                 )
                                 Text(
-                                    text = String.format(
-                                        Locale.US,
-                                        "%.5f, %.5f • Jarak dari Rumah: %.1f km",
-                                        centerLat,
-                                        centerLng,
-                                        liveDistance
-                                    ),
+                                    text = ps.coordsWithHomeDistance(centerLat, centerLng, liveDistance),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = SlotifyColors.TextSecondary
                                 )
@@ -906,7 +904,7 @@ fun PreciseLocationPickerModal(
                                 modifier = Modifier.weight(1f),
                                 shape = SlotifyShapes.Medium
                             ) {
-                                Text("Batal", color = SlotifyColors.TextSecondary)
+                                Text(str.cancelButton, color = SlotifyColors.TextSecondary)
                             }
 
                             Button(
@@ -926,7 +924,7 @@ fun PreciseLocationPickerModal(
                                     tint = Color.White
                                 )
                                 Spacer(Modifier.width(6.dp))
-                                Text("Sahkan Lokasi Ini", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(ps.confirmLocationButton, color = Color.White, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
