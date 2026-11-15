@@ -165,7 +165,7 @@ dependencies {
 
     // JSON & Networking for OSRM Routing (org.json ships with Android; the artifact is only
     // needed so JVM unit tests get a real implementation instead of the android.jar stubs)
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.1")
     testImplementation("org.json:json:20260814")
 
     // OpenStreetMap (osmdroid) for zero-cost offline/online map rendering

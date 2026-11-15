@@ -42,7 +42,7 @@ class OsrmRoutingService(
                     .header("User-Agent", USER_AGENT)
                     .build()
                 client.newCall(request).execute().use { response ->
-                    val body = response.body?.string().orEmpty()
+                    val body = response.body.string()
                     if (!response.isSuccessful || body.isEmpty()) null else parse(body)
                 }
             } catch (e: Exception) {

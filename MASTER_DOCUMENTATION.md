@@ -87,7 +87,7 @@ flowchart TD
 - **Settings:** Jetpack DataStore Preferences 1.3.0 (theme, language, selected student)
 - **Local Persistence:** Room 2.8.5 + SQLite (schema v7), schemas exported to `app/schemas/`
 - **Background Tasks:** WorkManager 2.12.0 (widget refresh, geofence monitor) + AlarmManager (daily reminders)
-- **Routing & Distance:** OSRM driving API + OkHttp 4.12
+- **Routing & Distance:** OSRM driving API + OkHttp 5.5
 - **Map Rendering:** `osmdroid-android:6.1.20`
 
 ---
@@ -415,7 +415,7 @@ Still open:
 - P4-4: money in sen + `MIGRATION_6_7` (instrumented test written; needs a device).
 - P4-5: theme, language and selected student persisted with DataStore.
 
-Remaining follow-ups: the Focus timer is still an in-screen overlay rather than a `Dialog`; screens are still long files (split into smaller composables opportunistically).
+Remaining follow-ups: screens are still long files (split into smaller composables opportunistically). The Focus timer now uses a real `Dialog` (2026-11-15).
 
 **2026-11-14 — P5 implemented (partially).** Verified with `./gradlew testDebugUnitTest lintDebug` (private) and `./gradlew -PslotifyProfile=demo testDebugUnitTest lintDebug assembleRelease`:
 - Unit tests: **57/57 passing** (adds `SlotifyStringsTest`). Lint: **0 errors, 17 warnings** (was 93): the remaining warnings are dependency/target-SDK versions.
@@ -431,7 +431,7 @@ Remaining follow-ups: the Focus timer is still an in-screen overlay rather than 
 - targetSdk 36 forces edge-to-edge: `enableEdgeToEdge()` with theme-aware bar icons, top bar pads for the status bar; `Scaffold` already pads content for the navigation bar.
 - Deprecations fixed: `LocalLifecycleOwner` (now `androidx.lifecycle.compose`), `Locale("ms","MY")` ➜ `Locale.forLanguageTag`, AutoMirrored volume icons, `fallbackToDestructiveMigrationFrom(dropAllTables = true, …)`.
 - Release build now shrinks resources; Google Fonts cert arrays renamed to `slotify_gms_fonts_certs*` so they no longer override the font library's private resources.
-- Not upgraded: OkHttp 4.12 ➜ 5.x (major version; do separately). `TabRow` ➜ `PrimaryTabRow` and `asFrameworkPaint` deprecations remain (warnings only).
+- Not upgraded at the time: OkHttp 4.12 ➜ 5.x, `TabRow` and `asFrameworkPaint` deprecations — all done on 2026-11-15 (below).
 - **Before installing on the family phone:** run `./gradlew connectedDebugAndroidTest` (Room migration tests 5➜6, 6➜7) and smoke-test status-bar/navigation-bar overlap, exact-alarm reminders and notifications on an Android 15/16 device.
 
 **2026-11-15 — P5-3 screen strings migrated.** Verified with `./gradlew testDebugUnitTest compileDebugAndroidTestKotlin lintDebug` (private) and `./gradlew -PslotifyProfile=demo testDebugUnitTest lintDebug assembleRelease`:
@@ -444,6 +444,11 @@ Remaining follow-ups: the Focus timer is still an in-screen overlay rather than 
 - New `SystemStrings` group (widget labels and lines, per-subject book hints, notification channels and messages, geofence alerts, compass directions, coordinate fallback); the geocoder uses `ms-MY` or `en-MY` to match.
 - `SlotifyNotificationManager`, `GeofenceManager.evaluateProximity` and `LocationAddressHelper.resolveAddress` now take the string table explicitly, so every caller passes the active language; workers and the alarm receiver read it from DataStore.
 - The widget's static labels ("⇄ Tukar", "Peta", "Jadual") are set from code on every render.
+
+**2026-11-15 — Remaining backlog cleared.** Unit tests **62/62**, lint **0 errors** (remaining warnings: 47 `UseKtx` style hints, `OldTargetApi`, one `ModifierParameter`); demo release build passes R8.
+- Focus timer: a real `Dialog` (covers the top bar and FAB, Back closes it, an outside tap no longer ends a running session); timer state survives rotation (`rememberSaveable`); the reward shown uses `StarRewards.FOCUS_SESSION_STARS`.
+- Deprecations: `TabRow` ➜ `PrimaryTabRow` (Finance, Takwim), `asFrameworkPaint()` ➜ `nativePaint` (neumorphic shadows). No compiler deprecation warnings remain.
+- OkHttp 4.12 ➜ 5.5.1 (`response.body` is non-null in 5.x).
 
 ### Execution order
 1. **P1 + P2** — privacy, security and data-loss fixes (blocking any further push).
