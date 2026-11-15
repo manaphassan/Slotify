@@ -1181,7 +1181,7 @@ fun TodayDashboardScreen(
 
             // FAB Bottom Clearance
             item {
-                Spacer(Modifier.height(115.dp))
+                Spacer(Modifier.height(16.dp))
             }
         }
 

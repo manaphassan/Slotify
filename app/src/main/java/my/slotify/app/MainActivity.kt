@@ -42,9 +42,13 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.FabPosition
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
@@ -91,7 +95,6 @@ import kotlinx.coroutines.launch
 import my.slotify.app.core.widget.SlotifyAppWidgetProvider
 import my.slotify.app.core.database.StudentEntity
 import my.slotify.app.core.database.TimetableSlotEntity
-import my.slotify.app.core.designsystem.component.SlotifySpeedDialFab
 import my.slotify.app.core.designsystem.theme.AppLanguage
 import my.slotify.app.core.designsystem.theme.AppThemeMode
 import my.slotify.app.core.designsystem.theme.LocalAppLanguage
@@ -218,12 +221,10 @@ class MainActivity : ComponentActivity() {
                     val backStackEntry by navController.currentBackStackEntryAsState()
                     val currentScreen = backStackEntry?.destination?.route
                         ?.let { route -> Screen.entries.firstOrNull { it.name == route } } ?: Screen.DASHBOARD
-                    var fabExpanded by rememberSaveable { mutableStateOf(false) }
 
                     // Top-level navigation: one entry per tab on top of Dashboard, so Back from any
                     // tab returns to Dashboard and Back on Dashboard exits.
                     val navigateTo: (Screen) -> Unit = { screen ->
-                        fabExpanded = false
                         if (screen != currentScreen) {
                             navController.navigate(screen.name) {
                                 popUpTo(Screen.DASHBOARD.name) { saveState = true }
@@ -256,20 +257,13 @@ class MainActivity : ComponentActivity() {
                         drawerState = drawerState,
                         drawerContent = {
                             SlotifyDrawerSheet(
-                                currentScreen = currentScreen,
                                 students = ui.students,
                                 selectedStudent = ui.selectedStudent,
-                                isDarkMode = isDarkMode,
                                 appThemeMode = ui.themeMode,
                                 appLanguage = ui.language,
-                                onToggleTheme = mainViewModel::cycleTheme,
                                 onSelectTheme = mainViewModel::setTheme,
                                 onSelectLanguage = mainViewModel::setLanguage,
-                                onSelectStudent = mainViewModel::selectStudent,
-                                onSelectScreen = { screen ->
-                                    navigateTo(screen)
-                                    coroutineScope.launch { drawerState.close() }
-                                }
+                                onSelectStudent = mainViewModel::selectStudent
                             )
                         }
                     ) {
@@ -278,28 +272,14 @@ class MainActivity : ComponentActivity() {
                                 SlotifyTopBar(
                                     currentScreen = currentScreen,
                                     selectedStudent = ui.selectedStudent,
-                                    isDarkMode = isDarkMode,
-                                    appThemeMode = ui.themeMode,
-                                    onToggleTheme = mainViewModel::cycleTheme,
                                     onOpenDrawer = { coroutineScope.launch { drawerState.open() } },
                                     onOpenProfile = { navigateTo(Screen.PROFILES) },
                                     onOpenRewards = { navigateTo(Screen.REWARDS) }
                                 )
                             },
-                            floatingActionButton = {
-                                SlotifySpeedDialFab(
-                                    isExpanded = fabExpanded,
-                                    onToggleExpand = { fabExpanded = !fabExpanded },
-                                    currentScreen = currentScreen,
-                                    onNavigate = navigateTo,
-                                    onToggleTheme = mainViewModel::cycleTheme,
-                                    onToggleLanguage = mainViewModel::toggleLanguage,
-                                    isDarkMode = isDarkMode,
-                                    appThemeMode = ui.themeMode,
-                                    appLanguage = ui.language
-                                )
-                            },
-                            floatingActionButtonPosition = FabPosition.End
+                            bottomBar = {
+                                SlotifyBottomBar(currentScreen = currentScreen, onNavigate = navigateTo)
+                            }
                         ) { innerPadding ->
                             NavHost(
                                 navController = navController,
@@ -339,10 +319,9 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            // Registered after NavHost so they take priority over its back
-                            // handling: Back closes the drawer / speed-dial before popping a screen.
+                            // Registered after NavHost so it takes priority over its back handling:
+                            // Back closes the drawer before popping a screen.
                             BackHandler(enabled = drawerState.isOpen) { coroutineScope.launch { drawerState.close() } }
-                            BackHandler(enabled = fabExpanded) { fabExpanded = false }
                         }
                     }
                 }
@@ -351,185 +330,113 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/**
- * Modern Neumorphic Top Bar with Left Hamburger Menu, Center Title/Avatar, Dark Mode Toggle & Profile Shortcut
- */
+/** Top bar: settings menu, current screen and active child, star balance and profile. */
 @Composable
 fun SlotifyTopBar(
     currentScreen: Screen,
     selectedStudent: StudentEntity?,
-    isDarkMode: Boolean = false,
-    appThemeMode: AppThemeMode = if (isDarkMode) AppThemeMode.DARK else AppThemeMode.LIGHT,
-    onToggleTheme: () -> Unit,
     onOpenDrawer: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenRewards: () -> Unit
 ) {
-    Surface(
-        color = SlotifyColors.CanvasBase,
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Surface(color = SlotifyColors.CanvasBase, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 10.dp, vertical = 5.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .padding(horizontal = 4.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left: Hamburger Menu Button
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 18.dp)
-                    .background(SlotifyColors.SurfaceCard, CircleShape)
-                    .clip(CircleShape)
-                    .clickable(onClick = onOpenDrawer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Menu,
-                    contentDescription = strings.openMenu,
-                    tint = SlotifyColors.TextPrimary,
-                    modifier = Modifier.size(18.dp)
-                )
+            IconButton(onClick = onOpenDrawer) {
+                Icon(Icons.Default.Menu, contentDescription = strings.openMenu, tint = SlotifyColors.TextPrimary)
             }
-
-            // Center: App / Screen Brand Title
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .clickable(onClick = onOpenProfile)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.app_name),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
-                    color = SlotifyColors.KpmSkyBlue,
+                    text = currentScreen.localizedTitle(),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = SlotifyColors.TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 selectedStudent?.let { s ->
-                    Spacer(Modifier.width(5.dp))
-                    Box(
-                        modifier = Modifier
-                            .background(SlotifyColors.SurfaceCard, RoundedCornerShape(10.dp))
-                            .padding(horizontal = 5.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = "${s.avatarEmoji} ${s.nickname}",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = SlotifyColors.TextPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    Text(
+                        text = "${s.avatarEmoji} ${s.nickname}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = SlotifyColors.TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
-
-            // Right: Dark Mode Toggle, Star Balance & Profile Icon
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                // Theme Quick Button (Light -> Dark -> Nord -> Light)
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 17.dp)
-                        .background(SlotifyColors.SurfaceCard, CircleShape)
-                        .clip(CircleShape)
-                        .clickable(onClick = onToggleTheme),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val (topBarIcon, topBarDesc, topBarTint) = when (appThemeMode) {
-                        AppThemeMode.LIGHT -> Triple(
-                            Icons.Default.DarkMode,
-                            strings.darkMode,
-                            SlotifyColors.ActionAmber
-                        )
-
-                        AppThemeMode.DARK -> Triple(Icons.Default.AcUnit, strings.nordMode, NordColors.Nord8)
-                        AppThemeMode.NORD -> Triple(
-                            Icons.Default.LightMode,
-                            strings.lightMode,
-                            SlotifyColors.ActionAmber
-                        )
-                    }
-                    Icon(
-                        imageVector = topBarIcon,
-                        contentDescription = topBarDesc,
-                        tint = topBarTint,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-
-                // Star Coins Quick Button
-                Box(
-                    modifier = Modifier
-                        .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 16.dp)
-                        .background(SlotifyColors.SurfaceCard, RoundedCornerShape(16.dp))
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable(onClick = onOpenRewards)
-                        .padding(horizontal = 6.dp, vertical = 4.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.Star,
-                            contentDescription = strings.stars,
-                            tint = SlotifyColors.StarGold,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(Modifier.width(2.dp))
-                        Text(
-                            text = "${selectedStudent?.starCoinsBalance ?: 0}",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = SlotifyColors.TextPrimary
-                        )
-                    }
-                }
-
-                // Profile Shortcut Button
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 17.dp)
-                        .background(
-                            if (currentScreen == Screen.PROFILES) SlotifyColors.KpmSkyBlue else SlotifyColors.SurfaceCard,
-                            CircleShape
-                        )
-                        .clip(CircleShape)
-                        .clickable(onClick = onOpenProfile),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = strings.profile,
-                        tint = if (currentScreen == Screen.PROFILES) Color.White else SlotifyColors.TextPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable(onClick = onOpenRewards)
+                    .padding(horizontal = 10.dp, vertical = 12.dp)
+            ) {
+                Icon(Icons.Default.Star, contentDescription = strings.stars, tint = SlotifyColors.StarGold, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(3.dp))
+                Text(
+                    text = "${selectedStudent?.starCoinsBalance ?: 0}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = SlotifyColors.TextPrimary
+                )
+            }
+            IconButton(onClick = onOpenProfile) {
+                Icon(
+                    Icons.Default.Person,
+                    contentDescription = strings.profile,
+                    tint = if (currentScreen == Screen.PROFILES) SlotifyColors.KpmSkyBlue else SlotifyColors.TextPrimary
+                )
             }
         }
     }
 }
 
-/**
- * Slide-out Left Navigation Drawer Sheet with Settings & Tactile Neumorphic Styling
- */
+/** Bottom navigation: one tab per area. Profile lives in the top bar. */
+@Composable
+fun SlotifyBottomBar(currentScreen: Screen, onNavigate: (Screen) -> Unit) {
+    val ss = strings.shellUi
+    val tabs = listOf(
+        Screen.DASHBOARD to ss.navToday,
+        Screen.TIMETABLE to ss.navTimetable,
+        Screen.LOGISTICS to ss.navLogistics,
+        Screen.REWARDS to ss.navRewards,
+        Screen.FINANCE to ss.navFinance
+    )
+    Column {
+        HorizontalDivider(color = SlotifyColors.BorderSubtle, thickness = 1.dp)
+        NavigationBar(containerColor = SlotifyColors.SurfaceCard, tonalElevation = 0.dp) {
+            tabs.forEach { (screen, label) ->
+                NavigationBarItem(
+                    selected = currentScreen == screen,
+                    onClick = { onNavigate(screen) },
+                    icon = { Icon(screen.icon, contentDescription = null) },
+                    label = { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = SlotifyColors.KpmSkyBlue,
+                        selectedTextColor = SlotifyColors.KpmSkyBlue,
+                        indicatorColor = SlotifyColors.KpmSkyBlue.copy(alpha = 0.12f),
+                        unselectedIconColor = SlotifyColors.TextSecondary,
+                        unselectedTextColor = SlotifyColors.TextSecondary
+                    )
+                )
+            }
+        }
+    }
+}
+
+/** Settings drawer: active child, language, theme and the home-screen widget. */
 @Composable
 fun SlotifyDrawerSheet(
-    currentScreen: Screen,
     students: List<StudentEntity>,
     selectedStudent: StudentEntity?,
-    isDarkMode: Boolean = false,
-    appThemeMode: AppThemeMode = if (isDarkMode) AppThemeMode.DARK else AppThemeMode.LIGHT,
+    appThemeMode: AppThemeMode,
     appLanguage: AppLanguage,
-    onToggleTheme: () -> Unit,
-    onSelectTheme: (AppThemeMode) -> Unit = {},
+    onSelectTheme: (AppThemeMode) -> Unit,
     onSelectLanguage: (AppLanguage) -> Unit,
-    onSelectStudent: (StudentEntity) -> Unit,
-    onSelectScreen: (Screen) -> Unit
+    onSelectStudent: (StudentEntity) -> Unit
 ) {
     val scrollState = rememberScrollState()
 
@@ -551,24 +458,14 @@ fun SlotifyDrawerSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Drawer Brand Header
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 14.dp)
-                        .background(SlotifyColors.SurfaceCard, RoundedCornerShape(14.dp))
-                        .padding(10.dp)
-                ) {
+                Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                     Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("⚡", fontSize = 18.sp)
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "Slotify",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = SlotifyColors.KpmSkyBlue
-                            )
-                        }
+                        Text(
+                            text = "Slotify",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = SlotifyColors.KpmSkyBlue
+                        )
                         Spacer(Modifier.height(2.dp))
                         Text(
                             text = strings.appTagline,
@@ -612,46 +509,6 @@ fun SlotifyDrawerSheet(
                                     color = if (isSelected) Color.White else SlotifyColors.TextPrimary
                                 )
                             }
-                        }
-                    }
-                }
-
-                HorizontalDivider(color = SlotifyColors.BorderSubtle, thickness = 0.8.dp)
-
-                // Menu Navigation Items
-                Text(
-                    text = strings.navMenu,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = SlotifyColors.TextSecondary
-                )
-
-                Screen.values().forEach { screen ->
-                    val isSelected = currentScreen == screen
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (isSelected) SlotifyColors.KpmSkyBlue.copy(alpha = 0.15f) else Color.Transparent
-                            )
-                            .clickable { onSelectScreen(screen) }
-                            .padding(horizontal = 10.dp, vertical = 7.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = screen.icon,
-                                contentDescription = null,
-                                tint = if (isSelected) SlotifyColors.KpmSkyBlue else SlotifyColors.TextSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                text = screen.localizedTitle(),
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) SlotifyColors.KpmSkyBlue else SlotifyColors.TextPrimary
-                            )
                         }
                     }
                 }

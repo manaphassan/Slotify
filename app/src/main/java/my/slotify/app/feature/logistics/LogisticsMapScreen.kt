@@ -2197,7 +2197,7 @@ fun LogisticsMapScreen(
 
             // Clearance spacer for Speed Dial FAB
             item {
-                Spacer(Modifier.height(115.dp))
+                Spacer(Modifier.height(16.dp))
             }
         }
     }

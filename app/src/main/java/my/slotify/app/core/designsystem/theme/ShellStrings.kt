@@ -1,9 +1,13 @@
 package my.slotify.app.core.designsystem.theme
 
-/** App shell (drawer, top bar, speed-dial) and the reward vault. Accessed as `strings.shellUi`. */
+/** App shell (drawer, top bar, bottom navigation) and the reward vault. Accessed as `strings.shellUi`. */
 data class ShellStrings(
-    // Speed-dial FAB
-    val quickActionsMenu: String,
+    // Bottom navigation (short labels)
+    val navToday: String,
+    val navTimetable: String,
+    val navLogistics: String,
+    val navRewards: String,
+    val navFinance: String,
 
     // Drawer theme chips (short labels)
     val themeLightShort: String,
@@ -28,8 +32,11 @@ data class ShellStrings(
 )
 
 val BmShellStrings = ShellStrings(
-    // Speed-dial FAB
-    quickActionsMenu = "Menu Tindakan Pantas",
+    navToday = "Hari Ini",
+    navTimetable = "Jadual",
+    navLogistics = "Logistik",
+    navRewards = "Ganjaran",
+    navFinance = "Kewangan",
 
     // Drawer theme chips (short labels)
     themeLightShort = "Cerah",
@@ -54,8 +61,11 @@ val BmShellStrings = ShellStrings(
 )
 
 val EnShellStrings = ShellStrings(
-    // Speed-dial FAB
-    quickActionsMenu = "Quick Actions Menu",
+    navToday = "Today",
+    navTimetable = "Timetable",
+    navLogistics = "Logistics",
+    navRewards = "Rewards",
+    navFinance = "Finance",
 
     // Drawer theme chips (short labels)
     themeLightShort = "Light",

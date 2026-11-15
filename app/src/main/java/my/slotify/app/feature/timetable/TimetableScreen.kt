@@ -332,7 +332,7 @@ fun TimetableScreen(
                 }
             }
 
-            item { Spacer(Modifier.height(115.dp)) }
+            item { Spacer(Modifier.height(16.dp)) }
         }
 
         // Add Slot Dialog
