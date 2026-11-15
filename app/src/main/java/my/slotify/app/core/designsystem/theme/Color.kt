@@ -3,6 +3,7 @@ package my.slotify.app.core.designsystem.theme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 
 enum class AppThemeMode {
     LIGHT,
@@ -65,28 +66,28 @@ object NordColors {
 }
 
 /**
- * Slotify minimal colour system
- * - Neutral canvas with white (light) or near-black (dark) cards separated by a hairline outline
- * - One accent: KpmSkyBlue; status colours (ActionAmber / SuccessMint / StarGold) are used sparingly
+ * Slotify colour system (Bordeaux)
+ * - Warm off-white canvas, white cards with a hairline outline
+ * - One brand accent (Bordeaux, `KpmSkyBlue`/`Brand`); timetable states use [StatusColors]
  */
 object SlotifyColors {
     // Static base colors for Light Mode
-    val LightCanvasBase       = Color(0xFFF6F7F9) // Neutral canvas
+    val LightCanvasBase       = Color(0xFFF8F6F7) // Warm off-white background
     val LightSurfaceCard      = Color(0xFFFFFFFF) // White card
     val LightHighlightLight   = Color(0xFFFFFFFF) // Specular Light Glow (Top-Left)
-    val LightDarkShadow       = Color(0xFFE6E8EC) // Hairline outline
-    val LightTextPrimary      = Color(0xFF111827) // Near-black
-    val LightTextSecondary    = Color(0xFF6B7280) // Neutral grey
-    val LightBorderSubtle     = Color(0xFFE6E8EC) // 1dp outline / divider
+    val LightDarkShadow       = Color(0xFFEEE8EA) // Hairline outline
+    val LightTextPrimary      = Color(0xFF120A0A) // Text primary
+    val LightTextSecondary    = Color(0xFF75696D) // Text secondary
+    val LightBorderSubtle     = Color(0xFFEEE8EA) // 1dp outline / divider
 
     // Static base colors for Dark Mode
-    val CanvasBaseDark        = Color(0xFF0E1014) // Neutral dark canvas
-    val SurfaceCardDark       = Color(0xFF171A1F) // Dark card
+    val CanvasBaseDark        = Color(0xFF141012) // Warm dark canvas
+    val SurfaceCardDark       = Color(0xFF1E191B) // Dark card
     val LightHighlightDark    = Color(0xFF283244) // Specular top-left glow in dark
-    val DarkShadowDark        = Color(0xFF262A31) // Hairline outline in dark
-    val DarkTextPrimary       = Color(0xFFF3F4F6) // Off-white
-    val DarkTextSecondary     = Color(0xFF9CA3AF) // Neutral grey
-    val DarkBorderSubtle      = Color(0xFF262A31) // Dark outline / divider
+    val DarkShadowDark        = Color(0xFF2E272A) // Hairline outline in dark
+    val DarkTextPrimary       = Color(0xFFF5EFF1) // Off-white
+    val DarkTextSecondary     = Color(0xFFA89CA0) // Warm grey
+    val DarkBorderSubtle      = Color(0xFF2E272A) // Dark outline / divider
 
     // Static base colors for Nord Mode
     val CanvasBaseNord        = NordColors.Nord0
@@ -130,16 +131,32 @@ object SlotifyColors {
         }
 
     // Default static colors (for static theme scheme initialization)
-    val DefaultKpmSkyBlue     = Color(0xFF0284C7)
+    val DefaultKpmSkyBlue     = Color(0xFF9A1F3F) // Brand Bordeaux (token name kept for call sites)
+    val BrandBordeauxDark     = Color(0xFF7C1D33)
+    val BrandOnDark           = Color(0xFFC94A68) // Brand accent on dark surfaces
+    val SelectedPink          = Color(0xFFF3C4D0)
+    val SurfacePink           = Color(0xFFFBE7EC)
     val DefaultActionAmber    = Color(0xFFD97706)
     val DefaultStarGold       = Color(0xFFF59E0B)
     val DefaultSuccessMint    = Color(0xFF059669)
     val DefaultKokuPurple     = Color(0xFF7C3AED)
 
     // Dynamic 30% Structural Secondary
+    /** The single brand accent (Bordeaux). Name kept from the KPM-blue era to avoid churn. */
     val KpmSkyBlue: Color
         @Composable get() = when (LocalAppThemeMode.current) {
             AppThemeMode.NORD -> NordColors.Nord8
+            AppThemeMode.DARK -> BrandOnDark
+            AppThemeMode.LIGHT -> DefaultKpmSkyBlue
+        }
+
+    val Brand: Color
+        @Composable get() = KpmSkyBlue
+
+    /** Hero cards (current class, next trip): deep brand in every theme. */
+    val HeroContainer: Color
+        @Composable get() = when (LocalAppThemeMode.current) {
+            AppThemeMode.NORD -> NordColors.Nord10
             else -> DefaultKpmSkyBlue
         }
 
@@ -293,4 +310,37 @@ object SlotifyColors {
         val mode = LocalAppThemeMode.current
         return getSubjectColor(code, mode)
     }
+}
+
+/** Timetable / trip states: each has a tinted card background, an accent bar and chip colour. */
+enum class SlotStatus { COMPLETED, NOW, NEXT, UPCOMING, BREAK, EXAM, CANCELLED, ROOM_CHANGED, MAKEUP, ON_TIME, DELAYED, OFFLINE }
+
+data class StatusColors(val container: Color, val accent: Color, val onContainer: Color)
+
+private fun lightStatus(status: SlotStatus): StatusColors = when (status) {
+    SlotStatus.COMPLETED    -> StatusColors(Color(0xFFEAF4EC), Color(0xFF3E8E5A), Color(0xFF2E6B44))
+    SlotStatus.NOW          -> StatusColors(Color(0xFFFBE7EC), Color(0xFF9A1F3F), Color(0xFF7C1D33))
+    SlotStatus.NEXT         -> StatusColors(Color(0xFFF3EFEF), Color(0xFF9A1F3F), Color(0xFF5E5458))
+    SlotStatus.UPCOMING     -> StatusColors(Color(0xFFF3EFEF), Color(0xFF9C9296), Color(0xFF5E5458))
+    SlotStatus.BREAK        -> StatusColors(Color(0xFFF8EEDC), Color(0xFFB7843B), Color(0xFF7A5520))
+    SlotStatus.EXAM         -> StatusColors(Color(0xFFF0EAF8), Color(0xFF7C4DBA), Color(0xFF5B3590))
+    SlotStatus.CANCELLED    -> StatusColors(Color(0xFFFDE8E8), Color(0xFFC0392B), Color(0xFF962D22))
+    SlotStatus.ROOM_CHANGED -> StatusColors(Color(0xFFFFF1D6), Color(0xFFC77D12), Color(0xFF8C560B))
+    SlotStatus.MAKEUP       -> StatusColors(Color(0xFFE8EFFA), Color(0xFF3A6EA5), Color(0xFF2A527D))
+    SlotStatus.ON_TIME      -> StatusColors(Color(0xFFEAF4EC), Color(0xFF3E8E5A), Color(0xFF2E6B44))
+    SlotStatus.DELAYED      -> StatusColors(Color(0xFFFFF1D6), Color(0xFFC77D12), Color(0xFF8C560B))
+    SlotStatus.OFFLINE      -> StatusColors(Color(0xFFF3EFEF), Color(0xFF9C9296), Color(0xFF5E5458))
+}
+
+@Composable
+fun statusColors(status: SlotStatus): StatusColors {
+    val light = lightStatus(status)
+    return if (LocalThemeIsDark.current) {
+        // Dark themes: tint the dark card with the accent instead of a pastel fill.
+        StatusColors(
+            container = light.accent.copy(alpha = 0.16f).compositeOver(SlotifyColors.SurfaceCard),
+            accent = light.accent,
+            onContainer = SlotifyColors.TextPrimary
+        )
+    } else light
 }

@@ -16,6 +16,7 @@ private val provider = GoogleFont.Provider(
 )
 
 private val nunitoFont = GoogleFont("Nunito")
+private val spaceGroteskFont = GoogleFont("Space Grotesk")
 private val interFont  = GoogleFont("Inter")
 
 val NunitoFamily = FontFamily(
@@ -26,6 +27,13 @@ val NunitoFamily = FontFamily(
     Font(googleFont = nunitoFont, fontProvider = provider, weight = FontWeight.ExtraBold),
 )
 
+/** Headings, titles and class names (style guide: Space Grotesk 500–700). */
+val SpaceGroteskFamily = FontFamily(
+    Font(googleFont = spaceGroteskFont, fontProvider = provider, weight = FontWeight.Medium),
+    Font(googleFont = spaceGroteskFont, fontProvider = provider, weight = FontWeight.SemiBold),
+    Font(googleFont = spaceGroteskFont, fontProvider = provider, weight = FontWeight.Bold),
+)
+
 val InterFamily = FontFamily(
     Font(googleFont = interFont, fontProvider = provider, weight = FontWeight.Normal),
     Font(googleFont = interFont, fontProvider = provider, weight = FontWeight.Medium),
@@ -33,20 +41,30 @@ val InterFamily = FontFamily(
     Font(googleFont = interFont, fontProvider = provider, weight = FontWeight.Bold),
 )
 
+private fun heading(weight: FontWeight, size: Int, line: Int, tracking: Double = 0.0) =
+    TextStyle(fontFamily = SpaceGroteskFamily, fontWeight = weight, fontSize = size.sp, lineHeight = line.sp, letterSpacing = tracking.sp)
+
+private fun body(weight: FontWeight, size: Int, line: Int, tracking: Double = 0.0) =
+    TextStyle(fontFamily = InterFamily, fontWeight = weight, fontSize = size.sp, lineHeight = line.sp, letterSpacing = tracking.sp)
+
+/**
+ * Space Grotesk for headings, Inter for interface text. Sizes follow the style guide, scaled
+ * slightly down for the denser cards (e.g. screen title 30 instead of 32).
+ */
 val SlotifyTypography = Typography(
-    displayLarge   = TextStyle(fontFamily = InterFamily, fontWeight = FontWeight.SemiBold, fontSize = 26.sp, lineHeight = 32.sp, letterSpacing = (-0.3).sp),
-    displayMedium  = TextStyle(fontFamily = InterFamily, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 30.sp, letterSpacing = (-0.2).sp),
-    displaySmall   = TextStyle(fontFamily = InterFamily, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 28.sp),
-    headlineLarge  = TextStyle(fontFamily = InterFamily, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp),
-    headlineMedium = TextStyle(fontFamily = InterFamily, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 24.sp),
-    headlineSmall  = TextStyle(fontFamily = InterFamily, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 22.sp),
-    titleLarge     = TextStyle(fontFamily = InterFamily, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 20.sp),
-    titleMedium    = TextStyle(fontFamily = InterFamily, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 18.sp, letterSpacing = 0.1.sp),
-    titleSmall     = TextStyle(fontFamily = InterFamily, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.1.sp),
-    bodyLarge      = TextStyle(fontFamily = InterFamily, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp),
-    bodyMedium     = TextStyle(fontFamily = InterFamily, fontWeight = FontWeight.Normal, fontSize = 12.sp, lineHeight = 18.sp),
-    bodySmall      = TextStyle(fontFamily = InterFamily, fontWeight = FontWeight.Normal, fontSize = 11.sp, lineHeight = 16.sp),
-    labelLarge     = TextStyle(fontFamily = InterFamily, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.5.sp),
-    labelMedium    = TextStyle(fontFamily = InterFamily, fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 14.sp, letterSpacing = 0.5.sp),
-    labelSmall     = TextStyle(fontFamily = InterFamily, fontWeight = FontWeight.Normal, fontSize = 10.sp, lineHeight = 13.sp, letterSpacing = 0.4.sp),
+    displayLarge   = heading(FontWeight.Bold, 30, 36, -0.5),     // Screen title ("Hari Ini")
+    displayMedium  = heading(FontWeight.Bold, 26, 32, -0.3),
+    displaySmall   = heading(FontWeight.SemiBold, 22, 28, -0.2),  // Section heading ("Jadual hari ini")
+    headlineLarge  = heading(FontWeight.SemiBold, 22, 28, -0.2),
+    headlineMedium = heading(FontWeight.SemiBold, 19, 24),        // Hero class name
+    headlineSmall  = heading(FontWeight.SemiBold, 17, 22),        // Card heading
+    titleLarge     = heading(FontWeight.SemiBold, 16, 22),
+    titleMedium    = heading(FontWeight.SemiBold, 15, 20),
+    titleSmall     = body(FontWeight.SemiBold, 13, 18),
+    bodyLarge      = body(FontWeight.Normal, 15, 22),
+    bodyMedium     = body(FontWeight.Normal, 13, 19),
+    bodySmall      = body(FontWeight.Normal, 12, 17),
+    labelLarge     = body(FontWeight.SemiBold, 13, 18),           // Buttons
+    labelMedium    = body(FontWeight.Medium, 12, 16),             // Metadata (time, room)
+    labelSmall     = body(FontWeight.SemiBold, 11, 14, 0.4),      // Small caps labels ("KELAS SEMASA")
 )

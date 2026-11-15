@@ -66,6 +66,15 @@ import my.slotify.app.core.time.rememberNow
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import my.slotify.app.core.designsystem.component.HeroCard
+import my.slotify.app.core.designsystem.component.HeroMetaLine
+import my.slotify.app.core.designsystem.component.ScheduleCard
+import my.slotify.app.core.designsystem.component.SlotifyScreenTitle
+import my.slotify.app.core.designsystem.component.SlotifySectionTitle
+import my.slotify.app.core.designsystem.theme.SlotStatus
+import my.slotify.app.core.designsystem.theme.statusColors
+import my.slotify.app.core.time.SlotStates
+import androidx.compose.material.icons.outlined.Schedule
 
 
 enum class TaskFilter {
@@ -76,6 +85,7 @@ enum class TaskFilter {
 fun TodayDashboardScreen(
     students: List<StudentEntity>,
     onSelectStudent: (StudentEntity) -> Unit,
+    onOpenTimetable: () -> Unit = {},
     viewModel: DashboardViewModel = viewModel(factory = SlotifyViewModelFactory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -84,7 +94,6 @@ fun TodayDashboardScreen(
     var showTakwimDialog by remember { mutableStateOf(false) }
     var showAddHomeworkDialog by remember { mutableStateOf(false) }
     var showSchoolBagDialog by remember { mutableStateOf(false) }
-    var nowOpen by rememberSaveable { mutableStateOf(true) }
     var prepOpen by rememberSaveable { mutableStateOf(true) }
     var academicOpen by rememberSaveable { mutableStateOf(true) }
     var infoOpen by rememberSaveable { mutableStateOf(false) }
@@ -119,6 +128,22 @@ fun TodayDashboardScreen(
     val bagPacked = state.bagPacked
     fun claimBagPacked() = viewModel.markBagPacked()
 
+    val sch = str.scheduleUi
+    val nowMinutes = now.hour * 60 + now.minute
+    val slotStates = remember(todaySlots, nowMinutes, todayDayOfWeek) {
+        SlotStates.forDay(todaySlots, if (todayDayOfWeek != null) nowMinutes else null)
+    }
+    val currentSlot = slotStates.firstOrNull { it.second.status == SlotStatus.NOW }
+    val nextSlot = slotStates.firstOrNull { it.second.status == SlotStatus.NEXT }
+    val todayLabel = remember(today, appLanguage) {
+        today.format(
+            java.time.format.DateTimeFormatter.ofPattern(
+                "EEEE, d MMMM",
+                if (appLanguage == AppLanguage.EN) Locale.ENGLISH else Locale.forLanguageTag("ms-MY")
+            )
+        ).replaceFirstChar { it.uppercase() }
+    }
+
     val filteredTasks = when (selectedFilter) {
         TaskFilter.ALL -> tasks
         TaskFilter.PENDING -> tasks.filter { !it.isCompleted }
@@ -136,6 +161,10 @@ fun TodayDashboardScreen(
                 .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            item {
+                SlotifyScreenTitle(title = strings.today, subtitle = todayLabel)
+            }
+
             // Child Profile Switcher Tabs (30% Secondary Structure)
             item {
                 LazyRow(
@@ -146,11 +175,9 @@ fun TodayDashboardScreen(
                         val isSelected = student.id == selectedStudent?.id
                         Box(
                             modifier = Modifier
-                                .neumorphicClickable(cornerRadius = SlotifyShapes.LargeDp) { onSelectStudent(student) }
-                                .background(
-                                    if (isSelected) SlotifyColors.KpmSkyBlue.copy(alpha = 0.15f) else SlotifyColors.SurfaceCard,
-                                    SlotifyShapes.Large
-                                )
+                                .clip(RoundedCornerShape(50))
+                                .background(if (isSelected) SlotifyColors.Brand else SlotifyColors.SurfaceCard)
+                                .clickable { onSelectStudent(student) }
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -161,12 +188,12 @@ fun TodayDashboardScreen(
                                         text = student.nickname,
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) SlotifyColors.KpmSkyBlue else SlotifyColors.TextPrimary
+                                        color = if (isSelected) Color.White else SlotifyColors.TextPrimary
                                     )
                                     Text(
                                         text = student.currentLevel,
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = SlotifyColors.TextSecondary
+                                        color = if (isSelected) Color.White.copy(alpha = 0.8f) else SlotifyColors.TextSecondary
                                     )
                                 }
                             }
@@ -175,22 +202,82 @@ fun TodayDashboardScreen(
                 }
             }
 
-            slotifySection(
-                key = "now",
-                title = ds.groupNow,
-                expanded = nowOpen,
-                onToggle = { nowOpen = !nowOpen }
-            ) {
-                // ============================================================
-                // 🌟 PILLAR 1: MYSTUDYLIFE REALTIME CLASS & TIMELINE PROGRESS
-                // ============================================================
-                item {
-                    InHomeRealtimeClassWidget(
-                        selectedStudent = selectedStudent,
-                        todaySlots = todaySlots
+            // Hero: the class that matters right now
+            item {
+                when {
+                    todayDayOfWeek == null || todaySlots.isEmpty() -> HeroCard(
+                        label = sch.freeDayTitle.uppercase(),
+                        title = sch.heroNoClassToday,
+                        onClick = onOpenTimetable
+                    ) {
+                        HeroMetaLine(
+                            Icons.Default.Event,
+                            sch.heroNextSchoolDay(AttireGuide.dayName(nextSchoolDayOfWeek, appLanguage))
+                        )
+                        Text(sch.viewFullWeek, style = MaterialTheme.typography.labelLarge, color = Color.White)
+                    }
+
+                    currentSlot != null -> HeroCard(
+                        label = sch.heroCurrentClass,
+                        title = currentSlot.first.subjectName,
+                        chip = sch.statusNow
+                    ) {
+                        HeroMetaLine(Icons.Outlined.Schedule, "${currentSlot.first.startTime} – ${currentSlot.first.endTime}")
+                        currentSlot.second.minutesLeft?.let { HeroMetaLine(Icons.Default.HourglassBottom, sch.heroTimeLeft(it)) }
+                        currentSlot.first.teacherName?.let { HeroMetaLine(Icons.Default.Person, it) }
+                    }
+
+                    nextSlot != null -> HeroCard(
+                        label = sch.heroNextClass,
+                        title = nextSlot.first.subjectName,
+                        chip = nextSlot.second.minutesUntilStart?.let { sch.statusIn(it) },
+                        chipStatus = SlotStatus.NEXT
+                    ) {
+                        HeroMetaLine(Icons.Outlined.Schedule, "${nextSlot.first.startTime} – ${nextSlot.first.endTime}")
+                        nextSlot.first.teacherName?.let { HeroMetaLine(Icons.Default.Person, it) }
+                    }
+
+                    else -> HeroCard(
+                        label = todayLabel.uppercase(),
+                        title = sch.heroAllDoneTitle,
+                        container = statusColors(SlotStatus.COMPLETED).accent
+                    ) {
+                        HeroMetaLine(Icons.Default.CheckCircle, sch.heroAllDoneSubtitle)
+                    }
+                }
+            }
+
+            if (todayDayOfWeek != null && todaySlots.isNotEmpty()) {
+                item { SlotifySectionTitle(sch.todaySchedule) }
+                items(slotStates, key = { "slot-" + it.first.id }) { (slot, st) ->
+                    ScheduleCard(
+                        title = slot.subjectName,
+                        time = "${slot.startTime} – ${slot.endTime}",
+                        status = st.status,
+                        subtitle = slot.teacherName,
+                        subtitleIcon = Icons.Default.Person,
+                        chip = when (st.status) {
+                            SlotStatus.COMPLETED -> sch.statusCompleted
+                            SlotStatus.NOW -> sch.statusNow
+                            SlotStatus.NEXT -> st.minutesUntilStart?.let { sch.statusIn(it) }
+                            SlotStatus.BREAK -> sch.statusBreak
+                            else -> sch.statusUpcoming
+                        },
+                        accent = when (st.status) {
+                            SlotStatus.COMPLETED, SlotStatus.NOW, SlotStatus.BREAK -> null
+                            else -> SlotifyColors.subjectColor(slot.subjectCode)
+                        },
+                        onClick = onOpenTimetable
                     )
                 }
+            }
 
+            slotifySection(
+                key = "prep",
+                title = ds.groupPrep,
+                expanded = prepOpen,
+                onToggle = { prepOpen = !prepOpen }
+            ) {
                 // Daily Attire Card
                 item {
                     Box(
@@ -218,14 +305,6 @@ fun TodayDashboardScreen(
                         }
                     }
                 }
-            }
-
-            slotifySection(
-                key = "prep",
-                title = ds.groupPrep,
-                expanded = prepOpen,
-                onToggle = { prepOpen = !prepOpen }
-            ) {
                 // ============================================================
                 // 🎒 SMART SCHOOL BAG PACK CHECKLIST
                 // ============================================================
@@ -1151,221 +1230,6 @@ fun TodayDashboardScreen(
     }
 }
 
-/**
- * Fix 2.1: Tactical In-Home Realtime Widget showing current class & next upcoming subject.
- * Now reads live timetable data and a live clock (refreshes every minute).
- */
-@Composable
-fun InHomeRealtimeClassWidget(
-    selectedStudent: StudentEntity?,
-    todaySlots: List<TimetableSlotEntity> = emptyList()
-) {
-    // Fix 2.1: Live clock that refreshes every minute
-    var nowHHMM by remember {
-        val c = Calendar.getInstance()
-        mutableIntStateOf(c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE))
-    }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(60_000L)
-            val c = Calendar.getInstance()
-            nowHHMM = c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE)
-        }
-    }
-
-    // Parse "08:30" -> minutes since midnight
-    fun parseTime(t: String): Int = try {
-        val parts = t.split(":")
-        parts[0].toInt() * 60 + parts[1].toInt()
-    } catch (e: Exception) {
-        0
-    }
-
-    val activeSlot = todaySlots.firstOrNull { slot ->
-        !slot.isRehat &&
-                parseTime(slot.startTime) <= nowHHMM &&
-                parseTime(slot.endTime) > nowHHMM
-    }
-    val nextSlot = todaySlots.firstOrNull { slot ->
-        !slot.isRehat && parseTime(slot.startTime) > nowHHMM
-    }
-    val ds = strings.dashboardUi
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = SlotifyShapes.LargeDp)
-            .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-            .padding(12.dp)
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            // Widget Title & Live Indicator
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(SlotifyColors.SuccessMint)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = strings.realtimeWidgetTitle,
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = SlotifyColors.TextPrimary
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .background(SlotifyColors.CanvasBase, SlotifyShapes.Small)
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = strings.todayDaySuffix(
-                            AttireGuide.dayName(SchoolDay.of(java.time.LocalDate.now()), LocalAppLanguage.current)
-                        ),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = SlotifyColors.KpmSkyBlue
-                    )
-                }
-            }
-
-            HorizontalDivider(color = SlotifyColors.BorderSubtle, thickness = 0.8.dp)
-
-            // Current Class (Sedang Berjalan)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    if (activeSlot != null) {
-                        val baki = parseTime(activeSlot.endTime) - nowHHMM
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "🔴 ${strings.ongoingClass}",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = SlotifyColors.EnglishRed
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "${activeSlot.startTime} – ${activeSlot.endTime} (${ds.minutesRemaining(baki)})",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = SlotifyColors.TextSecondary
-                            )
-                        }
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = "${activeSlot.subjectName} (${activeSlot.subjectCode})",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = SlotifyColors.TextPrimary
-                        )
-                        Text(
-                            text = buildString {
-                                activeSlot.teacherName?.let { append("$it • ") }
-                                append(selectedStudent?.className?.ifBlank { ds.classroomFallback }
-                                    ?: ds.classroomFallback)
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = SlotifyColors.TextSecondary
-                        )
-                    } else {
-                        Text(
-                            text = "🟢 ${strings.ongoingClass}",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = SlotifyColors.SuccessMint
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = if (todaySlots.isEmpty()) ds.timetableNotSet else ds.noClassNow,
-                            style = MaterialTheme.typography.titleLarge,
-                            color = SlotifyColors.TextPrimary
-                        )
-                        Text(
-                            text = selectedStudent?.nickname ?: "-",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = SlotifyColors.TextSecondary
-                        )
-                    }
-                }
-
-                // Fix 3.3: SlotifyShapes.Small replaces raw SlotifyShapes.Small
-                val badgeColor = if (activeSlot != null)
-                    SlotifyColors.subjectColor(activeSlot.subjectCode)
-                else SlotifyColors.TextTertiary
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .background(badgeColor.copy(alpha = 0.15f), SlotifyShapes.Small),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = activeSlot?.subjectCode ?: "–",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = badgeColor
-                    )
-                }
-            }
-
-            // Next Class (Seterusnya)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    // Fix 3.3: SlotifyShapes.Small replaces raw SlotifyShapes.Small
-                    .background(SlotifyColors.CanvasBase, SlotifyShapes.Small)
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("⏩", fontSize = 12.sp)
-                        Spacer(Modifier.width(6.dp))
-                        Column {
-                            Text(
-                                // Fix 2.1: Real next class from timetable
-                                text = if (nextSlot != null)
-                                    "${strings.nextClassPrefix} ${nextSlot.subjectName} (${nextSlot.subjectCode}) • ${nextSlot.startTime}"
-                                else
-                                    "${strings.nextClassPrefix} ${if (todaySlots.isEmpty()) ds.nextTimetableMissing else ds.noNextClass}",
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-                                color = SlotifyColors.TextPrimary
-                            )
-                            if (nextSlot != null && nextSlot.requiresTextbook) {
-                                Text(
-                                    text = "${strings.requiredBookPrefix} ${ds.textbookFor(nextSlot.subjectName)}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = SlotifyColors.ActionAmber
-                                )
-                            }
-                        }
-                    }
-                    Icon(
-                        // Fix deprecation: use AutoMirrored variant for RTL support
-                        Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        modifier = Modifier.size(12.dp),
-                        tint = SlotifyColors.TextTertiary
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Fix 3.1: Reusable empty state composable for lists with no items.
- * Shows a centred emoji + message to avoid blank whitespace confusion.
- */
 @Composable
 fun SlotifyEmptyState(emoji: String, message: String) {
     Column(

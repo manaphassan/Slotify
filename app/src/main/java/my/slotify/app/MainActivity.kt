@@ -291,7 +291,8 @@ class MainActivity : ComponentActivity() {
                                 composable(Screen.DASHBOARD.name) {
                                     TodayDashboardScreen(
                                         students = ui.students,
-                                        onSelectStudent = mainViewModel::selectStudent
+                                        onSelectStudent = mainViewModel::selectStudent,
+                                        onOpenTimetable = { navigateTo(Screen.TIMETABLE) }
                                     )
                                 }
                                 composable(Screen.TIMETABLE.name) { TimetableScreen() }
@@ -352,21 +353,19 @@ fun SlotifyTopBar(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = currentScreen.localizedTitle(),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = SlotifyColors.TextPrimary,
+                    text = stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = SlotifyColors.Brand,
+                    maxLines = 1
+                )
+                Text(
+                    text = selectedStudent?.let { "${it.avatarEmoji} ${it.nickname} • ${it.currentLevel}" }
+                        ?: strings.appTagline,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = SlotifyColors.TextSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                selectedStudent?.let { s ->
-                    Text(
-                        text = "${s.avatarEmoji} ${s.nickname}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = SlotifyColors.TextSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -375,7 +374,12 @@ fun SlotifyTopBar(
                     .clickable(onClick = onOpenRewards)
                     .padding(horizontal = 10.dp, vertical = 12.dp)
             ) {
-                Icon(Icons.Default.Star, contentDescription = strings.stars, tint = SlotifyColors.StarGold, modifier = Modifier.size(16.dp))
+                Icon(
+                    Icons.Default.Star,
+                    contentDescription = strings.stars,
+                    tint = SlotifyColors.StarGold,
+                    modifier = Modifier.size(16.dp)
+                )
                 Spacer(Modifier.width(3.dp))
                 Text(
                     text = "${selectedStudent?.starCoinsBalance ?: 0}",
