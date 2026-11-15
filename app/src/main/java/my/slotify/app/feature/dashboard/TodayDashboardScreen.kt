@@ -100,7 +100,14 @@ fun TodayDashboardScreen(
 
     val selectedStudent = state.student
     val tasks = state.tasks
-    val exams = state.exams
+    val exams = remember(state.exams, state.today) {
+        state.exams.sortedWith(
+            compareBy<ExamEntity>(
+                { (ExamDates.daysUntil(it.examDate, state.today) ?: 0L) < 0L },
+                { ExamDates.parse(it.examDate) })
+        )
+    }
+    val upcomingExamCount = exams.count { (ExamDates.daysUntil(it.examDate, state.today) ?: 0L) >= 0L }
     val today = state.today
     // School-day convention: 1=Isnin..5=Jumaat, null on weekends (no "today" timetable).
     val todayDayOfWeek: Int? = state.todaySchoolDay
@@ -172,9 +179,7 @@ fun TodayDashboardScreen(
                 key = "now",
                 title = ds.groupNow,
                 expanded = nowOpen,
-                onToggle = { nowOpen = !nowOpen },
-                expandLabel = ds.expandSection,
-                collapseLabel = ds.collapseSection
+                onToggle = { nowOpen = !nowOpen }
             ) {
                 // ============================================================
                 // 🌟 PILLAR 1: MYSTUDYLIFE REALTIME CLASS & TIMELINE PROGRESS
@@ -200,7 +205,7 @@ fun TodayDashboardScreen(
                             Spacer(Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = strings.sectionAttire,
+                                    text = if (todayDayOfWeek == null) strings.tomorrowAttireTitle else strings.sectionAttire,
                                     style = MaterialTheme.typography.titleMedium,
                                     color = SlotifyColors.TextPrimary
                                 )
@@ -219,9 +224,7 @@ fun TodayDashboardScreen(
                 key = "prep",
                 title = ds.groupPrep,
                 expanded = prepOpen,
-                onToggle = { prepOpen = !prepOpen },
-                expandLabel = ds.expandSection,
-                collapseLabel = ds.collapseSection
+                onToggle = { prepOpen = !prepOpen }
             ) {
                 // ============================================================
                 // 🎒 SMART SCHOOL BAG PACK CHECKLIST
@@ -327,9 +330,7 @@ fun TodayDashboardScreen(
                 title = ds.groupAcademic,
                 expanded = academicOpen,
                 onToggle = { academicOpen = !academicOpen },
-                expandLabel = ds.expandSection,
-                collapseLabel = ds.collapseSection,
-                summary = ds.groupAcademicSummary(tasks.count { !it.isCompleted }, exams.size)
+                summary = ds.groupAcademicSummary(tasks.count { !it.isCompleted }, upcomingExamCount)
             ) {
                 // ============================================================
                 // 🌟 PILLAR 2: MYSTUDYLIFE TASKS & HOMEWORK TRACKER
@@ -371,7 +372,11 @@ fun TodayDashboardScreen(
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                                         modifier = Modifier.height(28.dp)
                                     ) {
-                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(12.dp))
+                                        Icon(
+                                            Icons.Default.Add,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(12.dp)
+                                        )
                                         Spacer(Modifier.width(4.dp))
                                         Text(ds.addTaskButton, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
@@ -595,9 +600,15 @@ fun TodayDashboardScreen(
                                     // Fix 4.1: Use @Composable subjectColor() for theme-aware color resolution
                                     val subjectColor = SlotifyColors.subjectColor(exam.subjectCode)
                                     // Fix 2.2: Compute daysRemaining at runtime from examDate string
-                                    val daysLeft = remember(exam.examDate, today) {
-                                        ExamDates.daysUntil(exam.examDate, today)?.toInt()?.coerceAtLeast(0)
-                                            ?: exam.daysRemaining
+                                    val rawDays = remember(exam.examDate, today) {
+                                        ExamDates.daysUntil(exam.examDate, today)?.toInt()
+                                    }
+                                    val isPast = rawDays != null && rawDays < 0
+                                    val daysLeft = rawDays?.coerceAtLeast(0) ?: exam.daysRemaining
+                                    val badgeColor = when {
+                                        isPast -> SlotifyColors.TextSecondary
+                                        daysLeft <= 4 -> SlotifyColors.EnglishRed
+                                        else -> SlotifyColors.ActionAmber
                                     }
                                     Box(
                                         modifier = Modifier
@@ -620,23 +631,20 @@ fun TodayDashboardScreen(
                                                     modifier = Modifier
                                                         .size(42.dp)
                                                         .clip(CircleShape)
-                                                        .background(
-                                                            if (daysLeft <= 4) SlotifyColors.EnglishRed.copy(alpha = 0.15f)
-                                                            else SlotifyColors.ActionAmber.copy(alpha = 0.15f)
-                                                        ),
+                                                        .background(badgeColor.copy(alpha = 0.15f)),
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                         Text(
-                                                            text = "$daysLeft",
+                                                            text = if (isPast) "✓" else "$daysLeft",
                                                             style = MaterialTheme.typography.titleLarge,
-                                                            color = if (daysLeft <= 4) SlotifyColors.EnglishRed else SlotifyColors.ActionAmber
+                                                            color = badgeColor
                                                         )
                                                         Text(
-                                                            text = ds.examDaysUnit,
+                                                            text = if (isPast) ds.examPastLabel else ds.examDaysUnit,
                                                             fontSize = 10.sp,
                                                             fontWeight = FontWeight.Bold,
-                                                            color = if (daysLeft <= 4) SlotifyColors.EnglishRed else SlotifyColors.ActionAmber
+                                                            color = badgeColor
                                                         )
                                                     }
                                                 }
@@ -763,21 +771,21 @@ fun TodayDashboardScreen(
                 key = "info",
                 title = ds.groupInfo,
                 expanded = infoOpen,
-                onToggle = { infoOpen = !infoOpen },
-                expandLabel = ds.expandSection,
-                collapseLabel = ds.collapseSection
+                onToggle = { infoOpen = !infoOpen }
             ) {
                 // ============================================================
                 // 🗓️ KPM 2026/2027 ACADEMIC CALENDAR & HOLIDAYS BANNER
                 // ============================================================
                 item {
                     val todayDate = remember { java.time.LocalDate.now() }
-                    val currentHoliday = remember { my.slotify.app.core.takwim.KpmTakwimRepository.isHoliday(todayDate) }
+                    val currentHoliday =
+                        remember { my.slotify.app.core.takwim.KpmTakwimRepository.isHoliday(todayDate) }
                     val nextHoliday = remember {
                         my.slotify.app.core.takwim.KpmTakwimRepository.getUpcomingHolidays(todayDate, limit = 1)
                             .firstOrNull()
                     }
-                    val currentTerm = remember { my.slotify.app.core.takwim.KpmTakwimRepository.getCurrentTerm(todayDate) }
+                    val currentTerm =
+                        remember { my.slotify.app.core.takwim.KpmTakwimRepository.getCurrentTerm(todayDate) }
 
                     Box(
                         modifier = Modifier
@@ -967,9 +975,7 @@ fun TodayDashboardScreen(
                 key = "routine",
                 title = ds.groupRoutine,
                 expanded = routineOpen,
-                onToggle = { routineOpen = !routineOpen },
-                expandLabel = ds.expandSection,
-                collapseLabel = ds.collapseSection
+                onToggle = { routineOpen = !routineOpen }
             ) {
                 // Routine Notification & Automation Card
                 item {
@@ -1072,7 +1078,8 @@ fun TodayDashboardScreen(
                                             s = str.systemUi,
                                             childName = selectedStudent?.nickname ?: str.childFallback,
                                             attire = AttireGuide.forSchoolDay(nextSchoolDayOfWeek, appLanguage),
-                                            books = tomorrowSlots.filter { !it.isRehat }.map { it.subjectName }.distinct()
+                                            books = tomorrowSlots.filter { !it.isRehat }.map { it.subjectName }
+                                                .distinct()
                                                 .joinToString(", ").ifBlank { ds.attireBooksFallback }
                                         )
                                         notifFeedback = ds.attireTestSent

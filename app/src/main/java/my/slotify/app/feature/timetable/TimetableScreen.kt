@@ -46,6 +46,7 @@ import my.slotify.app.core.time.SchoolDay
 import my.slotify.app.core.model.AttireGuide
 import my.slotify.app.core.time.TimeOfDay
 import my.slotify.app.core.time.rememberNow
+import my.slotify.app.core.designsystem.component.slotifySection
 
 enum class TimetableViewMode {
     DAY,
@@ -98,6 +99,8 @@ fun TimetableScreen(
     val tomorrowDow = SchoolDay.nextAfter(today)
     val tomorrowSlots = allSlots.filter { it.dayOfWeek == tomorrowDow }
 
+    var trackerOpen by rememberSaveable { mutableStateOf(false) }
+
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier
@@ -114,20 +117,10 @@ fun TimetableScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(
-                            text = strings.timetableTitle,
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = SlotifyColors.TextPrimary
-                        )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(
-                                text = "${selectedStudent?.nickname ?: ts.studentFallback} • ${selectedStudent?.currentLevel ?: "KPM"}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = SlotifyColors.TextSecondary
-                            )
                             // Session badge — shows active session context (SRA Pagi / SK Petang)
                             if (session != null) {
                                 val sessionLabel = when (session.sessionTimeType) {
@@ -237,25 +230,6 @@ fun TimetableScreen(
                 }
             }
 
-            // Realtime Tracker Card
-            item {
-                RealtimeClassTrackerCard(
-                    activeSlot = activeSlot,
-                    nextSlot = nextSlot,
-                    simulatedTime = String.format(
-                        java.util.Locale.US,
-                        "%02d:%02d",
-                        currentSimMinutes / 60,
-                        currentSimMinutes % 60
-                    ) +
-                            if (simulatedMinutes == null) " (${ts.clockLiveTag})" else " (${ts.clockPreviewTag})",
-                    onSimulateMorning = { simulatedMinutes = 8 * 60 + 15 },
-                    onSimulateNoon = { simulatedMinutes = 10 * 60 + 15 },
-                    onSimulateAfternoon = { simulatedMinutes = 14 * 60 + 30 },
-                    onLive = { simulatedMinutes = null }
-                )
-            }
-
             // View Content
             when (viewMode) {
                 TimetableViewMode.DAY -> {
@@ -329,6 +303,33 @@ fun TimetableScreen(
                     item {
                         TomorrowViewSection(tomorrowSlots, tomorrowDow)
                     }
+                }
+            }
+
+            slotifySection(
+                key = "tracker",
+                title = ts.groupTracker,
+                expanded = trackerOpen,
+                onToggle = { trackerOpen = !trackerOpen },
+                summary = activeSlot?.let { ts.trackerSummary(it.subjectName) }
+            ) {
+                // Realtime Tracker Card
+                item {
+                    RealtimeClassTrackerCard(
+                        activeSlot = activeSlot,
+                        nextSlot = nextSlot,
+                        simulatedTime = String.format(
+                            java.util.Locale.US,
+                            "%02d:%02d",
+                            currentSimMinutes / 60,
+                            currentSimMinutes % 60
+                        ) +
+                                if (simulatedMinutes == null) " (${ts.clockLiveTag})" else " (${ts.clockPreviewTag})",
+                        onSimulateMorning = { simulatedMinutes = 8 * 60 + 15 },
+                        onSimulateNoon = { simulatedMinutes = 10 * 60 + 15 },
+                        onSimulateAfternoon = { simulatedMinutes = 14 * 60 + 30 },
+                        onLive = { simulatedMinutes = null }
+                    )
                 }
             }
 

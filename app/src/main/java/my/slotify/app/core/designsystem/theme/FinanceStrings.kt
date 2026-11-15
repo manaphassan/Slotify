@@ -2,6 +2,14 @@ package my.slotify.app.core.designsystem.theme
 
 /** Finance screen, fee dialogs and finance ViewModel messages. Accessed as `strings.financeUi`. */
 data class FinanceStrings(
+    // Section headers
+    val groupPocket: String,
+    val groupFees: String,
+    val groupTakwim: String,
+    val groupNotifications: String,
+    val pocketSummary: (String, String) -> String,
+    val feesSummary: (Int, Int) -> String,
+
     // Pocket money card
     val decreaseSpent: String,
     val increaseSpent: String,
@@ -53,6 +61,13 @@ data class FinanceStrings(
 )
 
 val BmFinanceStrings = FinanceStrings(
+    groupPocket = "Duit Poket & Tabung",
+    groupFees = "Yuran Bulanan",
+    groupTakwim = "Takwim KPM",
+    groupNotifications = "Notifikasi",
+    pocketSummary = { spent, saved -> "Belanja $spent • Tabung $saved" },
+    feesSummary = { pending, total -> "$pending belum bayar daripada $total" },
+
     // Pocket money card
     decreaseSpent = "Kurang",
     increaseSpent = "Tambah",
@@ -104,6 +119,13 @@ val BmFinanceStrings = FinanceStrings(
 )
 
 val EnFinanceStrings = FinanceStrings(
+    groupPocket = "Pocket Money & Savings",
+    groupFees = "Monthly Fees",
+    groupTakwim = "KPM Calendar",
+    groupNotifications = "Notifications",
+    pocketSummary = { spent, saved -> "Spent $spent • Savings $saved" },
+    feesSummary = { pending, total -> "$pending of $total unpaid" },
+
     // Pocket money card
     decreaseSpent = "Decrease",
     increaseSpent = "Increase",

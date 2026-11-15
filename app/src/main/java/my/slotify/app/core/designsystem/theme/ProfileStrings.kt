@@ -2,6 +2,11 @@ package my.slotify.app.core.designsystem.theme
 
 /** Student profile screen and its dialogs. Accessed as `strings.profileUi`. */
 data class ProfileStrings(
+    // Section headers
+    val groupPersonal: String,
+    val groupSchool: String,
+    val groupAssessment: String,
+
     // Hero card
     val classWithName: (String) -> String,
     val classFallback: String,
@@ -49,6 +54,10 @@ data class ProfileStrings(
 )
 
 val BmProfileStrings = ProfileStrings(
+    groupPersonal = "Maklumat Peribadi",
+    groupSchool = "Sekolah & Pengangkutan",
+    groupAssessment = "Pentaksiran (PBD)",
+
     // Hero card
     classWithName = { name -> "Kelas: $name" },
     classFallback = "Kelas KPM",
@@ -98,6 +107,10 @@ val BmProfileStrings = ProfileStrings(
 )
 
 val EnProfileStrings = ProfileStrings(
+    groupPersonal = "Personal Details",
+    groupSchool = "School & Transport",
+    groupAssessment = "Assessments (PBD)",
+
     // Hero card
     classWithName = { name -> "Class: $name" },
     classFallback = "KPM Class",

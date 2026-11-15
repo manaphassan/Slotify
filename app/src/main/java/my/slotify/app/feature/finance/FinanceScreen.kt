@@ -47,6 +47,8 @@ import my.slotify.app.feature.takwim.TakwimCalendarDialog
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import my.slotify.app.core.designsystem.component.slotifySection
+import androidx.compose.runtime.saveable.rememberSaveable
 
 // ── Finance screen — Room-backed with Tabung Maya, Fee Management & Takwim KPM ──
 
@@ -92,6 +94,11 @@ fun FinanceScreen(
         }
     }
 
+    var pocketOpen by rememberSaveable { mutableStateOf(true) }
+    var feesOpen by rememberSaveable { mutableStateOf(true) }
+    var takwimOpen by rememberSaveable { mutableStateOf(false) }
+    var notificationsOpen by rememberSaveable { mutableStateOf(false) }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -99,43 +106,6 @@ fun FinanceScreen(
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Header
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = strings.financeTitle,
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = SlotifyColors.TextPrimary
-                    )
-                    Text(
-                        text = strings.financeSubtitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = SlotifyColors.TextSecondary
-                    )
-                }
-
-                // Button to open KPM Takwim
-                FilledTonalButton(
-                    onClick = { showTakwimDialog = true },
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = SlotifyColors.KpmBlue.copy(alpha = 0.12f),
-                        contentColor = SlotifyColors.KpmBlue
-                    ),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text("🗓️ Takwim KPM", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
         // Celebration Banner when converting savings to stars
         if (celebrationMessage != null) {
             item {
@@ -174,417 +144,556 @@ fun FinanceScreen(
             }
         }
 
-        // Daily Pocket Money Card (Duit Poket)
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = SlotifyShapes.LargeDp)
-                    .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                    .padding(12.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(SlotifyColors.KpmBlue.copy(alpha = 0.15f), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.AccountBalanceWallet,
-                                    contentDescription = null,
-                                    tint = SlotifyColors.KpmBlue,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            Spacer(Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = "${strings.dailyPocketMoneyTitle} (${selectedStudent?.nickname ?: strings.childFallback})",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = SlotifyColors.TextPrimary
-                                )
-                                Text(
-                                    text = "${strings.canteenBudgetLabel}: ${Money.format(state.budgetSen)}",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                                    color = SlotifyColors.KpmBlue
-                                )
-                            }
-                        }
-                    }
-
-                    HorizontalDivider(color = SlotifyColors.TextTertiary.copy(alpha = 0.2f), thickness = 1.dp)
-
-                    // Spent and Savings counters
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                text = strings.canteenSpentLabel,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = SlotifyColors.TextSecondary
-                            )
-                            Text(
-                                text = Money.format(state.spentTodaySen),
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = SlotifyColors.EnglishRed
-                            )
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = strings.savingsLabel,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = SlotifyColors.TextSecondary
-                            )
-                            Text(
-                                text = "+ ${Money.format(state.savedTodaySen)}",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = SlotifyColors.ScienceGreen
-                            )
-                        }
-                    }
-
-                    // Interactive allowance adjustments (+ / - RM0.50 & quick presets)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = strings.quickPresetsLabel,
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-                            color = SlotifyColors.TextSecondary
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            // - RM 0.50
-                            FilledTonalIconButton(
-                                onClick = { viewModel.adjustSpentToday(-50) },
-                                modifier = Modifier.size(48.dp),
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = SlotifyColors.CanvasBase
-                                )
-                            ) {
-                                Icon(
-                                    Icons.Default.Remove,
-                                    contentDescription = fs.decreaseSpent,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = SlotifyColors.TextPrimary
-                                )
-                            }
-                            // Quick RM 3.00
-                            OutlinedButton(
-                                onClick = { viewModel.setSpentToday(300) },
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                modifier = Modifier.height(32.dp),
-                                shape = SlotifyShapes.Small
-                            ) {
-                                Text(
-                                    "RM 3",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
-                                )
-                            }
-                            // Quick RM 5.00
-                            OutlinedButton(
-                                onClick = { viewModel.setSpentToday(500) },
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                modifier = Modifier.height(32.dp),
-                                shape = SlotifyShapes.Small
-                            ) {
-                                Text(
-                                    "RM 5",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
-                                )
-                            }
-                            // + RM 0.50
-                            FilledTonalIconButton(
-                                onClick = { viewModel.adjustSpentToday(50) },
-                                modifier = Modifier.size(48.dp),
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = SlotifyColors.CanvasBase
-                                )
-                            ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = fs.increaseSpent,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = SlotifyColors.TextPrimary
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Tabung Maya (Virtual Piggy Bank) Card
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = SlotifyShapes.LargeDp)
-                    .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                    .padding(12.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(SlotifyColors.ScienceGreen.copy(alpha = 0.15f), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("🪙", fontSize = 18.sp)
-                            }
-                            Spacer(Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = fs.tabungTitle,
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = SlotifyColors.TextPrimary
-                                )
-                                Text(
-                                    text = fs.tabungSubtitle,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = SlotifyColors.TextSecondary
-                                )
-                            }
-                        }
-
-                        Text(
-                            text = Money.format(state.tabungSen),
-                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                            color = SlotifyColors.ScienceGreen
-                        )
-                    }
-
-                    HorizontalDivider(color = SlotifyColors.TextTertiary.copy(alpha = 0.15f), thickness = 1.dp)
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = fs.convertSavingsHint,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = SlotifyColors.TextSecondary,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Button(
-                            onClick = { viewModel.convertSavings() },
-                            shape = SlotifyShapes.Small,
-                            colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.ScienceGreen),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) {
-                            Text(fs.convertSavingsButton, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-        }
-
-        // KPM Takwim Status Banner
-        item {
-            val upcomingHoliday =
-                remember { KpmTakwimRepository.getUpcomingHolidays(todayDate, limit = 1).firstOrNull() }
-            val currentTerm = remember { KpmTakwimRepository.getCurrentTerm(todayDate) }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 14.dp)
-                    .background(SlotifyColors.SurfaceCard, RoundedCornerShape(14.dp))
-                    .clickable { showTakwimDialog = true }
-                    .padding(14.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                        Text(upcomingHoliday?.emoji ?: "🗓️", fontSize = 24.sp)
-                        Spacer(Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "Takwim KPM: ${currentTerm?.name ?: fs.takwimSessionFallback}",
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                color = SlotifyColors.TextPrimary
-                            )
-                            if (upcomingHoliday != null) {
-                                val days = upcomingHoliday.daysUntil(todayDate)
-                                val daysText = if (days <= 0) fs.holidayOngoing else fs.holidayInDays(days)
-                                val holidayTitle =
-                                    if (LocalAppLanguage.current == AppLanguage.EN) upcomingHoliday.titleEn else upcomingHoliday.titleBm
-                                Text(
-                                    text = "$holidayTitle ($daysText)",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = SlotifyColors.KpmBlue
-                                )
-                            }
-                        }
-                    }
-
-                    Icon(
-                        Icons.Default.ChevronRight,
-                        contentDescription = fs.openTakwim,
-                        tint = SlotifyColors.TextSecondary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-
-        // Monthly Commitment Header & Add Fee Button
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 16.dp)
-                    .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                    .padding(14.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = strings.monthlyCommitmentTitle,
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = SlotifyColors.TextPrimary
-                            )
-                            Text(
-                                text = "$settledCount / ${commitmentList.size} ${strings.paidLabel} (${
-                                    Money.format(
-                                        state.paidFeesSen
-                                    )
-                                } / ${Money.format(state.totalFeesSen)})",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = SlotifyColors.TextSecondary
-                            )
-                        }
-
-                        Button(
-                            onClick = { showAddFeeDialog = true },
-                            shape = SlotifyShapes.Small,
-                            colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmBlue),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(fs.addFeeButton, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    LinearProgressIndicator(
-                        progress = { progressFraction },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(SlotifyShapes.XSmall),
-                        color = SlotifyColors.ScienceGreen,
-                        trackColor = SlotifyColors.TextTertiary.copy(alpha = 0.2f)
-                    )
-
-                    // Fee Filter Tabs
-                    PrimaryTabRow(
-                        selectedTabIndex = feeFilter,
-                        containerColor = SlotifyColors.CanvasBase,
-                        contentColor = SlotifyColors.KpmBlue,
-                        modifier = Modifier.clip(RoundedCornerShape(8.dp))
-                    ) {
-                        Tab(
-                            selected = feeFilter == 0,
-                            onClick = { feeFilter = 0 },
-                            text = {
-                                Text(
-                                    "${strings.allTasks} (${commitmentList.size})",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        )
-                        Tab(
-                            selected = feeFilter == 1,
-                            onClick = { feeFilter = 1 },
-                            text = {
-                                Text(
-                                    "${strings.pendingLabel} ($pendingCount)",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        )
-                        Tab(
-                            selected = feeFilter == 2,
-                            onClick = { feeFilter = 2 },
-                            text = {
-                                Text(
-                                    "${strings.paidLabel} ($settledCount)",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-        // ── Interactive List of Fees from Room ────────────────────────────────
-        if (filteredFees.isEmpty()) {
+        slotifySection(
+            key = "pocket",
+            title = fs.groupPocket,
+            expanded = pocketOpen,
+            onToggle = { pocketOpen = !pocketOpen },
+            summary = fs.pocketSummary(Money.format(state.spentTodaySen), Money.format(state.tabungSen))
+        ) {
+            // Daily Pocket Money Card (Duit Poket)
             item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 24.dp),
-                    contentAlignment = Alignment.Center
+                        .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = SlotifyShapes.LargeDp)
+                        .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
+                        .padding(12.dp)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("💰", style = MaterialTheme.typography.displayMedium)
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = if (commitmentList.isEmpty()) fs.noFeesThisMonth else fs.noFeesInFilter,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = SlotifyColors.TextSecondary
-                        )
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(SlotifyColors.KpmBlue.copy(alpha = 0.15f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.AccountBalanceWallet,
+                                        contentDescription = null,
+                                        tint = SlotifyColors.KpmBlue,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "${strings.dailyPocketMoneyTitle} (${selectedStudent?.nickname ?: strings.childFallback})",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = SlotifyColors.TextPrimary
+                                    )
+                                    Text(
+                                        text = "${strings.canteenBudgetLabel}: ${Money.format(state.budgetSen)}",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                        color = SlotifyColors.KpmBlue
+                                    )
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = SlotifyColors.TextTertiary.copy(alpha = 0.2f), thickness = 1.dp)
+
+                        // Spent and Savings counters
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(
+                                    text = strings.canteenSpentLabel,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = SlotifyColors.TextSecondary
+                                )
+                                Text(
+                                    text = Money.format(state.spentTodaySen),
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    color = SlotifyColors.EnglishRed
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = strings.savingsLabel,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = SlotifyColors.TextSecondary
+                                )
+                                Text(
+                                    text = "+ ${Money.format(state.savedTodaySen)}",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    color = SlotifyColors.ScienceGreen
+                                )
+                            }
+                        }
+
+                        // Interactive allowance adjustments (+ / - RM0.50 & quick presets)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = strings.quickPresetsLabel,
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                color = SlotifyColors.TextSecondary
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                // - RM 0.50
+                                FilledTonalIconButton(
+                                    onClick = { viewModel.adjustSpentToday(-50) },
+                                    modifier = Modifier.size(48.dp),
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = SlotifyColors.CanvasBase
+                                    )
+                                ) {
+                                    Icon(
+                                        Icons.Default.Remove,
+                                        contentDescription = fs.decreaseSpent,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = SlotifyColors.TextPrimary
+                                    )
+                                }
+                                // Quick RM 3.00
+                                OutlinedButton(
+                                    onClick = { viewModel.setSpentToday(300) },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    modifier = Modifier.height(32.dp),
+                                    shape = SlotifyShapes.Small
+                                ) {
+                                    Text(
+                                        "RM 3",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                }
+                                // Quick RM 5.00
+                                OutlinedButton(
+                                    onClick = { viewModel.setSpentToday(500) },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    modifier = Modifier.height(32.dp),
+                                    shape = SlotifyShapes.Small
+                                ) {
+                                    Text(
+                                        "RM 5",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                }
+                                // + RM 0.50
+                                FilledTonalIconButton(
+                                    onClick = { viewModel.adjustSpentToday(50) },
+                                    modifier = Modifier.size(48.dp),
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = SlotifyColors.CanvasBase
+                                    )
+                                ) {
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = fs.increaseSpent,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = SlotifyColors.TextPrimary
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
-        } else {
-            items(filteredFees, key = { it.id }) { fee ->
-                val isPaid = fee.isPaid
-                val badgeBg by animateColorAsState(
-                    targetValue = if (isPaid) SlotifyColors.ScienceGreen.copy(alpha = 0.15f) else SlotifyColors.MathAmber.copy(
-                        alpha = 0.15f
-                    ),
-                    label = "feeBadge"
-                )
-                val badgeText = if (isPaid) SlotifyColors.ScienceGreen else SlotifyColors.MathAmber
+
+            // Tabung Maya (Virtual Piggy Bank) Card
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = SlotifyShapes.LargeDp)
+                        .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
+                        .padding(12.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(SlotifyColors.ScienceGreen.copy(alpha = 0.15f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("🪙", fontSize = 18.sp)
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = fs.tabungTitle,
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = SlotifyColors.TextPrimary
+                                    )
+                                    Text(
+                                        text = fs.tabungSubtitle,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = SlotifyColors.TextSecondary
+                                    )
+                                }
+                            }
+
+                            Text(
+                                text = Money.format(state.tabungSen),
+                                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                                color = SlotifyColors.ScienceGreen
+                            )
+                        }
+
+                        HorizontalDivider(color = SlotifyColors.TextTertiary.copy(alpha = 0.15f), thickness = 1.dp)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = fs.convertSavingsHint,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = SlotifyColors.TextSecondary,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Button(
+                                onClick = { viewModel.convertSavings() },
+                                shape = SlotifyShapes.Small,
+                                colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.ScienceGreen),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.heightIn(min = 48.dp)
+                            ) {
+                                Text(fs.convertSavingsButton, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        slotifySection(
+            key = "fees",
+            title = fs.groupFees,
+            expanded = feesOpen,
+            onToggle = { feesOpen = !feesOpen },
+            summary = fs.feesSummary(pendingCount, commitmentList.size)
+        ) {
+            // Monthly Commitment Header & Add Fee Button
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 16.dp)
+                        .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
+                        .padding(14.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = strings.monthlyCommitmentTitle,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = SlotifyColors.TextPrimary
+                                )
+                                Text(
+                                    text = "$settledCount / ${commitmentList.size} ${strings.paidLabel} (${
+                                        Money.format(
+                                            state.paidFeesSen
+                                        )
+                                    } / ${Money.format(state.totalFeesSen)})",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = SlotifyColors.TextSecondary
+                                )
+                            }
+
+                            Button(
+                                onClick = { showAddFeeDialog = true },
+                                shape = SlotifyShapes.Small,
+                                colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmBlue),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(fs.addFeeButton, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        LinearProgressIndicator(
+                            progress = { progressFraction },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(SlotifyShapes.XSmall),
+                            color = SlotifyColors.ScienceGreen,
+                            trackColor = SlotifyColors.TextTertiary.copy(alpha = 0.2f)
+                        )
+
+                        // Fee Filter Tabs
+                        PrimaryTabRow(
+                            selectedTabIndex = feeFilter,
+                            containerColor = SlotifyColors.CanvasBase,
+                            contentColor = SlotifyColors.KpmBlue,
+                            modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                        ) {
+                            Tab(
+                                selected = feeFilter == 0,
+                                onClick = { feeFilter = 0 },
+                                text = {
+                                    Text(
+                                        "${strings.allTasks} (${commitmentList.size})",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            )
+                            Tab(
+                                selected = feeFilter == 1,
+                                onClick = { feeFilter = 1 },
+                                text = {
+                                    Text(
+                                        "${strings.pendingLabel} ($pendingCount)",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            )
+                            Tab(
+                                selected = feeFilter == 2,
+                                onClick = { feeFilter = 2 },
+                                text = {
+                                    Text(
+                                        "${strings.paidLabel} ($settledCount)",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ── Interactive List of Fees from Room ────────────────────────────────
+            if (filteredFees.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("💰", style = MaterialTheme.typography.displayMedium)
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = if (commitmentList.isEmpty()) fs.noFeesThisMonth else fs.noFeesInFilter,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = SlotifyColors.TextSecondary
+                            )
+                        }
+                    }
+                }
+            } else {
+                items(filteredFees, key = { it.id }) { fee ->
+                    val isPaid = fee.isPaid
+                    val badgeBg by animateColorAsState(
+                        targetValue = if (isPaid) SlotifyColors.ScienceGreen.copy(alpha = 0.15f) else SlotifyColors.MathAmber.copy(
+                            alpha = 0.15f
+                        ),
+                        label = "feeBadge"
+                    )
+                    val badgeText = if (isPaid) SlotifyColors.ScienceGreen else SlotifyColors.MathAmber
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = 14.dp)
+                            .background(SlotifyColors.SurfaceCard, SlotifyShapes.Medium)
+                            .padding(14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Category emoji badge
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .background(badgeBg, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = fee.categoryEmoji,
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = fee.title,
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = SlotifyColors.TextPrimary
+                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = fs.dueLabel(fee.dueDateLabel),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = SlotifyColors.TextSecondary
+                                        )
+                                        Text(
+                                            text = " • ${fs.childTargetLabel(fee.childTarget)}",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                            color = SlotifyColors.KpmBlue
+                                        )
+                                    }
+                                }
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.End,
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = Money.format(fee.amountSen),
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = SlotifyColors.TextPrimary
+                                    )
+
+                                    // Toggle button: taps persist to Room via upsertCommitmentFee
+                                    Surface(
+                                        shape = SlotifyShapes.XSmall,
+                                        color = badgeBg,
+                                        modifier = Modifier.clickable { viewModel.togglePaid(fee) }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isPaid) Icons.Default.CheckCircle else Icons.Default.Pending,
+                                                contentDescription = null,
+                                                tint = badgeText,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                            Text(
+                                                text = if (isPaid) strings.paidLabel else strings.pendingLabel,
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                color = badgeText
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Delete fee button
+                                IconButton(
+                                    onClick = { viewModel.deleteFee(fee) },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.DeleteOutline,
+                                        contentDescription = fs.deleteFee,
+                                        tint = SlotifyColors.TextTertiary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        slotifySection(
+            key = "takwim",
+            title = fs.groupTakwim,
+            expanded = takwimOpen,
+            onToggle = { takwimOpen = !takwimOpen }
+        ) {
+            // KPM Takwim Status Banner
+            item {
+                val upcomingHoliday =
+                    remember { KpmTakwimRepository.getUpcomingHolidays(todayDate, limit = 1).firstOrNull() }
+                val currentTerm = remember { KpmTakwimRepository.getCurrentTerm(todayDate) }
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = 14.dp)
+                        .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 14.dp)
+                        .background(SlotifyColors.SurfaceCard, RoundedCornerShape(14.dp))
+                        .clickable { showTakwimDialog = true }
+                        .padding(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                            Text(upcomingHoliday?.emoji ?: "🗓️", fontSize = 24.sp)
+                            Spacer(Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Takwim KPM: ${currentTerm?.name ?: fs.takwimSessionFallback}",
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = SlotifyColors.TextPrimary
+                                )
+                                if (upcomingHoliday != null) {
+                                    val days = upcomingHoliday.daysUntil(todayDate)
+                                    val daysText = if (days <= 0) fs.holidayOngoing else fs.holidayInDays(days)
+                                    val holidayTitle =
+                                        if (LocalAppLanguage.current == AppLanguage.EN) upcomingHoliday.titleEn else upcomingHoliday.titleBm
+                                    Text(
+                                        text = "$holidayTitle ($daysText)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = SlotifyColors.KpmBlue
+                                    )
+                                }
+                            }
+                        }
+
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = fs.openTakwim,
+                            tint = SlotifyColors.TextSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        slotifySection(
+            key = "notifications",
+            title = fs.groupNotifications,
+            expanded = notificationsOpen,
+            onToggle = { notificationsOpen = !notificationsOpen }
+        ) {
+            // Test Notification Action Card
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 14.dp)
                         .background(SlotifyColors.SurfaceCard, SlotifyShapes.Medium)
                         .padding(14.dp)
                 ) {
@@ -597,162 +706,53 @@ fun FinanceScreen(
                             modifier = Modifier.weight(1f),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Category emoji badge
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .background(badgeBg, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = fee.categoryEmoji,
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                            }
+                            Icon(
+                                Icons.Default.NotificationsActive,
+                                contentDescription = null,
+                                tint = SlotifyColors.KokuPurple,
+                                modifier = Modifier.size(22.dp)
+                            )
                             Spacer(Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = fee.title,
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    text = strings.testNotificationTitle,
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                     color = SlotifyColors.TextPrimary
                                 )
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = fs.dueLabel(fee.dueDateLabel),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = SlotifyColors.TextSecondary
-                                    )
-                                    Text(
-                                        text = " • ${fs.childTargetLabel(fee.childTarget)}",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                                        color = SlotifyColors.KpmBlue
-                                    )
-                                }
-                            }
-                        }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.End,
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
                                 Text(
-                                    text = Money.format(fee.amountSen),
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = SlotifyColors.TextPrimary
+                                    text = fs.testNotificationDesc,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = SlotifyColors.TextSecondary
                                 )
+                            }
+                        }
 
-                                // Toggle button: taps persist to Room via upsertCommitmentFee
-                                Surface(
-                                    shape = SlotifyShapes.XSmall,
-                                    color = badgeBg,
-                                    modifier = Modifier.clickable { viewModel.togglePaid(fee) }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isPaid) Icons.Default.CheckCircle else Icons.Default.Pending,
-                                            contentDescription = null,
-                                            tint = badgeText,
-                                            modifier = Modifier.size(12.dp)
-                                        )
-                                        Text(
-                                            text = if (isPaid) strings.paidLabel else strings.pendingLabel,
-                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                            color = badgeText
-                                        )
+                        Button(
+                            onClick = {
+                                val unpaid = commitmentList.filter { !it.isPaid }
+                                SlotifyNotificationManager.showTestNotification(
+                                    context,
+                                    sys,
+                                    fs.feeReminderNotificationTitle,
+                                    if (unpaid.isEmpty()) fs.allFeesSettledNotification
+                                    else unpaid.joinToString("\n") {
+                                        "${it.title} (${Money.format(it.amountSen)}) • ${fs.dueLabel(it.dueDateLabel)}"
                                     }
-                                }
-                            }
-
-                            // Delete fee button
-                            IconButton(
-                                onClick = { viewModel.deleteFee(fee) },
-                                modifier = Modifier.size(48.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.DeleteOutline,
-                                    contentDescription = fs.deleteFee,
-                                    tint = SlotifyColors.TextTertiary,
-                                    modifier = Modifier.size(18.dp)
                                 )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Test Notification Action Card
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = 14.dp)
-                    .background(SlotifyColors.SurfaceCard, SlotifyShapes.Medium)
-                    .padding(14.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.NotificationsActive,
-                            contentDescription = null,
-                            tint = SlotifyColors.KokuPurple,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Column {
+                                notificationSentSnack = true
+                            },
+                            shape = SlotifyShapes.Small,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = SlotifyColors.KokuPurple
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
                             Text(
-                                text = strings.testNotificationTitle,
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                color = SlotifyColors.TextPrimary
-                            )
-                            Text(
-                                text = fs.testNotificationDesc,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = SlotifyColors.TextSecondary
+                                fs.testNowButton,
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
                             )
                         }
-                    }
-
-                    Button(
-                        onClick = {
-                            val unpaid = commitmentList.filter { !it.isPaid }
-                            SlotifyNotificationManager.showTestNotification(
-                                context,
-                                sys,
-                                fs.feeReminderNotificationTitle,
-                                if (unpaid.isEmpty()) fs.allFeesSettledNotification
-                                else unpaid.joinToString("\n") {
-                                    "${it.title} (${Money.format(it.amountSen)}) • ${fs.dueLabel(it.dueDateLabel)}"
-                                }
-                            )
-                            notificationSentSnack = true
-                        },
-                        shape = SlotifyShapes.Small,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = SlotifyColors.KokuPurple
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        modifier = Modifier.height(32.dp)
-                    ) {
-                        Text(
-                            fs.testNowButton,
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
-                        )
                     }
                 }
             }

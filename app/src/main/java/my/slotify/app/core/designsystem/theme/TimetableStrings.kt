@@ -2,6 +2,10 @@ package my.slotify.app.core.designsystem.theme
 
 /** Timetable screen and KPM takwim calendar dialog copy. Accessed as `strings.timetableUi`. */
 data class TimetableStrings(
+    // Section headers
+    val groupTracker: String,
+    val trackerSummary: (String) -> String,
+
     // School weekdays (1 = Monday … 5 = Friday)
     val dayMonday: String,
     val dayTuesday: String,
@@ -68,6 +72,9 @@ data class TimetableStrings(
 )
 
 val BmTimetableStrings = TimetableStrings(
+    groupTracker = "Penjejak Masa Nyata",
+    trackerSummary = { subject -> "Sekarang: $subject" },
+
     // School weekdays
     dayMonday = "Isnin",
     dayTuesday = "Selasa",
@@ -134,6 +141,9 @@ val BmTimetableStrings = TimetableStrings(
 )
 
 val EnTimetableStrings = TimetableStrings(
+    groupTracker = "Live Tracker",
+    trackerSummary = { subject -> "Now: $subject" },
+
     // School weekdays
     dayMonday = "Monday",
     dayTuesday = "Tuesday",

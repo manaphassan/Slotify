@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import my.slotify.app.core.designsystem.theme.SlotifyColors
+import my.slotify.app.core.designsystem.theme.strings
 
 /**
  * Header for a group of cards. Tapping it collapses or expands the group; [summary] is shown
@@ -33,11 +34,11 @@ fun SlotifySectionHeader(
     title: String,
     expanded: Boolean,
     onToggle: () -> Unit,
-    expandLabel: String,
-    collapseLabel: String,
     modifier: Modifier = Modifier,
     summary: String? = null
 ) {
+    val expandLabel = strings.expandSection
+    val collapseLabel = strings.collapseSection
     val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "SectionChevron")
     Row(
         modifier = modifier
@@ -77,13 +78,11 @@ fun LazyListScope.slotifySection(
     title: String,
     expanded: Boolean,
     onToggle: () -> Unit,
-    expandLabel: String,
-    collapseLabel: String,
     summary: String? = null,
     content: LazyListScope.() -> Unit
 ) {
     item(key = "section-$key") {
-        SlotifySectionHeader(title, expanded, onToggle, expandLabel, collapseLabel, summary = summary)
+        SlotifySectionHeader(title, expanded, onToggle, summary = summary)
     }
     if (expanded) content()
 }

@@ -2,6 +2,11 @@ package my.slotify.app.core.designsystem.theme
 
 /** App shell (drawer, top bar, bottom navigation) and the reward vault. Accessed as `strings.shellUi`. */
 data class ShellStrings(
+    // Section headers
+    val groupDailyBonus: String,
+    val groupCatalog: String,
+    val groupParent: String,
+
     // Bottom navigation (short labels)
     val navToday: String,
     val navTimetable: String,
@@ -32,6 +37,10 @@ data class ShellStrings(
 )
 
 val BmShellStrings = ShellStrings(
+    groupDailyBonus = "Bonus Harian",
+    groupCatalog = "Katalog Ganjaran",
+    groupParent = "Tetapan Ibu Bapa",
+
     navToday = "Hari Ini",
     navTimetable = "Jadual",
     navLogistics = "Logistik",
@@ -61,6 +70,10 @@ val BmShellStrings = ShellStrings(
 )
 
 val EnShellStrings = ShellStrings(
+    groupDailyBonus = "Daily Bonus",
+    groupCatalog = "Reward Catalogue",
+    groupParent = "Parent Settings",
+
     navToday = "Today",
     navTimetable = "Timetable",
     navLogistics = "Logistics",

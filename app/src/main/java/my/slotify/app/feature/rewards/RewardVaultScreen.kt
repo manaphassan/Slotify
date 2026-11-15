@@ -44,6 +44,8 @@ import my.slotify.app.core.designsystem.theme.SlotifyShapes
 import my.slotify.app.core.designsystem.theme.neumorphic
 import my.slotify.app.core.designsystem.theme.strings
 import my.slotify.app.core.security.PinManager
+import my.slotify.app.core.designsystem.component.slotifySection
+import androidx.compose.runtime.saveable.rememberSaveable
 
 data class RewardCatalogItem(
     /** Stable, non-localised identifier (list key); [title]/[description] are display copy. */
@@ -111,6 +113,10 @@ fun RewardVaultScreen(
         label = "chestPulseScale"
     )
 
+    var dailyOpen by rememberSaveable { mutableStateOf(true) }
+    var catalogOpen by rememberSaveable { mutableStateOf(true) }
+    var parentOpen by rememberSaveable { mutableStateOf(false) }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -162,186 +168,202 @@ fun RewardVaultScreen(
             }
         }
 
-        // Mystery Star Chest Card (Daily Bonus)
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = SlotifyShapes.LargeDp)
-                    .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                    .clip(SlotifyShapes.Large)
-                    .clickable(enabled = !chestOpened && selectedStudent != null) { viewModel.openChest() }
-                    .padding(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+        slotifySection(
+            key = "daily",
+            title = ss.groupDailyBonus,
+            expanded = dailyOpen,
+            onToggle = { dailyOpen = !dailyOpen }
+        ) {
+            // Mystery Star Chest Card (Daily Bonus)
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = SlotifyShapes.LargeDp)
+                        .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
+                        .clip(SlotifyShapes.Large)
+                        .clickable(enabled = !chestOpened && selectedStudent != null) { viewModel.openChest() }
+                        .padding(16.dp)
                 ) {
                     Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .scale(if (!chestOpened) chestScale else 1f)
-                                .background(
-                                    if (chestOpened) SlotifyColors.TextTertiary.copy(alpha = 0.15f)
-                                    else SlotifyColors.MathAmber.copy(alpha = 0.2f),
-                                    CircleShape
-                                ),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = if (chestOpened) "🎁" else "📦",
-                                fontSize = 26.sp
-                            )
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = strings.mysteryChestTitle,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = SlotifyColors.TextPrimary
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Surface(
-                                    color = if (chestOpened) SlotifyColors.ScienceGreen.copy(alpha = 0.15f) else SlotifyColors.MathAmber.copy(
-                                        alpha = 0.15f
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .scale(if (!chestOpened) chestScale else 1f)
+                                    .background(
+                                        if (chestOpened) SlotifyColors.TextTertiary.copy(alpha = 0.15f)
+                                        else SlotifyColors.MathAmber.copy(alpha = 0.2f),
+                                        CircleShape
                                     ),
-                                    shape = SlotifyShapes.XSmall
-                                ) {
-                                    Text(
-                                        text = if (chestOpened) ss.chestClaimedBadge else "+15 ⭐",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = if (chestOpened) SlotifyColors.ScienceGreen else SlotifyColors.MathAmber,
-                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                                    )
-                                }
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (chestOpened) "🎁" else "📦",
+                                    fontSize = 26.sp
+                                )
                             }
-                            Text(
-                                text = if (chestOpened) strings.mysteryChestOpened else strings.mysteryChestSubtitle,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = SlotifyColors.TextSecondary
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = strings.mysteryChestTitle,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = SlotifyColors.TextPrimary
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Surface(
+                                        color = if (chestOpened) SlotifyColors.ScienceGreen.copy(alpha = 0.15f) else SlotifyColors.MathAmber.copy(
+                                            alpha = 0.15f
+                                        ),
+                                        shape = SlotifyShapes.XSmall
+                                    ) {
+                                        Text(
+                                            text = if (chestOpened) ss.chestClaimedBadge else "+15 ⭐",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = if (chestOpened) SlotifyColors.ScienceGreen else SlotifyColors.MathAmber,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = if (chestOpened) strings.mysteryChestOpened else strings.mysteryChestSubtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = SlotifyColors.TextSecondary
+                                )
+                            }
+                        }
+
+                        if (!chestOpened) {
+                            Icon(
+                                Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = SlotifyColors.KpmBlue
                             )
                         }
                     }
-
-                    if (!chestOpened) {
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = SlotifyColors.KpmBlue
-                        )
-                    }
                 }
             }
         }
 
-        // Section Title: Reward Catalog
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = strings.rewardCatalogTitle,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = SlotifyColors.TextPrimary
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.Lock,
-                        contentDescription = null,
-                        tint = SlotifyColors.TextTertiary,
-                        modifier = Modifier.size(13.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = strings.parentApprovalRequired,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = SlotifyColors.TextTertiary
-                    )
-                }
-            }
-        }
-
-        // Parent PIN management
-        item {
-            TextButton(
-                onClick = { showChangePinDialog = true },
-                modifier = Modifier.heightIn(min = 48.dp)
-            ) {
-                Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    str.changePinButton,
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
-                )
-            }
-        }
-
-        // Reward Catalog Items
-        items(rewardItems, key = { it.id }) { item ->
-            val canAfford = (selectedStudent?.starCoinsBalance ?: 0) >= item.pointsCost
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = 16.dp)
-                    .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                    .padding(14.dp)
-            ) {
+        slotifySection(
+            key = "catalog",
+            title = ss.groupCatalog,
+            expanded = catalogOpen,
+            onToggle = { catalogOpen = !catalogOpen }
+        ) {
+            // Section Title: Reward Catalog
+            item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.Start,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = SlotifyColors.TextTertiary,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = strings.parentApprovalRequired,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = SlotifyColors.TextTertiary
+                        )
+                    }
+                }
+            }
+
+            // Reward Catalog Items
+            items(rewardItems, key = { it.id }) { item ->
+                val canAfford = (selectedStudent?.starCoinsBalance ?: 0) >= item.pointsCost
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = 16.dp)
+                        .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
+                        .padding(14.dp)
+                ) {
                     Row(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = item.iconEmoji, fontSize = 28.sp)
-                        Spacer(Modifier.width(12.dp))
-                        Column {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = item.iconEmoji, fontSize = 28.sp)
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = item.title,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = SlotifyColors.TextPrimary
+                                )
+                                Text(
+                                    text = item.description,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = SlotifyColors.TextSecondary
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.width(8.dp))
+
+                        Button(
+                            onClick = {
+                                if (canAfford) {
+                                    pendingRewardToRedeem = item
+                                    showPinDialog = true
+                                }
+                            },
+                            enabled = canAfford,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = SlotifyColors.KokuPurple,
+                                disabledContainerColor = SlotifyColors.TextTertiary.copy(alpha = 0.2f),
+                                disabledContentColor = SlotifyColors.TextTertiary
+                            ),
+                            shape = SlotifyShapes.Small,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
                             Text(
-                                text = item.title,
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = SlotifyColors.TextPrimary
-                            )
-                            Text(
-                                text = item.description,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = SlotifyColors.TextSecondary
+                                text = "${item.pointsCost} ⭐",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
                             )
                         }
                     }
+                }
+            }
+        }
 
-                    Spacer(Modifier.width(8.dp))
-
-                    Button(
-                        onClick = {
-                            if (canAfford) {
-                                pendingRewardToRedeem = item
-                                showPinDialog = true
-                            }
-                        },
-                        enabled = canAfford,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = SlotifyColors.KokuPurple,
-                            disabledContainerColor = SlotifyColors.TextTertiary.copy(alpha = 0.2f),
-                            disabledContentColor = SlotifyColors.TextTertiary
-                        ),
-                        shape = SlotifyShapes.Small,
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = "${item.pointsCost} ⭐",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
-                        )
-                    }
+        slotifySection(
+            key = "parent",
+            title = ss.groupParent,
+            expanded = parentOpen,
+            onToggle = { parentOpen = !parentOpen }
+        ) {
+            // Parent PIN management
+            item {
+                TextButton(
+                    onClick = { showChangePinDialog = true },
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) {
+                    Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        str.changePinButton,
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
+                    )
                 }
             }
         }

@@ -37,6 +37,8 @@ import my.slotify.app.core.designsystem.theme.neumorphicClickable
 import my.slotify.app.core.designsystem.theme.strings
 import kotlinx.coroutines.launch
 import java.util.UUID
+import my.slotify.app.core.designsystem.component.slotifySection
+import androidx.compose.runtime.saveable.rememberSaveable
 
 // Fix 1.4: Mask child national ID — show only last 4 digits by default
 private fun String.maskMyKid(): String {
@@ -87,6 +89,10 @@ fun StudentProfileScreen(
         }
     }
 
+    var schoolOpen by rememberSaveable { mutableStateOf(true) }
+    var assessmentOpen by rememberSaveable { mutableStateOf(true) }
+    var personalOpen by rememberSaveable { mutableStateOf(false) }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -94,72 +100,45 @@ fun StudentProfileScreen(
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Top Header
+        // Child switcher and edit button
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = strings.profileTitle,
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = SlotifyColors.TextPrimary
-                    )
-                    Text(
-                        text = strings.profileSubtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = SlotifyColors.TextSecondary
-                    )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.weight(1f)) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    ) {
+                        items(students) { student ->
+                            val isSelected = student.id == selectedStudent?.id
+                            Box(
+                                modifier = Modifier
+                                    .neumorphicClickable(cornerRadius = SlotifyShapes.LargeDp) { onSelectStudent(student) }
+                                    .background(
+                                        if (isSelected) SlotifyColors.KpmSkyBlue.copy(alpha = 0.15f) else SlotifyColors.SurfaceCard,
+                                        SlotifyShapes.Large
+                                    )
+                                    .padding(horizontal = 12.dp, vertical = 7.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(text = student.avatarEmoji, fontSize = 18.sp)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = student.nickname,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) SlotifyColors.KpmSkyBlue else SlotifyColors.TextPrimary
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
-
-                // Edit Button
-                IconButton(
-                    onClick = { showEditDialog = true },
-                    modifier = Modifier
-                        .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = SlotifyShapes.LargeDp)
-                        .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                        .size(38.dp)
-                ) {
+                IconButton(onClick = { showEditDialog = true }) {
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = strings.editProfileTitle,
-                        tint = SlotifyColors.KpmSkyBlue,
-                        modifier = Modifier.size(18.dp)
+                        tint = SlotifyColors.KpmSkyBlue
                     )
-                }
-            }
-        }
-
-        // Child Switcher Row
-        item {
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(vertical = 2.dp)
-            ) {
-                items(students) { student ->
-                    val isSelected = student.id == selectedStudent?.id
-                    Box(
-                        modifier = Modifier
-                            .neumorphicClickable(cornerRadius = SlotifyShapes.LargeDp) { onSelectStudent(student) }
-                            .background(
-                                if (isSelected) SlotifyColors.KpmSkyBlue.copy(alpha = 0.15f) else SlotifyColors.SurfaceCard,
-                                SlotifyShapes.Large
-                            )
-                            .padding(horizontal = 12.dp, vertical = 7.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = student.avatarEmoji, fontSize = 18.sp)
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = student.nickname,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) SlotifyColors.KpmSkyBlue else SlotifyColors.TextPrimary
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -218,145 +197,38 @@ fun StudentProfileScreen(
                 }
             }
 
-            // Biometrics & MyKid Card
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = SlotifyShapes.LargeDp)
-                        .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                        .padding(14.dp)
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+            slotifySection(
+                key = "school",
+                title = ps.groupSchool,
+                expanded = schoolOpen,
+                onToggle = { schoolOpen = !schoolOpen }
+            ) {
+                // School & Session Info Card
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = SlotifyShapes.LargeDp)
+                            .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
+                            .padding(14.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    Icons.Default.Badge,
+                                    Icons.Default.School,
                                     contentDescription = null,
-                                    tint = SlotifyColors.KpmSkyBlue,
+                                    tint = SlotifyColors.ScienceGreen,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(Modifier.width(6.dp))
                                 Text(
-                                    text = strings.officialMyKidTitle,
+                                    text = strings.schoolInstTitle,
                                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                     color = SlotifyColors.TextPrimary
                                 )
                             }
-                            // Fix 1.4: Show masked MyKid by default; toggle to reveal on tap
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.clickable { showMyKid = !showMyKid }
-                            ) {
-                                Text(
-                                    text = if (s.myKid.isNotBlank()) {
-                                        if (showMyKid) s.myKid else s.myKid.maskMyKid()
-                                    } else "-",
-                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = SlotifyColors.KpmSkyBlue
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                Icon(
-                                    imageVector = if (showMyKid) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = if (showMyKid) ps.hideMyKid else ps.showMyKid,
-                                    tint = SlotifyColors.TextTertiary,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                        }
 
-                        HorizontalDivider(color = SlotifyColors.BorderSubtle, thickness = 1.dp)
-
-                        // Biometrics 3-Column Metrics (Umur, Tinggi, Berat)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            BiometricMetricItem(
-                                title = strings.ageLabel,
-                                value = if (s.age > 0) "${s.age} ${strings.ageUnit}" else "-"
-                            )
-                            BiometricMetricItem(
-                                title = strings.heightLabel,
-                                value = if (s.heightCm > 0) "${s.heightCm} cm" else "-"
-                            )
-                            BiometricMetricItem(
-                                title = strings.weightLabel,
-                                value = if (s.weightKg > 0) "${s.weightKg} kg" else "-"
-                            )
-                            // BMI computation
-                            val bmi = if (s.heightCm > 0 && s.weightKg > 0) {
-                                val hM = s.heightCm / 100.0
-                                s.weightKg / (hM * hM)
-                            } else 0.0
-
-                            BiometricMetricItem(
-                                title = strings.bmiLabel,
-                                value = if (bmi > 0) String.format(java.util.Locale.US, "%.1f", bmi) else "-"
-                            )
-                        }
-                    }
-                }
-            }
-
-            // School & Session Info Card
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = SlotifyShapes.LargeDp)
-                        .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                        .padding(14.dp)
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.School,
-                                contentDescription = null,
-                                tint = SlotifyColors.ScienceGreen,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = strings.schoolInstTitle,
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                color = SlotifyColors.TextPrimary
-                            )
-                        }
-
-                        // Primary School
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = strings.mainSchoolLabel,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = SlotifyColors.TextSecondary
-                                )
-                                Text(
-                                    text = s.primarySchoolName,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = SlotifyColors.TextPrimary
-                                )
-                            }
-                            // Fix 4.2: Resolve raw DB sessionType string to readable label
-                            Text(
-                                text = s.sessionType.toSessionTypeLabel(str),
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = SlotifyColors.ScienceGreen
-                            )
-                        }
-
-                        // Secondary / Agama School
-                        s.secondarySchoolName?.let { sec ->
-                            HorizontalDivider(color = SlotifyColors.BorderSubtle, thickness = 0.8.dp)
+                            // Primary School
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -364,262 +236,390 @@ fun StudentProfileScreen(
                             ) {
                                 Column {
                                     Text(
-                                        text = ps.secondarySchoolLabel,
+                                        text = strings.mainSchoolLabel,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = SlotifyColors.TextSecondary
                                     )
                                     Text(
-                                        text = sec,
+                                        text = s.primarySchoolName,
                                         style = MaterialTheme.typography.labelLarge,
                                         color = SlotifyColors.TextPrimary
                                     )
                                 }
+                                // Fix 4.2: Resolve raw DB sessionType string to readable label
                                 Text(
-                                    text = strings.sessionMorning,
+                                    text = s.sessionType.toSessionTypeLabel(str),
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = SlotifyColors.IslamTeal
+                                    color = SlotifyColors.ScienceGreen
                                 )
+                            }
+
+                            // Secondary / Agama School
+                            s.secondarySchoolName?.let { sec ->
+                                HorizontalDivider(color = SlotifyColors.BorderSubtle, thickness = 0.8.dp)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = ps.secondarySchoolLabel,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = SlotifyColors.TextSecondary
+                                        )
+                                        Text(
+                                            text = sec,
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = SlotifyColors.TextPrimary
+                                        )
+                                    }
+                                    Text(
+                                        text = strings.sessionMorning,
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = SlotifyColors.IslamTeal
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            // Transport & Van Contact
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = SlotifyShapes.LargeDp)
-                        .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                        .padding(14.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                // Transport & Van Contact
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = SlotifyShapes.LargeDp)
+                            .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
+                            .padding(14.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.DirectionsBus,
-                                contentDescription = null,
-                                tint = SlotifyColors.VanPrimaryBlue,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = s.vanDriverName ?: ps.dropOffByParents,
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = SlotifyColors.TextPrimary
-                                )
-                                Text(
-                                    text = s.vanDriverPhone ?: ps.ownVehicle,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = SlotifyColors.TextSecondary
-                                )
-                            }
-                        }
-                        Box(
-                            modifier = Modifier
-                                .background(SlotifyColors.SuccessMint.copy(alpha = 0.15f), SlotifyShapes.Small)
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = ps.transportActive,
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = SlotifyColors.SuccessMint
-                            )
-                        }
-                    }
-                }
-            }
-
-            // ── Pentaksiran Bilik Darjah (PBD) & Akademik Section ──
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = SlotifyShapes.LargeDp)
-                        .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                        .padding(14.dp)
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("🎓", fontSize = 22.sp)
-                                Spacer(Modifier.width(8.dp))
+                                Icon(
+                                    Icons.Default.DirectionsBus,
+                                    contentDescription = null,
+                                    tint = SlotifyColors.VanPrimaryBlue,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(10.dp))
                                 Column {
                                     Text(
-                                        text = ps.pbdTitle,
+                                        text = s.vanDriverName ?: ps.dropOffByParents,
                                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                         color = SlotifyColors.TextPrimary
                                     )
                                     Text(
-                                        text = ps.pbdSubtitle,
-                                        style = MaterialTheme.typography.labelSmall,
+                                        text = s.vanDriverPhone ?: ps.ownVehicle,
+                                        style = MaterialTheme.typography.bodySmall,
                                         color = SlotifyColors.TextSecondary
                                     )
                                 }
                             }
-
-                            Button(
-                                onClick = { showAddPbdDialog = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue),
-                                shape = SlotifyShapes.Small,
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                modifier = Modifier.height(30.dp)
+                            Box(
+                                modifier = Modifier
+                                    .background(SlotifyColors.SuccessMint.copy(alpha = 0.15f), SlotifyShapes.Small)
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = Color.White
-                                )
-                                Spacer(Modifier.width(4.dp))
                                 Text(
-                                    ps.recordTpButton,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    text = ps.transportActive,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = SlotifyColors.SuccessMint
                                 )
                             }
                         }
+                    }
+                }
+            }
 
-                        if (pbdCelebrationText != null) {
-                            Surface(
-                                shape = SlotifyShapes.Small,
-                                color = SlotifyColors.SuccessMint.copy(alpha = 0.15f),
-                                modifier = Modifier.fillMaxWidth()
+            slotifySection(
+                key = "assessment",
+                title = ps.groupAssessment,
+                expanded = assessmentOpen,
+                onToggle = { assessmentOpen = !assessmentOpen }
+            ) {
+                // ── Pentaksiran Bilik Darjah (PBD) & Akademik Section ──
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = SlotifyShapes.LargeDp)
+                            .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
+                            .padding(14.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("🎓", fontSize = 22.sp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = ps.pbdTitle,
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = SlotifyColors.TextPrimary
+                                        )
+                                        Text(
+                                            text = ps.pbdSubtitle,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = SlotifyColors.TextSecondary
+                                        )
+                                    }
+                                }
+
+                                Button(
+                                    onClick = { showAddPbdDialog = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue),
+                                    shape = SlotifyShapes.Small,
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(30.dp)
                                 ) {
-                                    Text("⭐", fontSize = 16.sp)
-                                    Spacer(Modifier.width(6.dp))
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = Color.White
+                                    )
+                                    Spacer(Modifier.width(4.dp))
                                     Text(
-                                        text = pbdCelebrationText,
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = SlotifyColors.SuccessMint
+                                        ps.recordTpButton,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
                                     )
                                 }
                             }
-                        }
 
-                        if (assessments.isEmpty()) {
-                            Text(
-                                text = ps.pbdEmpty(s.nickname),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = SlotifyColors.TextSecondary
-                            )
-                        } else {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                assessments.forEach { assessment ->
-                                    val subjectColor = SlotifyColors.subjectColor(assessment.subjectCode)
-                                    val tpLabel = when (assessment.tahapPenguasaan) {
-                                        6 -> ps.tpLevel6
-                                        5 -> ps.tpLevel5
-                                        4 -> ps.tpLevel4
-                                        3 -> ps.tpLevel3
-                                        2 -> ps.tpLevel2
-                                        else -> ps.tpLevel1
-                                    }
-                                    val tpColor = when (assessment.tahapPenguasaan) {
-                                        6 -> Color(0xFF8B5CF6)
-                                        5 -> SlotifyColors.SuccessMint
-                                        4 -> SlotifyColors.KpmSkyBlue
-                                        3 -> SlotifyColors.ActionAmber
-                                        else -> Color(0xFFEF4444)
-                                    }
-
-                                    Surface(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = SlotifyShapes.Small,
-                                        color = SlotifyColors.CanvasBase
+                            if (pbdCelebrationText != null) {
+                                Surface(
+                                    shape = SlotifyShapes.Small,
+                                    color = SlotifyColors.SuccessMint.copy(alpha = 0.15f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Column(
-                                            modifier = Modifier.padding(10.dp),
-                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        Text("⭐", fontSize = 16.sp)
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            text = pbdCelebrationText,
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = SlotifyColors.SuccessMint
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (assessments.isEmpty()) {
+                                Text(
+                                    text = ps.pbdEmpty(s.nickname),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = SlotifyColors.TextSecondary
+                                )
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    assessments.forEach { assessment ->
+                                        val subjectColor = SlotifyColors.subjectColor(assessment.subjectCode)
+                                        val tpLabel = when (assessment.tahapPenguasaan) {
+                                            6 -> ps.tpLevel6
+                                            5 -> ps.tpLevel5
+                                            4 -> ps.tpLevel4
+                                            3 -> ps.tpLevel3
+                                            2 -> ps.tpLevel2
+                                            else -> ps.tpLevel1
+                                        }
+                                        val tpColor = when (assessment.tahapPenguasaan) {
+                                            6 -> Color(0xFF8B5CF6)
+                                            5 -> SlotifyColors.SuccessMint
+                                            4 -> SlotifyColors.KpmSkyBlue
+                                            3 -> SlotifyColors.ActionAmber
+                                            else -> Color(0xFFEF4444)
+                                        }
+
+                                        Surface(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = SlotifyShapes.Small,
+                                            color = SlotifyColors.CanvasBase
                                         ) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
+                                            Column(
+                                                modifier = Modifier.padding(10.dp),
+                                                verticalArrangement = Arrangement.spacedBy(6.dp)
                                             ) {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Surface(
-                                                        shape = SlotifyShapes.XSmall,
-                                                        color = subjectColor.copy(alpha = 0.15f)
-                                                    ) {
-                                                        Text(
-                                                            text = assessment.subjectCode,
-                                                            fontSize = 10.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = subjectColor,
-                                                            modifier = Modifier.padding(
-                                                                horizontal = 6.dp,
-                                                                vertical = 2.dp
-                                                            )
-                                                        )
-                                                    }
-                                                    Spacer(Modifier.width(8.dp))
-                                                    Text(
-                                                        text = assessment.subjectName,
-                                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                                        color = SlotifyColors.TextPrimary
-                                                    )
-                                                }
-
-                                                Surface(
-                                                    shape = SlotifyShapes.XSmall,
-                                                    color = tpColor.copy(alpha = 0.15f)
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
                                                 ) {
-                                                    Text(
-                                                        text = tpLabel,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = tpColor,
-                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                    )
-                                                }
-                                            }
-
-                                            // 6-segment TP Progress Bar
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                            ) {
-                                                for (step in 1..6) {
-                                                    val isAchieved = step <= assessment.tahapPenguasaan
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .weight(1f)
-                                                            .height(5.dp)
-                                                            .clip(RoundedCornerShape(3.dp))
-                                                            .background(
-                                                                if (isAchieved) tpColor else SlotifyColors.TextSecondary.copy(
-                                                                    alpha = 0.2f
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Surface(
+                                                            shape = SlotifyShapes.XSmall,
+                                                            color = subjectColor.copy(alpha = 0.15f)
+                                                        ) {
+                                                            Text(
+                                                                text = assessment.subjectCode,
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = subjectColor,
+                                                                modifier = Modifier.padding(
+                                                                    horizontal = 6.dp,
+                                                                    vertical = 2.dp
                                                                 )
                                                             )
+                                                        }
+                                                        Spacer(Modifier.width(8.dp))
+                                                        Text(
+                                                            text = assessment.subjectName,
+                                                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                                            color = SlotifyColors.TextPrimary
+                                                        )
+                                                    }
+
+                                                    Surface(
+                                                        shape = SlotifyShapes.XSmall,
+                                                        color = tpColor.copy(alpha = 0.15f)
+                                                    ) {
+                                                        Text(
+                                                            text = tpLabel,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = tpColor,
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                        )
+                                                    }
+                                                }
+
+                                                // 6-segment TP Progress Bar
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                                ) {
+                                                    for (step in 1..6) {
+                                                        val isAchieved = step <= assessment.tahapPenguasaan
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .weight(1f)
+                                                                .height(5.dp)
+                                                                .clip(RoundedCornerShape(3.dp))
+                                                                .background(
+                                                                    if (isAchieved) tpColor else SlotifyColors.TextSecondary.copy(
+                                                                        alpha = 0.2f
+                                                                    )
+                                                                )
+                                                        )
+                                                    }
+                                                }
+
+                                                if (assessment.teacherComment.isNotBlank()) {
+                                                    Text(
+                                                        text = ps.teacherCommentQuote(assessment.teacherComment),
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = SlotifyColors.TextSecondary
                                                     )
                                                 }
-                                            }
-
-                                            if (assessment.teacherComment.isNotBlank()) {
-                                                Text(
-                                                    text = ps.teacherCommentQuote(assessment.teacherComment),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = SlotifyColors.TextSecondary
-                                                )
                                             }
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+
+            slotifySection(
+                key = "personal",
+                title = ps.groupPersonal,
+                expanded = personalOpen,
+                onToggle = { personalOpen = !personalOpen }
+            ) {
+                // Biometrics & MyKid Card
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = SlotifyShapes.LargeDp)
+                            .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
+                            .padding(14.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Badge,
+                                        contentDescription = null,
+                                        tint = SlotifyColors.KpmSkyBlue,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = strings.officialMyKidTitle,
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = SlotifyColors.TextPrimary
+                                    )
+                                }
+                                // Fix 1.4: Show masked MyKid by default; toggle to reveal on tap
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.clickable { showMyKid = !showMyKid }
+                                ) {
+                                    Text(
+                                        text = if (s.myKid.isNotBlank()) {
+                                            if (showMyKid) s.myKid else s.myKid.maskMyKid()
+                                        } else "-",
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = SlotifyColors.KpmSkyBlue
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Icon(
+                                        imageVector = if (showMyKid) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = if (showMyKid) ps.hideMyKid else ps.showMyKid,
+                                        tint = SlotifyColors.TextTertiary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+
+                            HorizontalDivider(color = SlotifyColors.BorderSubtle, thickness = 1.dp)
+
+                            // Biometrics 3-Column Metrics (Umur, Tinggi, Berat)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                BiometricMetricItem(
+                                    title = strings.ageLabel,
+                                    value = if (s.age > 0) "${s.age} ${strings.ageUnit}" else "-"
+                                )
+                                BiometricMetricItem(
+                                    title = strings.heightLabel,
+                                    value = if (s.heightCm > 0) "${s.heightCm} cm" else "-"
+                                )
+                                BiometricMetricItem(
+                                    title = strings.weightLabel,
+                                    value = if (s.weightKg > 0) "${s.weightKg} kg" else "-"
+                                )
+                                // BMI computation
+                                val bmi = if (s.heightCm > 0 && s.weightKg > 0) {
+                                    val hM = s.heightCm / 100.0
+                                    s.weightKg / (hM * hM)
+                                } else 0.0
+
+                                BiometricMetricItem(
+                                    title = strings.bmiLabel,
+                                    value = if (bmi > 0) String.format(java.util.Locale.US, "%.1f", bmi) else "-"
+                                )
                             }
                         }
                     }

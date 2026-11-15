@@ -9,8 +9,7 @@ data class DashboardStrings(
     val groupInfo: String,
     val groupRoutine: String,
     val groupAcademicSummary: (Int, Int) -> String,
-    val expandSection: String,
-    val collapseSection: String,
+    val examPastLabel: String,
 
     // Takwim (academic calendar) banner
     val holidayBannerTitle: (String) -> String,
@@ -124,8 +123,7 @@ val BmDashboardStrings = DashboardStrings(
     groupInfo = "Takwim & Waktu Solat",
     groupRoutine = "Rutin & Notifikasi",
     groupAcademicSummary = { pending, exams -> "$pending tugasan belum siap • $exams ujian" },
-    expandSection = "Buka bahagian",
-    collapseSection = "Tutup bahagian",
+    examPastLabel = "Lepas",
 
     // Takwim (academic calendar) banner
     holidayBannerTitle = { title -> "Cuti: $title" },
@@ -239,8 +237,7 @@ val EnDashboardStrings = DashboardStrings(
     groupInfo = "Calendar & Prayer Times",
     groupRoutine = "Routine & Notifications",
     groupAcademicSummary = { pending, exams -> "$pending tasks pending • $exams exams" },
-    expandSection = "Expand section",
-    collapseSection = "Collapse section",
+    examPastLabel = "Past",
 
     // Takwim (academic calendar) banner
     holidayBannerTitle = { title -> "Holiday: $title" },
