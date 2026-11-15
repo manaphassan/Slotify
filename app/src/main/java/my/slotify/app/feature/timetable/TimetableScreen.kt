@@ -47,6 +47,14 @@ import my.slotify.app.core.model.AttireGuide
 import my.slotify.app.core.time.TimeOfDay
 import my.slotify.app.core.time.rememberNow
 import my.slotify.app.core.designsystem.component.slotifySection
+import my.slotify.app.core.designsystem.component.ScheduleCard
+import my.slotify.app.core.designsystem.component.SlotifyScreenTitle
+import my.slotify.app.core.designsystem.theme.SlotStatus
+import my.slotify.app.core.designsystem.theme.AppLanguage
+import my.slotify.app.core.time.SlotState
+import my.slotify.app.core.time.SlotStates
+import androidx.compose.foundation.shape.RoundedCornerShape
+import java.util.Locale
 
 enum class TimetableViewMode {
     DAY,
@@ -76,10 +84,37 @@ fun TimetableScreen(
     var simulatedMinutes by remember { mutableStateOf<Int?>(null) }
 
     val ts = strings.timetableUi
-    val days = listOf(ts.dayMonday to 1, ts.dayTuesday to 2, ts.dayWednesday to 3, ts.dayThursday to 4, ts.dayFriday to 5)
+    val days =
+        listOf(ts.dayMonday to 1, ts.dayTuesday to 2, ts.dayWednesday to 3, ts.dayThursday to 4, ts.dayFriday to 5)
 
     val allSlots = slots
     val currentSlots = allSlots.filter { it.dayOfWeek == selectedDay }
+
+    // School week shown: this week on school days, next week at the weekend.
+    val appLanguage = LocalAppLanguage.current
+    val dateLocale = if (appLanguage == AppLanguage.EN) Locale.ENGLISH else Locale.forLanguageTag("ms-MY")
+    val weekStart = remember(today) {
+        if (todayDow == null) SchoolDay.nextSchoolDate(today) else today.minusDays((todayDow - 1).toLong())
+    }
+
+    fun dateOf(dayIndex: Int) = weekStart.plusDays((dayIndex - 1).toLong())
+    val weekRangeLabel = remember(weekStart, dateLocale) {
+        val end = weekStart.plusDays(4)
+        val dm = java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy", dateLocale)
+        if (weekStart.month == end.month) "${weekStart.dayOfMonth}–${end.format(dm)}"
+        else "${
+            weekStart.format(
+                java.time.format.DateTimeFormatter.ofPattern(
+                    "d MMM",
+                    dateLocale
+                )
+            )
+        } – ${end.format(dm)}"
+    }
+    val dayStates = remember(currentSlots, selectedDay, todayDow, liveNow.hour, liveNow.minute) {
+        SlotStates.forDay(currentSlots, if (selectedDay == todayDow) liveNow.hour * 60 + liveNow.minute else null)
+    }
+    val sch = strings.scheduleUi
 
     // Live tracking uses today's slots (none on weekends); a time preview uses the selected day.
     val currentSimMinutes = simulatedMinutes ?: (liveNow.hour * 60 + liveNow.minute)
@@ -109,7 +144,9 @@ fun TimetableScreen(
                 .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Header
+            item { SlotifyScreenTitle(title = strings.timetable, subtitle = weekRangeLabel) }
+
+            // Session badge and actions
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -125,7 +162,10 @@ fun TimetableScreen(
                             if (session != null) {
                                 val sessionLabel = when (session.sessionTimeType) {
                                     "PAGI" -> ts.sessionBadgeMorning(session.schoolName.substringBefore(" ").take(3))
-                                    "PETANG" -> ts.sessionBadgeAfternoon(session.schoolName.substringBefore(" ").take(3))
+                                    "PETANG" -> ts.sessionBadgeAfternoon(
+                                        session.schoolName.substringBefore(" ").take(3)
+                                    )
+
                                     "FULL_DAY" -> "🏫 ${session.schoolName.substringBefore(" ").take(4)}"
                                     else -> session.sessionTimeType
                                 }
@@ -156,12 +196,8 @@ fun TimetableScreen(
                             IconButton(
                                 onClick = { showAddSlotDialog = true },
                                 modifier = Modifier
-                                    .neumorphic(
-                                        elevation = NeumorphicElevation.LOW,
-                                        cornerRadius = SlotifyShapes.LargeDp
-                                    )
-                                    .background(SlotifyColors.KpmSkyBlue, SlotifyShapes.Large)
-                                    .size(36.dp)
+                                    .size(44.dp)
+                                    .background(SlotifyColors.Brand, CircleShape)
                             ) {
                                 Icon(
                                     Icons.Default.Add,
@@ -177,12 +213,8 @@ fun TimetableScreen(
                             IconButton(
                                 onClick = onToggleYearInversion,
                                 modifier = Modifier
-                                    .neumorphic(
-                                        elevation = NeumorphicElevation.LOW,
-                                        cornerRadius = SlotifyShapes.LargeDp
-                                    )
-                                    .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                                    .size(36.dp)
+                                    .size(44.dp)
+                                    .background(SlotifyColors.SurfaceCard, CircleShape)
                             ) {
                                 Icon(
                                     Icons.Default.Autorenew,
@@ -201,8 +233,8 @@ fun TimetableScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .neumorphic(elevation = NeumorphicElevation.LOW, cornerRadius = SlotifyShapes.LargeDp)
-                        .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
+                        .clip(RoundedCornerShape(50))
+                        .background(SlotifyColors.SurfaceCard)
                         .padding(4.dp)
                 ) {
                     Row(modifier = Modifier.fillMaxWidth()) {
@@ -241,51 +273,68 @@ fun TimetableScreen(
                         ) {
                             items(days) { (dayName, dayIndex) ->
                                 val isSelected = selectedDay == dayIndex
-                                Box(
+                                val fg = if (isSelected) Color.White else SlotifyColors.TextPrimary
+                                Column(
                                     modifier = Modifier
-                                        .defaultMinSize(minHeight = 44.dp)
-                                        .clip(SlotifyShapes.Medium)
-                                        .background(
-                                            if (isSelected) SlotifyColors.KpmSkyBlue else SlotifyColors.SurfaceCard
-                                        )
+                                        .defaultMinSize(minWidth = 56.dp, minHeight = 48.dp)
+                                        .clip(RoundedCornerShape(50))
+                                        .background(if (isSelected) SlotifyColors.Brand else SlotifyColors.SurfaceCard)
                                         .clickable { selectedDay = dayIndex }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                    contentAlignment = Alignment.Center
+                                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(dayName.take(3), style = MaterialTheme.typography.labelLarge, color = fg)
+                                        if (dayIndex == todayDow) {
+                                            Spacer(Modifier.width(4.dp))
+                                            Box(
+                                                Modifier.size(5.dp).background(
+                                                    if (isSelected) Color.White else SlotifyColors.Brand,
+                                                    CircleShape
+                                                )
+                                            )
+                                        }
+                                    }
                                     Text(
-                                        text = dayName,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) Color.White else SlotifyColors.TextPrimary
+                                        "${dateOf(dayIndex).dayOfMonth}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = if (isSelected) Color.White.copy(alpha = 0.85f) else SlotifyColors.TextSecondary
                                     )
                                 }
                             }
                         }
                     }
 
+                    item {
+                        Column(modifier = Modifier.padding(top = 4.dp)) {
+                            Text(
+                                days.first { it.second == selectedDay }.first,
+                                style = MaterialTheme.typography.headlineLarge,
+                                color = SlotifyColors.TextPrimary
+                            )
+                            Text(
+                                dateOf(selectedDay).format(
+                                    java.time.format.DateTimeFormatter.ofPattern(
+                                        "d MMMM",
+                                        dateLocale
+                                    )
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = SlotifyColors.TextSecondary
+                            )
+                        }
+                    }
+
                     // Slots list
                     if (currentSlots.isEmpty()) {
                         item {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 24.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text("📅", fontSize = 36.sp)
-                                Spacer(Modifier.height(8.dp))
-                                Text(
-                                    ts.emptyDaySlots,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = SlotifyColors.TextSecondary,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
+                            ScheduleCard(title = sch.freeDayTitle, time = ts.emptyDaySlots, status = SlotStatus.NOW)
                         }
                     } else {
-                        items(currentSlots, key = { it.id }) { slot ->
+                        items(dayStates, key = { it.first.id }) { (slot, st) ->
                             TimetableSlotCard(
                                 slot = slot,
+                                state = st,
                                 canDelete = session != null,
                                 onDelete = { viewModel.deleteSlot(slot) }
                             )
@@ -361,7 +410,8 @@ private fun AddSlotDialog(
     onConfirm: (TimetableSlotEntity) -> Unit
 ) {
     val ts = strings.timetableUi
-    val days = listOf(ts.dayMonday to 1, ts.dayTuesday to 2, ts.dayWednesday to 3, ts.dayThursday to 4, ts.dayFriday to 5)
+    val days =
+        listOf(ts.dayMonday to 1, ts.dayTuesday to 2, ts.dayWednesday to 3, ts.dayThursday to 4, ts.dayFriday to 5)
     val subjects = KpmSubjectCatalog.subjects.values.toList()
 
     var selectedDay by remember { mutableIntStateOf(preselectedDay) }
@@ -398,7 +448,11 @@ private fun AddSlotDialog(
                         color = SlotifyColors.TextPrimary
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = strings.close, tint = SlotifyColors.TextSecondary)
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = strings.close,
+                            tint = SlotifyColors.TextSecondary
+                        )
                     }
                 }
 
@@ -654,10 +708,10 @@ private fun ViewModeTab(
 ) {
     Box(
         modifier = modifier
-            .clip(SlotifyShapes.Medium)
-            .background(if (isSelected) SlotifyColors.KpmSkyBlue else Color.Transparent)
-            .neumorphicClickable(cornerRadius = SlotifyShapes.MediumDp, onClick = onClick)
-            .padding(vertical = 8.dp),
+            .clip(RoundedCornerShape(50))
+            .background(if (isSelected) SlotifyColors.Brand else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -822,97 +876,47 @@ private fun SimTimeChip(label: String, onClick: () -> Unit) {
 @Composable
 private fun TimetableSlotCard(
     slot: TimetableSlotEntity,
+    state: SlotState,
     canDelete: Boolean = false,
     onDelete: () -> Unit = {}
 ) {
-    val subject = KpmSubjectCatalog.getSubject(slot.subjectCode)
+    val sch = strings.scheduleUi
+    val ts = strings.timetableUi
     var showDeleteConfirm by remember { mutableStateOf(false) }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize()
-            .neumorphic(
-                elevation = if (slot.isRehat) NeumorphicElevation.LOW else NeumorphicElevation.MEDIUM,
-                cornerRadius = SlotifyShapes.MediumDp
-            )
-            .background(SlotifyColors.SurfaceCard, SlotifyShapes.Medium)
-            .padding(12.dp)
-    ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(subject.color.copy(alpha = 0.15f), SlotifyShapes.Small),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = subject.code,
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                            color = subject.color,
-                            fontSize = if (subject.code.length > 4) 7.sp else 10.sp
-                        )
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = slot.subjectName,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = SlotifyColors.TextPrimary
-                        )
-                        Text(
-                            text = slot.teacherName ?: if (slot.isRehat) strings.timetableUi.breakFallbackLabel else strings.timetableUi.subjectTeacherFallback,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = SlotifyColors.TextSecondary
-                        )
-                    }
-                }
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .background(SlotifyColors.CanvasBase, SlotifyShapes.Small)
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "${slot.startTime} – ${slot.endTime}",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                            color = SlotifyColors.TextPrimary
-                        )
-                    }
-
-                    if (canDelete) {
-                        IconButton(
-                            onClick = { showDeleteConfirm = !showDeleteConfirm },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                if (showDeleteConfirm) Icons.Default.ExpandLess else Icons.Default.MoreVert,
-                                contentDescription = strings.timetableUi.slotOptionsDesc,
-                                tint = SlotifyColors.TextTertiary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
+    val chip = when (state.status) {
+        SlotStatus.COMPLETED -> sch.statusCompleted
+        SlotStatus.NOW -> sch.statusNow
+        SlotStatus.NEXT -> state.minutesUntilStart?.let { sch.statusIn(it) }
+        SlotStatus.BREAK -> sch.statusBreak
+        else -> null
+    }
+    ScheduleCard(
+        title = slot.subjectName,
+        time = "${slot.startTime} – ${slot.endTime}",
+        status = state.status,
+        modifier = Modifier.animateContentSize(),
+        subtitle = slot.teacherName ?: if (slot.isRehat) ts.breakFallbackLabel else null,
+        subtitleIcon = Icons.Default.Person,
+        chip = chip,
+        accent = when (state.status) {
+            SlotStatus.COMPLETED, SlotStatus.NOW, SlotStatus.BREAK -> null
+            else -> SlotifyColors.subjectColor(slot.subjectCode)
+        },
+        trailing = if (canDelete) {
+            {
+                IconButton(onClick = { showDeleteConfirm = !showDeleteConfirm }, modifier = Modifier.size(44.dp)) {
+                    Icon(
+                        if (showDeleteConfirm) Icons.Default.ExpandLess else Icons.Default.MoreVert,
+                        contentDescription = ts.slotOptionsDesc,
+                        tint = SlotifyColors.TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
-
+        } else null,
+        footer = {
             AnimatedVisibility(visible = showDeleteConfirm) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.End
-                ) {
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.End) {
                     TextButton(
                         onClick = { showDeleteConfirm = false },
                         colors = ButtonDefaults.textButtonColors(contentColor = SlotifyColors.TextSecondary)
@@ -921,7 +925,7 @@ private fun TimetableSlotCard(
                     Button(
                         onClick = onDelete,
                         colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.EnglishRed),
-                        shape = SlotifyShapes.Small,
+                        shape = SlotifyShapes.Medium,
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                     ) {
                         Icon(
@@ -931,12 +935,12 @@ private fun TimetableSlotCard(
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text(strings.timetableUi.deleteSlotButton, style = MaterialTheme.typography.bodySmall, color = Color.White)
+                        Text(ts.deleteSlotButton, style = MaterialTheme.typography.labelLarge, color = Color.White)
                     }
                 }
             }
         }
-    }
+    )
 }
 
 @Composable
