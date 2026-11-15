@@ -451,6 +451,10 @@ Remaining follow-ups: screens are still long files (split into smaller composabl
 - OkHttp 4.12 ➜ 5.5.1 (`response.body` is non-null in 5.x).
 - Lint clean-up: all 47 `UseKtx` hints (`SharedPreferences.edit { }`, `toColorInt()`, `toUri()`, `createBitmap`, `toDrawable`), 5 `AutoboxingStateCreation` hints (`mutableIntStateOf`) and the speed-dial `ModifierParameter` order. Lint now reports **0 errors, 1 warning**: `OldTargetApi`, kept deliberately until targetSdk 37 has been tested on a device.
 
+**2026-11-15 — First on-device run.** `./gradlew connectedDebugAndroidTest` on a Sony Xperia X Compact (Android 8.0, API 26 = minSdk), a TECNO SPARK 30 5G (Android 14) and an Android 16 emulator: **`SlotifyMigrationTest` 2/2 passing on all three** (5➜6 fee series, 6➜7 money to sen).
+- Fixed first: the test APK crashed with `AbstractMethodError` in `kotlinx.serialization` (Room 2.8's schema reader needs serialization 1.8, but the app resolved core 1.7.3 and AGP aligns test dependencies to the app). The app now pins serialization 1.8.1 with a dependency constraint.
+- The debug build launches without crashing on both phones. The Android 14 phone shows the notification-permission prompt; the custom top bar clears the status bar on both.
+
 ### Execution order
 1. **P1 + P2** — privacy, security and data-loss fixes (blocking any further push).
 2. **P3** — correctness bugs.

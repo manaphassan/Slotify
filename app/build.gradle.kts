@@ -177,4 +177,11 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.room:room-testing:$roomVersion")
+
+    constraints {
+        // room-testing 2.8 (schema JSON) needs serialization 1.8+, but Navigation pulls 1.7.3 into the
+        // app and AGP aligns the test APK to the app's versions, mixing core 1.7.3 with json 1.8.1.
+        implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.1")
+        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+    }
 }
