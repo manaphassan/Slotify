@@ -35,11 +35,11 @@ Slotify dibina dengan mematuhi prinsip reka bentuk visual profesional **60 : 30 
 ├────────────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │   ██████████████████████████████████████   60% KANVAS UTAMA (DOMINANT)     │
-│   #F4F7FB (Soft Cloud Pearl)               • Kanvas Latar & Ruang Rehat    │
-│   Light Neumorphic Base Canvas             • Menghilangkan keletihan mata  │
+│   #F6F7F9 (Neutral Canvas)                 • Kanvas Latar & Ruang Rehat    │
+│   Minimal Flat Base Canvas                 • Menghilangkan keletihan mata  │
 │                                                                            │
 │   ███████████████████                      30% STRUKTUR KAD & TEKS         │
-│   #E8EFF8 (Kad Timbul) / #0284C7           • Kad Taktil, Bar Navigasi      │
+│   #FFFFFF (Kad Putih) / #0284C7            • Kad Bergaris, Bar Navigasi    │
 │   Deep Navy Slate & Biru Struktur KPM      • Tipografi Jelas & Grid Jadual │
 │                                                                            │
 │   ██████                                   10% AKSEN TINDAKAN & BINTANG    │
