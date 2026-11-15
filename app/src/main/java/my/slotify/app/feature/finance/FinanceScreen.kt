@@ -506,7 +506,7 @@ fun FinanceScreen(
                     )
 
                     // Fee Filter Tabs
-                    TabRow(
+                    PrimaryTabRow(
                         selectedTabIndex = feeFilter,
                         containerColor = SlotifyColors.CanvasBase,
                         contentColor = SlotifyColors.KpmBlue,

@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativePaint
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -59,7 +60,7 @@ fun Modifier.neumorphic(
         drawIntoCanvas { canvas ->
             val paint = Paint().apply {
                 color = darkColor
-                asFrameworkPaint().maskFilter = BlurMaskFilter(elevPx, BlurMaskFilter.Blur.NORMAL)
+                nativePaint.maskFilter = BlurMaskFilter(elevPx, BlurMaskFilter.Blur.NORMAL)
             }
             canvas.drawRoundRect(
                 left = elevPx / 2f,
@@ -76,7 +77,7 @@ fun Modifier.neumorphic(
         drawIntoCanvas { canvas ->
             val paint = Paint().apply {
                 color = lightColor
-                asFrameworkPaint().maskFilter = BlurMaskFilter(elevPx, BlurMaskFilter.Blur.NORMAL)
+                nativePaint.maskFilter = BlurMaskFilter(elevPx, BlurMaskFilter.Blur.NORMAL)
             }
             canvas.drawRoundRect(
                 left = -elevPx / 2f,

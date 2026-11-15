@@ -145,7 +145,7 @@ fun TakwimCalendarDialog(
                 }
 
                 // Filter Tabs (Semua / Cuti Penggal / Cuti Umum)
-                TabRow(
+                PrimaryTabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = SlotifyColors.SurfaceCard,
                     contentColor = SlotifyColors.KpmBlue,
