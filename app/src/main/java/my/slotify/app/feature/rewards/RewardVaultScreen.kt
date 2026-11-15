@@ -46,6 +46,9 @@ import my.slotify.app.core.designsystem.theme.strings
 import my.slotify.app.core.security.PinManager
 import my.slotify.app.core.designsystem.component.slotifySection
 import androidx.compose.runtime.saveable.rememberSaveable
+import my.slotify.app.core.designsystem.component.HeroCard
+import my.slotify.app.core.designsystem.component.HeroMetaLine
+import my.slotify.app.core.designsystem.component.SlotifyScreenTitle
 
 data class RewardCatalogItem(
     /** Stable, non-localised identifier (list key); [title]/[description] are display copy. */
@@ -124,47 +127,15 @@ fun RewardVaultScreen(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Star Balance Card
+        item { SlotifyScreenTitle(title = strings.rewards, subtitle = selectedStudent?.nickname) }
+
+        // Star balance
         item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = 20.dp)
-                    .background(SlotifyColors.SurfaceCard, SlotifyShapes.XLarge)
-                    .padding(18.dp)
+            HeroCard(
+                label = strings.starTabungTitle.uppercase(),
+                title = "${selectedStudent?.starCoinsBalance ?: 0} ⭐"
             ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = "${strings.starTabungTitle} (${selectedStudent?.nickname ?: strings.childFallback})",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
-                        color = SlotifyColors.TextSecondary
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.Star,
-                            contentDescription = null,
-                            tint = SlotifyColors.MathAmber,
-                            modifier = Modifier.size(36.dp)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = "${selectedStudent?.starCoinsBalance ?: 0} ⭐",
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = SlotifyColors.TextPrimary
-                        )
-                    }
-                    Text(
-                        text = strings.starTabungSubtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = TextAlign.Center,
-                        color = SlotifyColors.TextSecondary
-                    )
-                }
+                HeroMetaLine(Icons.Default.Star, strings.starTabungSubtitle)
             }
         }
 

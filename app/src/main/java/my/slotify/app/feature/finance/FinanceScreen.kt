@@ -49,6 +49,7 @@ import java.time.format.DateTimeFormatter
 import java.util.UUID
 import my.slotify.app.core.designsystem.component.slotifySection
 import androidx.compose.runtime.saveable.rememberSaveable
+import my.slotify.app.core.designsystem.component.SlotifyScreenTitle
 
 // ── Finance screen — Room-backed with Tabung Maya, Fee Management & Takwim KPM ──
 
@@ -106,6 +107,19 @@ fun FinanceScreen(
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        item {
+            val lang = LocalAppLanguage.current
+            val month = remember(lang) {
+                java.time.LocalDate.now().format(
+                    java.time.format.DateTimeFormatter.ofPattern(
+                        "MMMM yyyy",
+                        if (lang == AppLanguage.EN) java.util.Locale.ENGLISH else java.util.Locale.forLanguageTag("ms-MY")
+                    )
+                ).replaceFirstChar { it.uppercase() }
+            }
+            SlotifyScreenTitle(title = strings.finance, subtitle = month)
+        }
+
         // Celebration Banner when converting savings to stars
         if (celebrationMessage != null) {
             item {

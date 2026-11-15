@@ -39,6 +39,7 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import my.slotify.app.core.designsystem.component.slotifySection
 import androidx.compose.runtime.saveable.rememberSaveable
+import my.slotify.app.core.designsystem.component.SlotifyScreenTitle
 
 // Fix 1.4: Mask child national ID — show only last 4 digits by default
 private fun String.maskMyKid(): String {
@@ -100,6 +101,8 @@ fun StudentProfileScreen(
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item { SlotifyScreenTitle(title = strings.profile, subtitle = strings.profileSubtitle) }
+
         // Child switcher and edit button
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
