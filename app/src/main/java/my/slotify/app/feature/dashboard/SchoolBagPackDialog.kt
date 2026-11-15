@@ -37,6 +37,7 @@ import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.profile.FamilyProfileData
 import my.slotify.app.core.rewards.StarRewards
 import java.time.LocalDate
+import androidx.core.content.edit
 
 data class BagItem(
     val id: String,
@@ -57,7 +58,7 @@ object SchoolBagHelper {
     fun setBagPackedToday(context: Context, studentId: String, packed: Boolean) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val todayKey = LocalDate.now().toString()
-        prefs.edit().putBoolean("packed_${studentId}_$todayKey", packed).apply()
+        prefs.edit { putBoolean("packed_${studentId}_$todayKey", packed) }
     }
 
     fun getDefaultItemsForStudent(

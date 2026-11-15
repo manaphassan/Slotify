@@ -72,7 +72,7 @@ fun FinanceScreen(
     // Dialog & UI states
     var showAddFeeDialog by remember { mutableStateOf(false) }
     var showTakwimDialog by remember { mutableStateOf(false) }
-    var feeFilter by remember { mutableStateOf(0) } // 0: Semua, 1: Belum Bayar, 2: Selesai
+    var feeFilter by remember { mutableIntStateOf(0) } // 0: Semua, 1: Belum Bayar, 2: Selesai
     var celebrationMessage by remember { mutableStateOf<FinanceMessage?>(null) }
     var notificationSentSnack by remember { mutableStateOf(false) }
     LaunchedEffect(vmMessage) {

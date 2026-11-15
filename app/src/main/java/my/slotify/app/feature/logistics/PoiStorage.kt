@@ -6,6 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 import kotlin.math.abs
+import androidx.core.content.edit
 
 object PoiStorage {
     private const val PREFS_NAME = "slotify_logistics_pois"
@@ -83,12 +84,12 @@ object PoiStorage {
             }
             arr.put(obj)
         }
-        prefs.edit().putString(KEY_POIS_JSON, arr.toString()).apply()
+        prefs.edit { putString(KEY_POIS_JSON, arr.toString()) }
     }
 
     fun resetToDefaults(context: Context): List<PoiItem> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().remove(KEY_POIS_JSON).remove(OLD_KEY_POIS_JSON).apply()
+        prefs.edit { remove(KEY_POIS_JSON); remove(OLD_KEY_POIS_JSON) }
         return defaultPois
     }
 }

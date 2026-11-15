@@ -2,8 +2,10 @@ package my.slotify.app.feature.logistics
 
 import android.content.Context
 import android.graphics.*
-import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import androidx.core.graphics.toColorInt
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.drawable.toDrawable
 
 /**
  * Helper to generate high-resolution teardrop map pins with category colors
@@ -25,11 +27,11 @@ object PoiMarkerHelper {
         markerCache[cacheKey]?.let { return it }
 
         val categoryColor = when (poi.category) {
-            PoiCategory.RUMAH -> Color.parseColor("#16A34A")   // Vibrant Green
-            PoiCategory.SEKOLAH -> Color.parseColor("#0284C7") // Sky Blue
-            PoiCategory.TRANSIT -> Color.parseColor("#F59E0B") // Amber Gold
-            PoiCategory.PEJABAT -> Color.parseColor("#475569") // Slate Gray
-            PoiCategory.ALL -> Color.parseColor("#0284C7")
+            PoiCategory.RUMAH -> "#16A34A".toColorInt()   // Vibrant Green
+            PoiCategory.SEKOLAH -> "#0284C7".toColorInt() // Sky Blue
+            PoiCategory.TRANSIT -> "#F59E0B".toColorInt() // Amber Gold
+            PoiCategory.PEJABAT -> "#475569".toColorInt() // Slate Gray
+            PoiCategory.ALL -> "#0284C7".toColorInt()
         }
 
         val drawable = createPinDrawable(
@@ -55,7 +57,7 @@ object PoiMarkerHelper {
         val drawable = createPinDrawable(
             context = context,
             emoji = emoji,
-            pinColor = Color.parseColor("#EF4444"), // Crimson Red
+            pinColor = "#EF4444".toColorInt(), // Crimson Red
             isSelected = true
         )
         markerCache[cacheKey] = drawable
@@ -75,7 +77,7 @@ object PoiMarkerHelper {
         val density = context.resources.displayMetrics.density
         val size = (50 * density).toInt()
 
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(size, size)
         val canvas = Canvas(bitmap)
         val cx = size / 2f
         val cy = size / 2f
@@ -90,7 +92,7 @@ object PoiMarkerHelper {
 
         // 2. Amber pulsing halo
         val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#F59E0B") // Amber 500
+            color = "#F59E0B".toColorInt() // Amber 500
             style = Paint.Style.FILL
         }
         canvas.drawCircle(cx, cy, r + 3 * density, haloPaint)
@@ -105,7 +107,7 @@ object PoiMarkerHelper {
 
         // 4. Inner disc
         val innerDisc = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#FEF3C7") // Warm cream amber-50
+            color = "#FEF3C7".toColorInt() // Warm cream amber-50
             style = Paint.Style.FILL
         }
         canvas.drawCircle(cx, cy, r, innerDisc)
@@ -119,7 +121,7 @@ object PoiMarkerHelper {
         val textY = cy - (fm.ascent + fm.descent) / 2f
         canvas.drawText(emoji, cx, textY, emojiPaint)
 
-        val drawable = BitmapDrawable(context.resources, bitmap)
+        val drawable = bitmap.toDrawable(context.resources)
         markerCache[cacheKey] = drawable
         return drawable
     }
@@ -134,7 +136,7 @@ object PoiMarkerHelper {
         val width = (46 * density).toInt()
         val height = (60 * density).toInt()
 
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(width, height)
         val canvas = Canvas(bitmap)
 
         val cx = width / 2f
@@ -156,7 +158,7 @@ object PoiMarkerHelper {
         // 2. Halo glow if selected
         if (isSelected) {
             val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.parseColor("#38BDF8") // Sky-400
+                color = "#38BDF8".toColorInt() // Sky-400
                 style = Paint.Style.STROKE
                 strokeWidth = 3.5f * density
             }
@@ -206,7 +208,7 @@ object PoiMarkerHelper {
         val textY = cy - (fm.ascent + fm.descent) / 2f
         canvas.drawText(emoji, cx, textY, emojiPaint)
 
-        return BitmapDrawable(context.resources, bitmap)
+        return bitmap.toDrawable(context.resources)
     }
 
     fun clearCache() {

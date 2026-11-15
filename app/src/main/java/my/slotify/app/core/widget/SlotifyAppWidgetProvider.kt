@@ -31,6 +31,7 @@ import java.time.LocalTime
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
+import androidx.core.content.edit
 
 /**
  * Home screen widget provider with interactive multi-child toggling.
@@ -49,7 +50,7 @@ class SlotifyAppWidgetProvider : AppWidgetProvider() {
         if (intent.action == ACTION_SWITCH_STUDENT) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val currentIndex = prefs.getInt(PREF_STUDENT_INDEX, 0)
-            prefs.edit().putInt(PREF_STUDENT_INDEX, currentIndex + 1).apply()
+            prefs.edit { putInt(PREF_STUDENT_INDEX, currentIndex + 1) }
 
             // Trigger immediate background update with newly selected student
             val request = OneTimeWorkRequestBuilder<WidgetUpdateWorker>().build()
@@ -217,7 +218,7 @@ class WidgetUpdateWorker(
         val appStrings = stringsFor(language)
         s = appStrings.systemUi
         context.getSharedPreferences(SlotifyAppWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putString(SlotifyAppWidgetProvider.PREF_LANGUAGE, language.name).apply()
+            .edit { putString(SlotifyAppWidgetProvider.PREF_LANGUAGE, language.name) }
         return try {
             val dao = SlotifyDatabase.getDatabase(context).slotifyDao()
 
@@ -228,7 +229,7 @@ class WidgetUpdateWorker(
             val prefs = context.getSharedPreferences(SlotifyAppWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
             val rawIndex = prefs.getInt(SlotifyAppWidgetProvider.PREF_STUDENT_INDEX, 0)
             val activeIndex = ((rawIndex % students.size) + students.size) % students.size
-            prefs.edit().putInt(SlotifyAppWidgetProvider.PREF_STUDENT_INDEX, activeIndex).apply()
+            prefs.edit { putInt(SlotifyAppWidgetProvider.PREF_STUDENT_INDEX, activeIndex) }
             val student = students[activeIndex]
 
             val sessions = dao.getSessionsOnce(student.id).sortedBy { it.startTime }

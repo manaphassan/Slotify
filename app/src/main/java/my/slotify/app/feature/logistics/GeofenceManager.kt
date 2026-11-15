@@ -6,6 +6,7 @@ import my.slotify.app.core.designsystem.theme.SystemStrings
 import my.slotify.app.core.notification.SlotifyNotificationManager
 import java.util.concurrent.TimeUnit
 import kotlin.math.*
+import androidx.core.content.edit
 
 enum class GeofenceEventType {
     ENTERED,
@@ -170,6 +171,6 @@ object GeofenceManager {
 
     /** Clears persisted geofence state and cooldowns. */
     fun resetState(context: Context) {
-        context.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE).edit().clear().apply()
+        context.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE).edit { clear() }
     }
 }

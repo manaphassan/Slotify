@@ -76,6 +76,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import kotlin.math.roundToInt
 import my.slotify.app.core.profile.FamilyProfileData
 import my.slotify.app.core.profile.RouteProfile
+import androidx.core.graphics.toColorInt
+import androidx.core.net.toUri
 
 enum class PoiCategory {
     ALL, SEKOLAH, TRANSIT, RUMAH, PEJABAT
@@ -128,11 +130,11 @@ fun osrmCoordinateString(points: List<PoiItem>): String =
 
 fun launchNavigationIntent(context: Context, lat: Double, lng: Double, label: String) {
     try {
-        val uri = Uri.parse("geo:$lat,$lng?q=$lat,$lng(${Uri.encode(label)})")
+        val uri = "geo:$lat,$lng?q=$lat,$lng(${Uri.encode(label)})".toUri()
         val intent = Intent(Intent.ACTION_VIEW, uri)
         context.startActivity(intent)
     } catch (_: Exception) {
-        val webUri = Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng")
+        val webUri = "https://www.google.com/maps/search/?api=1&query=$lat,$lng".toUri()
         context.startActivity(Intent(Intent.ACTION_VIEW, webUri))
     }
 }
@@ -162,12 +164,12 @@ fun launchWhatsAppIntent(context: Context, phone: String, message: String) {
         val cleanPhone = phone.replace(Regex("[^0-9+]"), "").let {
             if (it.startsWith("0")) "+60" + it.substring(1) else it
         }
-        val uri = Uri.parse("https://api.whatsapp.com/send?phone=$cleanPhone&text=${Uri.encode(message)}")
+        val uri = "https://api.whatsapp.com/send?phone=$cleanPhone&text=${Uri.encode(message)}".toUri()
         val intent = Intent(Intent.ACTION_VIEW, uri)
         context.startActivity(intent)
     } catch (_: Exception) {
         try {
-            val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+            val dialIntent = Intent(Intent.ACTION_DIAL, "tel:$phone".toUri())
             context.startActivity(dialIntent)
         } catch (_: Exception) {
         }
@@ -176,7 +178,7 @@ fun launchWhatsAppIntent(context: Context, phone: String, message: String) {
 
 fun launchDialerIntent(context: Context, phone: String) {
     try {
-        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+        val intent = Intent(Intent.ACTION_DIAL, "tel:$phone".toUri())
         context.startActivity(intent)
     } catch (_: Exception) {
     }
@@ -2481,9 +2483,9 @@ private fun setupMapOverlays(
         val polyline = Polyline().apply {
             setPoints(routePoints)
             outlinePaint.color = when (selectedRoute) {
-                RouteSelection.PARENT_PICKUP -> android.graphics.Color.parseColor("#0284C7")
-                RouteSelection.VAN_PRIMARY -> android.graphics.Color.parseColor("#2563EB")
-                RouteSelection.VAN_SECONDARY -> android.graphics.Color.parseColor("#F59E0B")
+                RouteSelection.PARENT_PICKUP -> "#0284C7".toColorInt()
+                RouteSelection.VAN_PRIMARY -> "#2563EB".toColorInt()
+                RouteSelection.VAN_SECONDARY -> "#F59E0B".toColorInt()
             }
             outlinePaint.strokeWidth = 10f
         }

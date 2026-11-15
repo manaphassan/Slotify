@@ -66,10 +66,10 @@ fun SlotifySpeedDialFab(
     onNavigate: (Screen) -> Unit,
     onToggleTheme: () -> Unit,
     onToggleLanguage: () -> Unit,
-    isDarkMode: Boolean = false,
-    appThemeMode: AppThemeMode = if (isDarkMode) AppThemeMode.DARK else AppThemeMode.LIGHT,
     appLanguage: AppLanguage,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isDarkMode: Boolean = false,
+    appThemeMode: AppThemeMode = if (isDarkMode) AppThemeMode.DARK else AppThemeMode.LIGHT
 ) {
     val rotation by animateFloatAsState(
         targetValue = if (isExpanded) 135f else 0f,

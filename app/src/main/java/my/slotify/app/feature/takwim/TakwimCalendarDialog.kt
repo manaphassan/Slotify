@@ -38,7 +38,7 @@ fun TakwimCalendarDialog(
 ) {
     val today = remember { LocalDate.now() }
     val ts = strings.timetableUi
-    var selectedTab by remember { mutableStateOf(0) } // 0: Semua, 1: Cuti Penggal, 2: Cuti Umum
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: Semua, 1: Cuti Penggal, 2: Cuti Umum
 
     val dateFormatter = remember {
         DateTimeFormatter.ofPattern("d MMM yyyy", Locale.forLanguageTag("ms-MY"))

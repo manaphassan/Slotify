@@ -449,6 +449,7 @@ Remaining follow-ups: screens are still long files (split into smaller composabl
 - Focus timer: a real `Dialog` (covers the top bar and FAB, Back closes it, an outside tap no longer ends a running session); timer state survives rotation (`rememberSaveable`); the reward shown uses `StarRewards.FOCUS_SESSION_STARS`.
 - Deprecations: `TabRow` ➜ `PrimaryTabRow` (Finance, Takwim), `asFrameworkPaint()` ➜ `nativePaint` (neumorphic shadows). No compiler deprecation warnings remain.
 - OkHttp 4.12 ➜ 5.5.1 (`response.body` is non-null in 5.x).
+- Lint clean-up: all 47 `UseKtx` hints (`SharedPreferences.edit { }`, `toColorInt()`, `toUri()`, `createBitmap`, `toDrawable`), 5 `AutoboxingStateCreation` hints (`mutableIntStateOf`) and the speed-dial `ModifierParameter` order. Lint now reports **0 errors, 1 warning**: `OldTargetApi`, kept deliberately until targetSdk 37 has been tested on a device.
 
 ### Execution order
 1. **P1 + P2** — privacy, security and data-loss fixes (blocking any further push).

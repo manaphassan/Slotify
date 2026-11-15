@@ -10,6 +10,7 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
 import kotlin.math.abs
 import kotlin.math.cos
+import androidx.core.graphics.toColorInt
 
 /**
  * High-tech Animated RF Range Pulse Overlay (3.0 km radius).
@@ -34,13 +35,13 @@ class RfPulseOverlay(
     // Shaded coverage fill
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = android.graphics.Color.parseColor("#120284C7") // 7% translucent cyan
+        color = "#120284C7".toColorInt() // 7% translucent cyan
     }
 
     // 3km Outer limit boundary
     private val boundaryPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = android.graphics.Color.parseColor("#0284C7")
+        color = "#0284C7".toColorInt()
         strokeWidth = 4f
         pathEffect = DashPathEffect(floatArrayOf(14f, 8f), 0f)
     }
@@ -48,7 +49,7 @@ class RfPulseOverlay(
     // 1km & 2km Inner guide rings
     private val guideRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = android.graphics.Color.parseColor("#440284C7")
+        color = "#440284C7".toColorInt()
         strokeWidth = 2f
         pathEffect = DashPathEffect(floatArrayOf(8f, 6f), 0f)
     }
@@ -60,14 +61,14 @@ class RfPulseOverlay(
 
     // Distance & status text
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.parseColor("#0369A1")
+        color = "#0369A1".toColorInt()
         textSize = 24f
         isFakeBoldText = true
     }
 
     private val centerDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = android.graphics.Color.parseColor("#0284C7")
+        color = "#0284C7".toColorInt()
     }
 
     private val centerWhiteRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {

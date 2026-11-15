@@ -1,6 +1,7 @@
 package my.slotify.app.core.security
 
 import android.content.Context
+import androidx.core.content.edit
 
 sealed interface PinResult {
     data object Success : PinResult
@@ -62,16 +63,16 @@ object PinManager {
         val iterations = p.getInt(KEY_ITERATIONS, PinHasher.ITERATIONS)
 
         if (PinHasher.matches(input, salt, expected, iterations)) {
-            p.edit().putInt(KEY_FAILED, 0).putLong(KEY_LOCKED_UNTIL, 0L).apply()
+            p.edit { putInt(KEY_FAILED, 0); putLong(KEY_LOCKED_UNTIL, 0L) }
             return PinResult.Success
         }
 
         val failed = p.getInt(KEY_FAILED, 0) + 1
         val lockMs = PinHasher.lockoutDurationMs(failed)
-        p.edit()
-            .putInt(KEY_FAILED, failed)
-            .putLong(KEY_LOCKED_UNTIL, if (lockMs > 0) now + lockMs else 0L)
-            .apply()
+        p.edit {
+            putInt(KEY_FAILED, failed)
+            putLong(KEY_LOCKED_UNTIL, if (lockMs > 0) now + lockMs else 0L)
+        }
         return if (lockMs > 0) PinResult.LockedOut(lockMs) else PinResult.Incorrect(3 - failed % 3)
     }
 
@@ -88,14 +89,14 @@ object PinManager {
         if (!PinHasher.isValidPin(newPin)) return PinResult.InvalidFormat
         val salt = PinHasher.newSalt()
         val hash = PinHasher.hash(newPin, salt)
-        prefs(context).edit()
-            .putString(KEY_SALT, PinHasher.encode(salt))
-            .putString(KEY_HASH, PinHasher.encode(hash))
-            .putInt(KEY_ITERATIONS, PinHasher.ITERATIONS)
-            .putInt(KEY_FAILED, 0)
-            .putLong(KEY_LOCKED_UNTIL, 0L)
-            .remove(LEGACY_KEY_SHA256)
-            .apply()
+        prefs(context).edit {
+            putString(KEY_SALT, PinHasher.encode(salt))
+            putString(KEY_HASH, PinHasher.encode(hash))
+            putInt(KEY_ITERATIONS, PinHasher.ITERATIONS)
+            putInt(KEY_FAILED, 0)
+            putLong(KEY_LOCKED_UNTIL, 0L)
+            remove(LEGACY_KEY_SHA256)
+        }
         return PinResult.Success
     }
 }

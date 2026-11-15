@@ -1240,7 +1240,7 @@ fun InHomeRealtimeClassWidget(
     // Fix 2.1: Live clock that refreshes every minute
     var nowHHMM by remember {
         val c = Calendar.getInstance()
-        mutableStateOf(c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE))
+        mutableIntStateOf(c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE))
     }
     LaunchedEffect(Unit) {
         while (true) {
@@ -1471,8 +1471,8 @@ fun FocusTimerModalDialog(
     onDismiss: () -> Unit,
     onComplete: () -> Unit
 ) {
-    var selectedMinutes by rememberSaveable { mutableStateOf(20) }
-    var secondsRemaining by rememberSaveable { mutableStateOf(selectedMinutes * 60) }
+    var selectedMinutes by rememberSaveable { mutableIntStateOf(20) }
+    var secondsRemaining by rememberSaveable { mutableIntStateOf(selectedMinutes * 60) }
     var isRunning by rememberSaveable { mutableStateOf(false) }
     var isFinished by rememberSaveable { mutableStateOf(false) }
     val ds = strings.dashboardUi

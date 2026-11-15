@@ -5,6 +5,7 @@ import android.util.Log
 import my.slotify.app.core.finance.FeeRepository
 import my.slotify.app.core.profile.FamilyProfile
 import my.slotify.app.core.profile.FamilyProfileData
+import androidx.core.content.edit
 
 /**
  * Seeds the database from the active [FamilyProfile].
@@ -27,10 +28,10 @@ object DatabaseSeeder {
         if (alreadySeeded) return
 
         seed(context, dao, profile)
-        prefs.edit()
-            .putInt(KEY_VERSION, profile.seedVersion)
-            .putString(KEY_PROFILE, profile.profileName)
-            .apply()
+        prefs.edit {
+            putInt(KEY_VERSION, profile.seedVersion)
+            putString(KEY_PROFILE, profile.profileName)
+        }
     }
 
     suspend fun seed(context: Context?, dao: SlotifyDao, profile: FamilyProfile) {
