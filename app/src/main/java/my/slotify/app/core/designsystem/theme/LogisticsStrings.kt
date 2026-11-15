@@ -4,6 +4,12 @@ import java.util.Locale
 
 /** Logistics map, route planner and location picker copy. Accessed as `strings.logisticsUi`. */
 data class LogisticsStrings(
+    // Section headers
+    val groupRoutes: String,
+    val groupDirections: String,
+    val groupPlaces: String,
+    val placesSummary: (Int) -> String,
+
     // Driver contact card
     val driverActiveBadge: String,
     val callDriver: String,
@@ -136,6 +142,11 @@ data class LogisticsStrings(
 )
 
 val BmLogisticsStrings = LogisticsStrings(
+    groupRoutes = "Laluan",
+    groupDirections = "Panduan Arah",
+    groupPlaces = "Lokasi Tersimpan",
+    placesSummary = { n -> "$n lokasi" },
+
     // Driver contact card
     driverActiveBadge = "Aktif",
     callDriver = "Panggil",
@@ -274,6 +285,11 @@ val BmLogisticsStrings = LogisticsStrings(
 )
 
 val EnLogisticsStrings = LogisticsStrings(
+    groupRoutes = "Routes",
+    groupDirections = "Directions",
+    groupPlaces = "Saved Places",
+    placesSummary = { n -> "$n places" },
+
     // Driver contact card
     driverActiveBadge = "Active",
     callDriver = "Call",

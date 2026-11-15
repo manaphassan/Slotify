@@ -78,6 +78,8 @@ import my.slotify.app.core.profile.FamilyProfileData
 import my.slotify.app.core.profile.RouteProfile
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
+import my.slotify.app.core.designsystem.component.slotifySection
+import androidx.compose.runtime.saveable.rememberSaveable
 
 enum class PoiCategory {
     ALL, SEKOLAH, TRANSIT, RUMAH, PEJABAT
@@ -700,6 +702,10 @@ fun LogisticsMapScreen(
         droppedMapPin = null
         selectedMapPoi = poi
     }
+
+    var routesOpen by rememberSaveable { mutableStateOf(true) }
+    var directionsOpen by rememberSaveable { mutableStateOf(false) }
+    var placesOpen by rememberSaveable { mutableStateOf(false) }
 
     // The map sits outside the LazyColumn so it is never recycled while scrolling
     // (recycling destroyed the MapView and orphaned its GPS/compass overlays).
@@ -1504,23 +1510,6 @@ fun LogisticsMapScreen(
                 }
             }
 
-            // Header
-            item {
-                Column {
-                    Text(
-                        text = strings.mapTitle,
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = SlotifyColors.TextPrimary
-                    )
-                    Text(
-                        text = strings.mapSubtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = SlotifyColors.TextSecondary
-                    )
-                }
-            }
-
-
             // POI Category Filter Pills
             item {
                 val categories = listOf(
@@ -1728,465 +1717,487 @@ fun LogisticsMapScreen(
                 }
             }
 
-            // Active Route Selector Cards: [Parent | Van A | Van B] (labels from FamilyProfile)
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = SlotifyShapes.LargeDp)
-                        .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                        .padding(14.dp)
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            slotifySection(
+                key = "routes",
+                title = ls.groupRoutes,
+                expanded = routesOpen,
+                onToggle = { routesOpen = !routesOpen }
+            ) {
+                // Active Route Selector Cards: [Parent | Van A | Van B] (labels from FamilyProfile)
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = SlotifyShapes.LargeDp)
+                            .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
+                            .padding(14.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Route,
+                                        contentDescription = null,
+                                        tint = SlotifyColors.KpmSkyBlue,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = strings.routeChainTitle,
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = SlotifyColors.TextPrimary
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Surface(
+                                        shape = SlotifyShapes.Small,
+                                        color = SlotifyColors.SuccessMint.copy(alpha = 0.15f)
+                                    ) {
+                                        Text(
+                                            text = if (isOsrmLoading) "OSRM..." else "OSRM Live",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = SlotifyColors.SuccessMint,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(
+                                        onClick = { viewModel.refreshRoute() },
+                                        modifier = Modifier.size(48.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Refresh,
+                                            contentDescription = ls.recalculateRoute,
+                                            tint = SlotifyColors.KpmSkyBlue,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+
+                                    // Simulation button with Geofence Alerts & Smooth Animation
+                                    Button(
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            isSimulating = !isSimulating
+                                            if (!isSimulating) {
+                                                voiceHelper.stop()
+                                                simulatedVehicleState = null
+                                                simulationStep = 0
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (isSimulating) Color(0xFFEF4444) else SlotifyColors.ActionAmber
+                                        ),
+                                        shape = SlotifyShapes.Small,
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isSimulating) ls.stopSimShort else ls.startSimShort,
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = Color.White
+                                        )
+                                    }
+                                }
+                            }
+
+                            // 3 Route Tabs with dynamic OSRM ETA / KM
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                val abahSubtitle =
+                                    if (isOsrmLoading && selectedRoute == RouteSelection.PARENT_PICKUP) ls.routeCalculating
+                                    else if (osrmRoute != null && selectedRoute == RouteSelection.PARENT_PICKUP) ls.routeEta(
+                                        osrmRoute!!.totalDurationMinutes.toInt(),
+                                        osrmRoute!!.totalDistanceKm
+                                    )
+                                    else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.PARENT_PICKUP) ls.routeOffline
+                                    else FamilyProfileData.routes[RouteSelection.PARENT_PICKUP]?.passengerLabel ?: ""
+                                RouteTabCard(
+                                    title = FamilyProfileData.routes[RouteSelection.PARENT_PICKUP]?.tabTitle
+                                        ?: "PARENT_PICKUP",
+                                    subtitle = abahSubtitle,
+                                    isSelected = selectedRoute == RouteSelection.PARENT_PICKUP,
+                                    modifier = Modifier.weight(1f)
+                                ) { viewModel.selectRoute(RouteSelection.PARENT_PICKUP) }
+
+                                val vanPrimarySubtitle =
+                                    if (isOsrmLoading && selectedRoute == RouteSelection.VAN_PRIMARY) ls.routeCalculating
+                                    else if (osrmRoute != null && selectedRoute == RouteSelection.VAN_PRIMARY) ls.routeEta(
+                                        osrmRoute!!.totalDurationMinutes.toInt(),
+                                        osrmRoute!!.totalDistanceKm
+                                    )
+                                    else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.VAN_PRIMARY) ls.routeOffline
+                                    else FamilyProfileData.routes[RouteSelection.VAN_PRIMARY]?.passengerLabel ?: ""
+                                RouteTabCard(
+                                    title = FamilyProfileData.routes[RouteSelection.VAN_PRIMARY]?.tabTitle ?: "VAN_PRIMARY",
+                                    subtitle = vanPrimarySubtitle,
+                                    isSelected = selectedRoute == RouteSelection.VAN_PRIMARY,
+                                    modifier = Modifier.weight(1f)
+                                ) { viewModel.selectRoute(RouteSelection.VAN_PRIMARY) }
+
+                                val vanSecondarySubtitle =
+                                    if (isOsrmLoading && selectedRoute == RouteSelection.VAN_SECONDARY) ls.routeCalculating
+                                    else if (osrmRoute != null && selectedRoute == RouteSelection.VAN_SECONDARY) ls.routeEta(
+                                        osrmRoute!!.totalDurationMinutes.toInt(),
+                                        osrmRoute!!.totalDistanceKm
+                                    )
+                                    else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.VAN_SECONDARY) ls.routeOffline
+                                    else FamilyProfileData.routes[RouteSelection.VAN_SECONDARY]?.passengerLabel ?: ""
+                                RouteTabCard(
+                                    title = FamilyProfileData.routes[RouteSelection.VAN_SECONDARY]?.tabTitle
+                                        ?: "VAN_SECONDARY",
+                                    subtitle = vanSecondarySubtitle,
+                                    isSelected = selectedRoute == RouteSelection.VAN_SECONDARY,
+                                    modifier = Modifier.weight(1f)
+                                ) { viewModel.selectRoute(RouteSelection.VAN_SECONDARY) }
+                            }
+
+                            // Driver WhatsApp & Direct Call Dispatch Card
+                            DriverContactCard(
+                                selectedRoute = selectedRoute,
+                                onWhatsAppClick = { phone, msg ->
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    launchWhatsAppIntent(context, phone, msg)
+                                },
+                                onCallClick = { phone ->
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    launchDialerIntent(context, phone)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            slotifySection(
+                key = "directions",
+                title = ls.groupDirections,
+                expanded = directionsOpen,
+                onToggle = { directionsOpen = !directionsOpen }
+            ) {
+                // Turn-by-Turn Directions Steps for Selected Route
+                item {
+                    val routeLegs = osrmRoute?.legs.orEmpty()
+                    val steps = FamilyProfileData.routes[selectedRoute]?.steps.orEmpty().mapIndexed { i, step ->
+                        val leg = routeLegs.getOrNull(i)
+                        val detail = if (leg != null) {
+                            "${formatKm(leg.distanceMeters / 1000.0)} • ${
+                                (leg.durationSeconds / 60.0).roundToInt().coerceAtLeast(1)
+                            } min"
+                        } else "—"
+                        Triple("${i + 1}. ${step.title}", detail, step.note)
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = strings.turnByTurnTitle,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = SlotifyColors.TextPrimary
+                        )
+
+                        steps.forEachIndexed { index, (stepTitle, stepEta, stepDesc) ->
+                            val isCurrentSim = isSimulating && simulationStep == (index + 1)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .neumorphic(
+                                        elevation = if (isCurrentSim) NeumorphicElevation.HIGH else NeumorphicElevation.LOW,
+                                        cornerRadius = 14.dp
+                                    )
+                                    .background(
+                                        if (isCurrentSim) SlotifyColors.ActionAmber.copy(alpha = 0.12f) else SlotifyColors.SurfaceCard,
+                                        SlotifyShapes.Medium
+                                    )
+                                    .padding(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .background(
+                                                    if (isCurrentSim) SlotifyColors.ActionAmber else SlotifyColors.KpmSkyBlue.copy(
+                                                        alpha = 0.15f
+                                                    ),
+                                                    CircleShape
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "${index + 1}",
+                                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                                color = if (isCurrentSim) Color.White else SlotifyColors.KpmSkyBlue
+                                            )
+                                        }
+                                        Spacer(Modifier.width(10.dp))
+                                        Column {
+                                            Text(
+                                                text = stepTitle,
+                                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                                color = SlotifyColors.TextPrimary
+                                            )
+                                            Text(
+                                                text = stepDesc,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = SlotifyColors.TextSecondary
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = stepEta,
+                                        modifier = Modifier.padding(end = 64.dp), 
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                        color = if (isCurrentSim) SlotifyColors.ActionAmber else SlotifyColors.SuccessMint
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            slotifySection(
+                key = "places",
+                title = ls.groupPlaces,
+                expanded = placesOpen,
+                onToggle = { placesOpen = !placesOpen },
+                summary = ls.placesSummary(pois.size)
+            ) {
+                // Points of Interest (POI) Listing & Management Section
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Default.Route,
-                                    contentDescription = null,
-                                    tint = SlotifyColors.KpmSkyBlue,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(Modifier.width(6.dp))
+                            Column {
                                 Text(
-                                    text = strings.routeChainTitle,
+                                    text = ls.poiListTitle(filteredPois.size),
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                     color = SlotifyColors.TextPrimary
                                 )
-                                Spacer(Modifier.width(6.dp))
-                                Surface(
-                                    shape = SlotifyShapes.Small,
-                                    color = SlotifyColors.SuccessMint.copy(alpha = 0.15f)
-                                ) {
-                                    Text(
-                                        text = if (isOsrmLoading) "OSRM..." else "OSRM Live",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = SlotifyColors.SuccessMint,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
+                                Text(
+                                    text = ls.poiListSubtitle,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = SlotifyColors.TextSecondary
+                                )
                             }
 
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Reset to default POIs
                                 IconButton(
-                                    onClick = { viewModel.refreshRoute() },
+                                    onClick = { showResetConfirm = true },
                                     modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(
-                                        Icons.Default.Refresh,
-                                        contentDescription = ls.recalculateRoute,
-                                        tint = SlotifyColors.KpmSkyBlue,
-                                        modifier = Modifier.size(16.dp)
+                                        Icons.Default.RestartAlt,
+                                        contentDescription = ls.resetDefaults,
+                                        tint = SlotifyColors.TextSecondary,
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
 
-                                // Simulation button with Geofence Alerts & Smooth Animation
+                                // Add new POI button
                                 Button(
                                     onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        isSimulating = !isSimulating
-                                        if (!isSimulating) {
-                                            voiceHelper.stop()
-                                            simulatedVehicleState = null
-                                            simulationStep = 0
-                                        }
+                                        editingPoi = null
+                                        showEditDialog = true
                                     },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isSimulating) Color(0xFFEF4444) else SlotifyColors.ActionAmber
-                                    ),
+                                    colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue),
                                     shape = SlotifyShapes.Small,
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(32.dp)
                                 ) {
-                                    Text(
-                                        text = if (isSimulating) ls.stopSimShort else ls.startSimShort,
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = Color.White
+                                    Icon(
+                                        Icons.Default.AddLocationAlt,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(15.dp),
+                                        tint = Color.White
                                     )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(ls.addButton, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                 }
                             }
                         }
 
-                        // 3 Route Tabs with dynamic OSRM ETA / KM
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            val abahSubtitle =
-                                if (isOsrmLoading && selectedRoute == RouteSelection.PARENT_PICKUP) ls.routeCalculating
-                                else if (osrmRoute != null && selectedRoute == RouteSelection.PARENT_PICKUP) ls.routeEta(
-                                    osrmRoute!!.totalDurationMinutes.toInt(),
-                                    osrmRoute!!.totalDistanceKm
-                                )
-                                else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.PARENT_PICKUP) ls.routeOffline
-                                else FamilyProfileData.routes[RouteSelection.PARENT_PICKUP]?.passengerLabel ?: ""
-                            RouteTabCard(
-                                title = FamilyProfileData.routes[RouteSelection.PARENT_PICKUP]?.tabTitle
-                                    ?: "PARENT_PICKUP",
-                                subtitle = abahSubtitle,
-                                isSelected = selectedRoute == RouteSelection.PARENT_PICKUP,
-                                modifier = Modifier.weight(1f)
-                            ) { viewModel.selectRoute(RouteSelection.PARENT_PICKUP) }
+                        filteredPois.forEach { poi ->
+                            val isSelected = selectedMapPoi?.id == poi.id
+                            val poiColor = poiCategoryColor(poi.category)
 
-                            val vanPrimarySubtitle =
-                                if (isOsrmLoading && selectedRoute == RouteSelection.VAN_PRIMARY) ls.routeCalculating
-                                else if (osrmRoute != null && selectedRoute == RouteSelection.VAN_PRIMARY) ls.routeEta(
-                                    osrmRoute!!.totalDurationMinutes.toInt(),
-                                    osrmRoute!!.totalDistanceKm
-                                )
-                                else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.VAN_PRIMARY) ls.routeOffline
-                                else FamilyProfileData.routes[RouteSelection.VAN_PRIMARY]?.passengerLabel ?: ""
-                            RouteTabCard(
-                                title = FamilyProfileData.routes[RouteSelection.VAN_PRIMARY]?.tabTitle ?: "VAN_PRIMARY",
-                                subtitle = vanPrimarySubtitle,
-                                isSelected = selectedRoute == RouteSelection.VAN_PRIMARY,
-                                modifier = Modifier.weight(1f)
-                            ) { viewModel.selectRoute(RouteSelection.VAN_PRIMARY) }
-
-                            val vanSecondarySubtitle =
-                                if (isOsrmLoading && selectedRoute == RouteSelection.VAN_SECONDARY) ls.routeCalculating
-                                else if (osrmRoute != null && selectedRoute == RouteSelection.VAN_SECONDARY) ls.routeEta(
-                                    osrmRoute!!.totalDurationMinutes.toInt(),
-                                    osrmRoute!!.totalDistanceKm
-                                )
-                                else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.VAN_SECONDARY) ls.routeOffline
-                                else FamilyProfileData.routes[RouteSelection.VAN_SECONDARY]?.passengerLabel ?: ""
-                            RouteTabCard(
-                                title = FamilyProfileData.routes[RouteSelection.VAN_SECONDARY]?.tabTitle
-                                    ?: "VAN_SECONDARY",
-                                subtitle = vanSecondarySubtitle,
-                                isSelected = selectedRoute == RouteSelection.VAN_SECONDARY,
-                                modifier = Modifier.weight(1f)
-                            ) { viewModel.selectRoute(RouteSelection.VAN_SECONDARY) }
-                        }
-
-                        // Driver WhatsApp & Direct Call Dispatch Card
-                        DriverContactCard(
-                            selectedRoute = selectedRoute,
-                            onWhatsAppClick = { phone, msg ->
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                launchWhatsAppIntent(context, phone, msg)
-                            },
-                            onCallClick = { phone ->
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                launchDialerIntent(context, phone)
-                            }
-                        )
-                    }
-                }
-            }
-
-            // Turn-by-Turn Directions Steps for Selected Route
-            item {
-                val routeLegs = osrmRoute?.legs.orEmpty()
-                val steps = FamilyProfileData.routes[selectedRoute]?.steps.orEmpty().mapIndexed { i, step ->
-                    val leg = routeLegs.getOrNull(i)
-                    val detail = if (leg != null) {
-                        "${formatKm(leg.distanceMeters / 1000.0)} • ${
-                            (leg.durationSeconds / 60.0).roundToInt().coerceAtLeast(1)
-                        } min"
-                    } else "—"
-                    Triple("${i + 1}. ${step.title}", detail, step.note)
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = strings.turnByTurnTitle,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = SlotifyColors.TextPrimary
-                    )
-
-                    steps.forEachIndexed { index, (stepTitle, stepEta, stepDesc) ->
-                        val isCurrentSim = isSimulating && simulationStep == (index + 1)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .neumorphic(
-                                    elevation = if (isCurrentSim) NeumorphicElevation.HIGH else NeumorphicElevation.LOW,
-                                    cornerRadius = 14.dp
-                                )
-                                .background(
-                                    if (isCurrentSim) SlotifyColors.ActionAmber.copy(alpha = 0.12f) else SlotifyColors.SurfaceCard,
-                                    SlotifyShapes.Medium
-                                )
-                                .padding(12.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .neumorphic(
+                                        elevation = if (isSelected) NeumorphicElevation.MEDIUM else NeumorphicElevation.LOW,
+                                        cornerRadius = 14.dp
+                                    )
+                                    .background(
+                                        if (isSelected) SlotifyColors.KpmSkyBlue.copy(alpha = 0.08f) else SlotifyColors.SurfaceCard,
+                                        SlotifyShapes.Medium
+                                    )
+                                    .padding(horizontal = 10.dp, vertical = 8.dp)
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(28.dp)
-                                            .background(
-                                                if (isCurrentSim) SlotifyColors.ActionAmber else SlotifyColors.KpmSkyBlue.copy(
-                                                    alpha = 0.15f
-                                                ),
-                                                CircleShape
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "${index + 1}",
-                                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                            color = if (isCurrentSim) Color.White else SlotifyColors.KpmSkyBlue
-                                        )
-                                    }
-                                    Spacer(Modifier.width(10.dp))
-                                    Column {
-                                        Text(
-                                            text = stepTitle,
-                                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                            color = SlotifyColors.TextPrimary
-                                        )
-                                        Text(
-                                            text = stepDesc,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = SlotifyColors.TextSecondary
-                                        )
-                                    }
-                                }
-                                Text(
-                                    text = stepEta,
-                                    modifier = Modifier.padding(end = 64.dp), // Clearance for Speed Dial FAB
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                                    color = if (isCurrentSim) SlotifyColors.ActionAmber else SlotifyColors.SuccessMint
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Points of Interest (POI) Listing & Management Section
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = ls.poiListTitle(filteredPois.size),
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = SlotifyColors.TextPrimary
-                            )
-                            Text(
-                                text = ls.poiListSubtitle,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = SlotifyColors.TextSecondary
-                            )
-                        }
-
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Reset to default POIs
-                            IconButton(
-                                onClick = { showResetConfirm = true },
-                                modifier = Modifier.size(48.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.RestartAlt,
-                                    contentDescription = ls.resetDefaults,
-                                    tint = SlotifyColors.TextSecondary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-
-                            // Add new POI button
-                            Button(
-                                onClick = {
-                                    editingPoi = null
-                                    showEditDialog = true
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = SlotifyColors.KpmSkyBlue),
-                                shape = SlotifyShapes.Small,
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                modifier = Modifier.height(32.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.AddLocationAlt,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(15.dp),
-                                    tint = Color.White
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                Text(ls.addButton, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-                    }
-
-                    filteredPois.forEach { poi ->
-                        val isSelected = selectedMapPoi?.id == poi.id
-                        val poiColor = poiCategoryColor(poi.category)
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .neumorphic(
-                                    elevation = if (isSelected) NeumorphicElevation.MEDIUM else NeumorphicElevation.LOW,
-                                    cornerRadius = 14.dp
-                                )
-                                .background(
-                                    if (isSelected) SlotifyColors.KpmSkyBlue.copy(alpha = 0.08f) else SlotifyColors.SurfaceCard,
-                                    SlotifyShapes.Medium
-                                )
-                                .padding(horizontal = 10.dp, vertical = 8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Left clickable area to focus map & open bottom preview
                                 Row(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(SlotifyShapes.Small)
-                                        .clickable {
-                                            selectedMapPoi = poi
-                                            droppedMapPin = null
-                                            mapViewRef?.let { mv ->
-                                                mv.controller.animateTo(GeoPoint(poi.lat, poi.lng))
-                                                mv.controller.setZoom(15.5)
-                                            }
-                                        }
-                                        .padding(vertical = 4.dp, horizontal = 4.dp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(
+                                    // Left clickable area to focus map & open bottom preview
+                                    Row(
                                         modifier = Modifier
-                                            .size(38.dp)
-                                            .background(poiColor.copy(alpha = 0.16f), CircleShape),
-                                        contentAlignment = Alignment.Center
+                                            .weight(1f)
+                                            .clip(SlotifyShapes.Small)
+                                            .clickable {
+                                                selectedMapPoi = poi
+                                                droppedMapPin = null
+                                                mapViewRef?.let { mv ->
+                                                    mv.controller.animateTo(GeoPoint(poi.lat, poi.lng))
+                                                    mv.controller.setZoom(15.5)
+                                                }
+                                            }
+                                            .padding(vertical = 4.dp, horizontal = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(poi.iconEmoji, fontSize = 20.sp)
-                                    }
-                                    Spacer(Modifier.width(10.dp))
-                                    Column {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = poi.name,
-                                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                                color = SlotifyColors.TextPrimary
-                                            )
-                                            Spacer(Modifier.width(6.dp))
-                                            Surface(
-                                                shape = SlotifyShapes.Small,
-                                                color = poiColor.copy(alpha = 0.15f)
-                                            ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .background(poiColor.copy(alpha = 0.16f), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(poi.iconEmoji, fontSize = 20.sp)
+                                        }
+                                        Spacer(Modifier.width(10.dp))
+                                        Column {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text(
-                                                    text = poiCategoryLabel(poi.category),
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = poiColor,
-                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    text = poi.name,
+                                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                                    color = SlotifyColors.TextPrimary
+                                                )
+                                                Spacer(Modifier.width(6.dp))
+                                                Surface(
+                                                    shape = SlotifyShapes.Small,
+                                                    color = poiColor.copy(alpha = 0.15f)
+                                                ) {
+                                                    Text(
+                                                        text = poiCategoryLabel(poi.category),
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = poiColor,
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                            }
+                                            if (poi.address.isNotBlank()) {
+                                                Text(
+                                                    text = poi.address,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = SlotifyColors.TextSecondary,
+                                                    maxLines = 1,
+                                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                                 )
                                             }
-                                        }
-                                        if (poi.address.isNotBlank()) {
                                             Text(
-                                                text = poi.address,
+                                                text = ls.poiCoordsWithDistance(
+                                                    poi.lat,
+                                                    poi.lng,
+                                                    if (poi.distanceKm > 0) "${poi.distanceKm} km" else ls.distanceCenter
+                                                ),
                                                 style = MaterialTheme.typography.labelSmall,
-                                                color = SlotifyColors.TextSecondary,
-                                                maxLines = 1,
-                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                                color = SlotifyColors.KpmSkyBlue
                                             )
                                         }
-                                        Text(
-                                            text = ls.poiCoordsWithDistance(
-                                                poi.lat,
-                                                poi.lng,
-                                                if (poi.distanceKm > 0) "${poi.distanceKm} km" else ls.distanceCenter
-                                            ),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = SlotifyColors.KpmSkyBlue
-                                        )
-                                    }
-                                }
-
-                                // Right action buttons
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    // 1. Navigation Button
-                                    IconButton(
-                                        onClick = {
-                                            launchNavigationIntent(context, poi.lat, poi.lng, poi.name)
-                                        },
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .background(SlotifyColors.KpmSkyBlue.copy(alpha = 0.12f), CircleShape)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Navigation,
-                                            contentDescription = ls.navigate,
-                                            tint = SlotifyColors.KpmSkyBlue,
-                                            modifier = Modifier.size(16.dp)
-                                        )
                                     }
 
-                                    // 2. Laras Tepat Button
-                                    IconButton(
-                                        onClick = {
-                                            precisePickerTarget = GeoPoint(poi.lat, poi.lng)
-                                            precisePickerPoi = poi
-                                            showPrecisePicker = true
-                                        },
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .background(SlotifyColors.ActionAmber.copy(alpha = 0.12f), CircleShape)
+                                    // Right action buttons
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
-                                        Icon(
-                                            Icons.Default.PinDrop,
-                                            contentDescription = ls.adjustPrecise,
-                                            tint = SlotifyColors.ActionAmber,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
+                                        // 1. Navigation Button
+                                        IconButton(
+                                            onClick = {
+                                                launchNavigationIntent(context, poi.lat, poi.lng, poi.name)
+                                            },
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .background(SlotifyColors.KpmSkyBlue.copy(alpha = 0.12f), CircleShape)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Navigation,
+                                                contentDescription = ls.navigate,
+                                                tint = SlotifyColors.KpmSkyBlue,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
 
-                                    // 3. Edit POI button
-                                    IconButton(
-                                        onClick = {
-                                            editingPoi = poi
-                                            showEditDialog = true
-                                        },
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .background(SlotifyColors.KpmSkyBlue.copy(alpha = 0.12f), CircleShape)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Edit,
-                                            contentDescription = ls.editPoi,
-                                            tint = SlotifyColors.KpmSkyBlue,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
+                                        // 2. Laras Tepat Button
+                                        IconButton(
+                                            onClick = {
+                                                precisePickerTarget = GeoPoint(poi.lat, poi.lng)
+                                                precisePickerPoi = poi
+                                                showPrecisePicker = true
+                                            },
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .background(SlotifyColors.ActionAmber.copy(alpha = 0.12f), CircleShape)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.PinDrop,
+                                                contentDescription = ls.adjustPrecise,
+                                                tint = SlotifyColors.ActionAmber,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
 
-                                    // 4. Delete POI button
-                                    IconButton(
-                                        onClick = {
-                                            poiToDelete = poi
-                                        },
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .background(Color(0xFFEF4444).copy(alpha = 0.12f), CircleShape)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.DeleteOutline,
-                                            contentDescription = ls.deletePoi,
-                                            tint = Color(0xFFEF4444),
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                        // 3. Edit POI button
+                                        IconButton(
+                                            onClick = {
+                                                editingPoi = poi
+                                                showEditDialog = true
+                                            },
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .background(SlotifyColors.KpmSkyBlue.copy(alpha = 0.12f), CircleShape)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Edit,
+                                                contentDescription = ls.editPoi,
+                                                tint = SlotifyColors.KpmSkyBlue,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+
+                                        // 4. Delete POI button
+                                        IconButton(
+                                            onClick = {
+                                                poiToDelete = poi
+                                            },
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .background(Color(0xFFEF4444).copy(alpha = 0.12f), CircleShape)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.DeleteOutline,
+                                                contentDescription = ls.deletePoi,
+                                                tint = Color(0xFFEF4444),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -2195,7 +2206,7 @@ fun LogisticsMapScreen(
                 }
             }
 
-            // Clearance spacer for Speed Dial FAB
+            // Bottom spacing
             item {
                 Spacer(Modifier.height(16.dp))
             }
