@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +33,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import my.slotify.app.R
@@ -77,7 +79,7 @@ fun TodayDashboardScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedFilter by remember { mutableStateOf(TaskFilter.ALL) }
-    var showFocusDialog by remember { mutableStateOf(false) }
+    var showFocusDialog by rememberSaveable { mutableStateOf(false) }
     var showTakwimDialog by remember { mutableStateOf(false) }
     var showAddHomeworkDialog by remember { mutableStateOf(false) }
     var showSchoolBagDialog by remember { mutableStateOf(false) }
@@ -1184,7 +1186,7 @@ fun TodayDashboardScreen(
         }
 
         // ============================================================
-        // 🌟 FOCUS STUDY TIMER DIALOG (POMODORO MODAL OVERLAY)
+        // 🌟 FOCUS STUDY TIMER DIALOG (POMODORO)
         // ============================================================
         if (showFocusDialog) {
             FocusTimerModalDialog(
@@ -1469,10 +1471,10 @@ fun FocusTimerModalDialog(
     onDismiss: () -> Unit,
     onComplete: () -> Unit
 ) {
-    var selectedMinutes by remember { mutableStateOf(20) }
-    var secondsRemaining by remember { mutableStateOf(selectedMinutes * 60) }
-    var isRunning by remember { mutableStateOf(false) }
-    var isFinished by remember { mutableStateOf(false) }
+    var selectedMinutes by rememberSaveable { mutableStateOf(20) }
+    var secondsRemaining by rememberSaveable { mutableStateOf(selectedMinutes * 60) }
+    var isRunning by rememberSaveable { mutableStateOf(false) }
+    var isFinished by rememberSaveable { mutableStateOf(false) }
     val ds = strings.dashboardUi
 
     // Reset the seconds when a new duration is selected (only when not running)
@@ -1502,17 +1504,15 @@ fun FocusTimerModalDialog(
         onDismiss()
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.65f))
-            .clickable(onClick = safeDismiss),
-        contentAlignment = Alignment.Center
+    // A real window: covers the top bar and FAB, Back closes it, and an outside tap can't
+    // end a running session by accident.
+    Dialog(
+        onDismissRequest = safeDismiss,
+        properties = DialogProperties(dismissOnClickOutside = !isRunning, usePlatformDefaultWidth = false)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.92f)
-                .clickable(enabled = false) {}
                 .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = 22.dp)
                 .background(SlotifyColors.SurfaceCard, SlotifyShapes.XLarge)
                 .padding(20.dp)
@@ -1665,7 +1665,7 @@ fun FocusTimerModalDialog(
                             color = SlotifyColors.TextSecondary
                         )
                         Text(
-                            text = "+10 ⭐",
+                            text = "+${StarRewards.FOCUS_SESSION_STARS} ⭐",
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 28.sp,
                             color = SlotifyColors.StarGold
