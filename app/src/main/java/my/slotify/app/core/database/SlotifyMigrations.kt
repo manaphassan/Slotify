@@ -106,5 +106,12 @@ object SlotifyMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_5_6, MIGRATION_6_7)
+    /** v7 → v8: optional classroom on timetable slots. Additive, so existing rows are untouched. */
+    val MIGRATION_7_8 = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE timetable_slots ADD COLUMN room TEXT")
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
 }

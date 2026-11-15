@@ -223,6 +223,7 @@ fun TodayDashboardScreen(
                         chip = sch.statusNow
                     ) {
                         HeroMetaLine(Icons.Outlined.Schedule, "${currentSlot.first.startTime} – ${currentSlot.first.endTime}")
+                        currentSlot.first.room?.takeIf { it.isNotBlank() }?.let { HeroMetaLine(Icons.Default.Place, it) }
                         currentSlot.second.minutesLeft?.let { HeroMetaLine(Icons.Default.HourglassBottom, sch.heroTimeLeft(it)) }
                         currentSlot.first.teacherName?.let { HeroMetaLine(Icons.Default.Person, it) }
                     }
@@ -234,6 +235,7 @@ fun TodayDashboardScreen(
                         chipStatus = SlotStatus.NEXT
                     ) {
                         HeroMetaLine(Icons.Outlined.Schedule, "${nextSlot.first.startTime} – ${nextSlot.first.endTime}")
+                        nextSlot.first.room?.takeIf { it.isNotBlank() }?.let { HeroMetaLine(Icons.Default.Place, it) }
                         nextSlot.first.teacherName?.let { HeroMetaLine(Icons.Default.Person, it) }
                     }
 
@@ -254,8 +256,8 @@ fun TodayDashboardScreen(
                         title = slot.subjectName,
                         time = "${slot.startTime} – ${slot.endTime}",
                         status = st.status,
-                        subtitle = slot.teacherName,
-                        subtitleIcon = Icons.Default.Person,
+                        subtitle = my.slotify.app.feature.timetable.slotPlaceLine(slot),
+                        subtitleIcon = if (slot.room.isNullOrBlank()) Icons.Default.Person else Icons.Default.Place,
                         chip = when (st.status) {
                             SlotStatus.COMPLETED -> sch.statusCompleted
                             SlotStatus.NOW -> sch.statusNow

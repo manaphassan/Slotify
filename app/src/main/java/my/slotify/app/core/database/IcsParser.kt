@@ -18,6 +18,7 @@ object IcsParser {
         var startTime = ""
         var endTime = ""
         var dayOfWeek: Int? = null
+        var location: String? = null
 
         val dateFormat = SimpleDateFormat("yyyyMMdd'T'HHmmss", Locale.US)
         dateFormat.timeZone = TimeZone.getTimeZone("Asia/Kuala_Lumpur")
@@ -27,6 +28,7 @@ object IcsParser {
                 line.startsWith("BEGIN:VEVENT") -> {
                     inEvent = true
                     summary = ""
+                    location = null
                     startTime = ""
                     endTime = ""
                     dayOfWeek = null
@@ -34,6 +36,10 @@ object IcsParser {
 
                 line.startsWith("SUMMARY:") && inEvent -> {
                     summary = line.removePrefix("SUMMARY:")
+                }
+
+                line.startsWith("LOCATION") && inEvent -> {
+                    location = line.substringAfter(":").replace("\\,", ",").trim().ifBlank { null }
                 }
 
                 line.startsWith("DTSTART") && inEvent -> {
@@ -97,6 +103,7 @@ object IcsParser {
                                 subjectCode = code,
                                 subjectName = summary,
                                 teacherName = null,
+                                room = location,
                                 isRehat = code == "REHAT",
                                 requiresTextbook = code != "REHAT" && code != "UNKNOWN",
                                 requiresWorkbook = code != "REHAT" && code != "UNKNOWN"

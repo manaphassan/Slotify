@@ -4,6 +4,7 @@ import androidx.room.testing.MigrationTestHelper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -101,5 +102,32 @@ class SlotifyMigrationTest {
             it.moveToFirst(); assertEquals(8010L, it.getLong(0)); assertEquals("van", it.getString(1))
         }
         db.query("SELECT spentSen FROM daily_spending").use { it.moveToFirst(); assertEquals(320L, it.getLong(0)) }
+    }
+
+    @Test
+    fun migrate7To8_addsNullableRoom_keepingSlots() {
+        helper.createDatabase(dbName, 7).apply {
+            execSQL(
+                "INSERT INTO students (id, fullName, nickname, currentLevel, avatarEmoji, primarySchoolName, " +
+                        "secondarySchoolName, sessionType, academicYearShift, vanDriverName, vanDriverPhone, starCoinsBalance, " +
+                        "dailyCanteenBudgetSen, myKid, heightCm, weightKg, age, className) VALUES " +
+                        "('s1','A','A','D4','👦','SK',NULL,'DUAL_SRA_SK','Y4',NULL,NULL,42,450,'',0,0,10,'4A')"
+            )
+            execSQL(
+                "INSERT INTO school_sessions (id, studentId, schoolName, className, sessionTimeType, startTime, endTime, fridayEndTime) " +
+                        "VALUES ('sess1','s1','SK','4A','PETANG','13:00','18:00','11:30')"
+            )
+            execSQL(
+                "INSERT INTO timetable_slots (id, sessionId, dayOfWeek, periodIndex, startTime, endTime, subjectCode, subjectName, " +
+                        "teacherName, isRehat, requiresTextbook, requiresWorkbook) VALUES ('slot1','sess1',1,1,'13:00','14:00','BM','BM','Cikgu A',0,1,1)"
+            )
+            close()
+        }
+
+        val db = helper.runMigrationsAndValidate(dbName, 8, true, SlotifyMigrations.MIGRATION_7_8)
+
+        db.query("SELECT teacherName, room FROM timetable_slots WHERE id = 'slot1'").use {
+            it.moveToFirst(); assertEquals("Cikgu A", it.getString(0)); assertTrue(it.isNull(1))
+        }
     }
 }

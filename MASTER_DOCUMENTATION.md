@@ -85,7 +85,7 @@ flowchart TD
 - **Navigation:** Navigation Compose 2.10.2; Lifecycle 2.11.0; Activity Compose 1.13.0
 - **Dependency Injection:** Manual (`AppContainer` + `SlotifyViewModelFactory`)
 - **Settings:** Jetpack DataStore Preferences 1.3.0 (theme, language, selected student)
-- **Local Persistence:** Room 2.8.5 + SQLite (schema v7), schemas exported to `app/schemas/`
+- **Local Persistence:** Room 2.8.5 + SQLite (schema v8), schemas exported to `app/schemas/`
 - **Background Tasks:** WorkManager 2.12.0 (widget refresh, geofence monitor) + AlarmManager (daily reminders)
 - **Routing & Distance:** OSRM driving API + OkHttp 5.5
 - **Map Rendering:** `osmdroid-android:6.1.20`
@@ -96,7 +96,7 @@ flowchart TD
 
 Calm by default, loud only when something changes. Adopted 2026-11-15, inspired by the *Cxrili* timetable style guide (hierarchy, status cards, Bordeaux palette) and *FoxTransit* (trip-first logistics).
 - **Colour:** brand Bordeaux `#9A1F3F` (dark `#7C1D33`, on-dark accent `#C94A68`), warm off-white canvas `#F8F6F7`, white cards with a 1 dp hairline, text `#120A0A` / `#75696D`. The brand token keeps its old name `SlotifyColors.KpmSkyBlue` (alias `Brand`) so existing call sites did not change. Light, Dark and Nord remain selectable; Nord keeps its own frost accent.
-- **Type:** Space Grotesk for screen titles, section headings and card titles; Inter for body, labels and metadata (`Typography.kt`, downloadable Google Fonts with system fallback).
+- **Type:** Space Grotesk for screen titles, section headings and card titles; Inter for body, labels and metadata. Both are bundled variable fonts in `res/font/` (SIL OFL, see `third_party/fonts/`), so they render offline and without Play services.
 - **Spacing & shape:** card radius 16, button radius 12, touch targets ≥ 44 dp, card gap 8–12 dp.
 - **Status system** (`SlotStatus` + `statusColors()` in `Color.kt`): every state has a tinted card, a coloured accent bar and a chip with icon + label — Completed (green ✓), Now (Bordeaux ●), Next / In 1h 26m (clock), Upcoming (grey), Break (beige), Exam (purple), Cancelled, Room changed, Make-up, On time, Delayed, Offline. `SlotStates.forDay()` (`core/time/SlotStates.kt`, unit-tested) derives the state of each slot from the clock.
 - **Components** (`core/designsystem/component/SlotifySchedule.kt`): `SlotifyScreenTitle`, `SlotifySectionTitle`, `HeroCard` (deep brand card with decorative circles), `ScheduleCard` (accent bar + title + time/place lines + chip), `StatusChip`, `MetaLine`. Collapsible groups use `slotifySection` (`SlotifySection.kt`).
@@ -498,3 +498,7 @@ Personal data already exists in pushed commits. After the code fix is committed,
 - New tokens (Bordeaux palette, status colours), Space Grotesk headings, shared hero/schedule/chip components (§3).
 - Today leads with the current or next class and a status-coloured schedule; the old "real-time class widget" card is replaced by the hero card.
 - Timetable becomes a week view with dated day pills and status cards; Logistics leads with an estimated-arrival trip card and route option cards; every tab has a screen title.
+
+**2026-11-15 — Bundled fonts, classroom field.** Unit tests **68/68**; `SlotifyMigrationTest` **3/3** on the Sony (Android 8).
+- Space Grotesk and Inter are shipped in the APK (variable fonts, ~1 MB) instead of being downloaded through Google Play services; `ui-text-google-fonts` and the font certificate arrays were removed.
+- `timetable_slots.room` (nullable) added with `MIGRATION_7_8` (DB v8). The add-slot dialog has a "Bilik / Lokasi" field, ICS imports map `LOCATION` to it, and cards show "Room • Teacher" with a pin icon (the hero card shows the room too). Existing slots have no room until edited or re-imported.

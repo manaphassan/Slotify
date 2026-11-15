@@ -117,7 +117,7 @@ graph TD
 │  📱 Presentation Layer : Jetpack Compose + Navigation Compose    │
 │  🎨 Design System      : Bordeaux tokens + hero & status cards  │
 │  🧠 State & Logic      : ViewModels (StateFlow) + Repositories   │
-│  💾 Data Storage       : Room 2.8 (v7) + DataStore (Local-First) │
+│  💾 Data Storage       : Room 2.8 (v8) + DataStore (Local-First) │
 │  🗺️ Map & Routing      : OpenStreetMap (OSMDroid + OSRM Engine)  │
 │  ⏰ Background Engine  : AndroidX WorkManager (Alarms & Alerts)  │
 └──────────────────────────────────────────────────────────────────┘

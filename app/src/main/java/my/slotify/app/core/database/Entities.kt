@@ -75,6 +75,8 @@ data class TimetableSlotEntity(
     val subjectCode: String,            // "BM", "MT", "SN", "REHAT"
     val subjectName: String,
     val teacherName: String? = null,
+    /** Classroom / venue, e.g. "Bilik 2 Imtiaz" or "Makmal Sains" (v8). */
+    val room: String? = null,
     val isRehat: Boolean = false,
     val requiresTextbook: Boolean = true,
     val requiresWorkbook: Boolean = true

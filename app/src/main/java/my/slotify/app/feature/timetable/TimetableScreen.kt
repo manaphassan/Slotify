@@ -419,6 +419,7 @@ private fun AddSlotDialog(
     var startTime by remember { mutableStateOf("08:00") }
     var endTime by remember { mutableStateOf("08:30") }
     var teacherName by remember { mutableStateOf("") }
+    var room by remember { mutableStateOf("") }
     var requiresTextbook by remember { mutableStateOf(true) }
     var requiresWorkbook by remember { mutableStateOf(true) }
 
@@ -610,6 +611,27 @@ private fun AddSlotDialog(
                     )
                 )
 
+                // Room / location
+                Text(
+                    ts.roomLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = SlotifyColors.TextSecondary
+                )
+                OutlinedTextField(
+                    value = room,
+                    onValueChange = { room = it },
+                    placeholder = { Text(ts.roomPlaceholder) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = SlotifyShapes.Small,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = SlotifyColors.KpmSkyBlue,
+                        unfocusedBorderColor = SlotifyColors.BorderSubtle,
+                        focusedTextColor = SlotifyColors.TextPrimary,
+                        unfocusedTextColor = SlotifyColors.TextPrimary
+                    )
+                )
+
                 // Book toggles
                 if (!selectedSubject.isRehat) {
                     Row(
@@ -675,6 +697,7 @@ private fun AddSlotDialog(
                             subjectCode = selectedSubject.code,
                             subjectName = selectedSubject.nameBm,
                             teacherName = teacherName.ifBlank { null },
+                            room = room.trim().ifBlank { null },
                             isRehat = selectedSubject.isRehat,
                             requiresTextbook = if (selectedSubject.isRehat) false else requiresTextbook,
                             requiresWorkbook = if (selectedSubject.isRehat) false else requiresWorkbook
@@ -895,8 +918,8 @@ private fun TimetableSlotCard(
         time = "${slot.startTime} – ${slot.endTime}",
         status = state.status,
         modifier = Modifier.animateContentSize(),
-        subtitle = slot.teacherName ?: if (slot.isRehat) ts.breakFallbackLabel else null,
-        subtitleIcon = Icons.Default.Person,
+        subtitle = slotPlaceLine(slot) ?: if (slot.isRehat) ts.breakFallbackLabel else null,
+        subtitleIcon = if (slot.room.isNullOrBlank()) Icons.Default.Person else Icons.Default.Place,
         chip = chip,
         accent = when (state.status) {
             SlotStatus.COMPLETED, SlotStatus.NOW, SlotStatus.BREAK -> null
@@ -1107,3 +1130,9 @@ private fun parseTimeToMinutes(timeStr: String): Int {
     val m = parts[1].trim().toIntOrNull() ?: 0
     return h * 60 + m
 }
+
+/** "Room • Teacher" when both are known, else whichever exists. */
+internal fun slotPlaceLine(slot: TimetableSlotEntity): String? =
+    listOfNotNull(slot.room?.takeIf { it.isNotBlank() }, slot.teacherName?.takeIf { it.isNotBlank() })
+        .joinToString(" • ")
+        .ifBlank { null }
