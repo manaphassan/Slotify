@@ -49,7 +49,7 @@ object NordColors {
 
     // Nord Neumorphic Specular Highlight & Deep Drop Shadow
     val NordHighlight = Color(0xFF434C5E) // Specular glow in polar night
-    val NordShadow    = Color(0xFF1E222A) // Deep shadow below Nord0
+    val NordShadow    = Color(0xFF434C5E) // Hairline outline (Nord2)
 
     fun getSubjectColor(code: String): Color = when (code.uppercase()) {
         "BM" -> Nord9
@@ -65,29 +65,28 @@ object NordColors {
 }
 
 /**
- * Slotify 60 : 30 : 10 Color System
- * - 60% Dominant Base: CanvasBase / SurfaceCard
- * - 30% Structural Secondary: KpmSkyBlue / TextPrimary / TextSecondary
- * - 10% Radiant Accent: ActionAmber / SuccessMint / StarGold
+ * Slotify minimal colour system
+ * - Neutral canvas with white (light) or near-black (dark) cards separated by a hairline outline
+ * - One accent: KpmSkyBlue; status colours (ActionAmber / SuccessMint / StarGold) are used sparingly
  */
 object SlotifyColors {
     // Static base colors for Light Mode
-    val LightCanvasBase       = Color(0xFFF4F7FB) // Soft Cloud Pearl
-    val LightSurfaceCard      = Color(0xFFE8EFF8) // Tactile Off-White Squircle
+    val LightCanvasBase       = Color(0xFFF6F7F9) // Neutral canvas
+    val LightSurfaceCard      = Color(0xFFFFFFFF) // White card
     val LightHighlightLight   = Color(0xFFFFFFFF) // Specular Light Glow (Top-Left)
-    val LightDarkShadow       = Color(0xFFCBD5E1) // Soft Slate Shadow (Bottom-Right)
-    val LightTextPrimary      = Color(0xFF0F172A) // Deep Navy Slate
-    val LightTextSecondary    = Color(0xFF64748B) // Cool Slate
-    val LightBorderSubtle     = Color(0xFFE2E8F0) // 1dp boundary divider
+    val LightDarkShadow       = Color(0xFFE6E8EC) // Hairline outline
+    val LightTextPrimary      = Color(0xFF111827) // Near-black
+    val LightTextSecondary    = Color(0xFF6B7280) // Neutral grey
+    val LightBorderSubtle     = Color(0xFFE6E8EC) // 1dp outline / divider
 
     // Static base colors for Dark Mode
-    val CanvasBaseDark        = Color(0xFF111622) // Deep Twilight Slate
-    val SurfaceCardDark       = Color(0xFF192030) // Elevated Dark Slate
+    val CanvasBaseDark        = Color(0xFF0E1014) // Neutral dark canvas
+    val SurfaceCardDark       = Color(0xFF171A1F) // Dark card
     val LightHighlightDark    = Color(0xFF283244) // Specular top-left glow in dark
-    val DarkShadowDark        = Color(0xFF0A0D14) // Deep drop shadow in dark
-    val DarkTextPrimary       = Color(0xFFF8FAFC) // Crisp White Slate
-    val DarkTextSecondary     = Color(0xFF94A3B8) // Muted Cool Slate
-    val DarkBorderSubtle      = Color(0xFF334155) // Dark boundary divider
+    val DarkShadowDark        = Color(0xFF262A31) // Hairline outline in dark
+    val DarkTextPrimary       = Color(0xFFF3F4F6) // Off-white
+    val DarkTextSecondary     = Color(0xFF9CA3AF) // Neutral grey
+    val DarkBorderSubtle      = Color(0xFF262A31) // Dark outline / divider
 
     // Static base colors for Nord Mode
     val CanvasBaseNord        = NordColors.Nord0
@@ -132,10 +131,10 @@ object SlotifyColors {
 
     // Default static colors (for static theme scheme initialization)
     val DefaultKpmSkyBlue     = Color(0xFF0284C7)
-    val DefaultActionAmber    = Color(0xFFFF7A00)
+    val DefaultActionAmber    = Color(0xFFD97706)
     val DefaultStarGold       = Color(0xFFF59E0B)
-    val DefaultSuccessMint    = Color(0xFF10B981)
-    val DefaultKokuPurple     = Color(0xFF8B5CF6)
+    val DefaultSuccessMint    = Color(0xFF059669)
+    val DefaultKokuPurple     = Color(0xFF7C3AED)
 
     // Dynamic 30% Structural Secondary
     val KpmSkyBlue: Color
@@ -164,8 +163,8 @@ object SlotifyColors {
     val TextTertiary: Color
         @Composable get() = when (LocalAppThemeMode.current) {
             AppThemeMode.NORD  -> NordColors.Nord4  // #D8DEE9 — contrast ~8.5:1 on Nord0 (WCAG AAA ✓)
-            AppThemeMode.DARK  -> Color(0xFF64748B)
-            AppThemeMode.LIGHT -> Color(0xFF94A3B8)
+            AppThemeMode.DARK  -> Color(0xFF6B7280)
+            AppThemeMode.LIGHT -> Color(0xFF9CA3AF)
         }
 
     val BorderSubtle: Color
