@@ -7,10 +7,10 @@
 
 [![Platform: Android](https://img.shields.io/badge/Platform-Android%20Native%20(API%2026%2B)-3DDC84.svg?logo=android&logoColor=white)](https://developer.android.com/)
 [![Language: Kotlin](https://img.shields.io/badge/Language-Kotlin%202.4-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
-[![UI: Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%7C%20Minimal-4285F4.svg?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
+[![UI: Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%7C%20Bordeaux-9A1F3F.svg?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![Database: Room](https://img.shields.io/badge/Storage-Room%20DB%20(Local--First)-F43F5E.svg)](https://developer.android.com/training/data-storage/room)
 [![Map: OpenStreetMap](https://img.shields.io/badge/Maps-OpenStreetMap%20(OSRM)-7EBC6F.svg?logo=openstreetmap&logoColor=white)](https://www.openstreetmap.org/)
-[![Design: Minimal](https://img.shields.io/badge/Design-Minimal%20Flat%20UI-FF7A00.svg)]()
+[![Design: Status cards](https://img.shields.io/badge/Design-Hero%20%2B%20Status%20Cards-9A1F3F.svg)]()
 [![Version](https://img.shields.io/badge/Version-v1.1.0-blue.svg)]() [![Android CI](https://github.com/manaphassan/Slotify/actions/workflows/android.yml/badge.svg)](https://github.com/manaphassan/Slotify/actions/workflows/android.yml)
 
 </div>
@@ -19,7 +19,7 @@
 
 ## 📖 Pengenalan (Overview)
 
-**Slotify** ialah aplikasi mudah alih Android Native berasaskan reka bentuk **minimal dan rata (flat)** yang direka khas untuk memudahkan urusan harian ibu bapa serta murid sekolah rendah di Malaysia (**Sekolah Kebangsaan - SK**, **Sekolah Rendah Agama - SRA/SRAI**, dan **Tadika / PASTI**).
+**Slotify** ialah aplikasi mudah alih Android Native berasaskan reka bentuk **tenang bertema Bordeaux** (kad utama + kad status jadual) yang direka khas untuk memudahkan urusan harian ibu bapa serta murid sekolah rendah di Malaysia (**Sekolah Kebangsaan - SK**, **Sekolah Rendah Agama - SRA/SRAI**, dan **Tadika / PASTI**).
 
 Aplikasi ini bertindak sebagai **Pusat Logistik & Waktu Sehenti Keluarga**, menyelesaikan kekusutan harian seperti dwi-sesi pagi/petang, senarai semak beg sekolah, panduan baju seragam mingguan, pengesanan dua aliran van sekolah, serta pemupukan motivasi anak melalui tabung ganjaran bintang.
 
@@ -35,11 +35,11 @@ Slotify dibina dengan mematuhi prinsip reka bentuk visual profesional **60 : 30 
 ├────────────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │   ██████████████████████████████████████   60% KANVAS UTAMA (DOMINANT)     │
-│   #F6F7F9 (Neutral Canvas)                 • Kanvas Latar & Ruang Rehat    │
+│   #F8F6F7 (Warm Off-White)                 • Kanvas Latar & Ruang Rehat    │
 │   Minimal Flat Base Canvas                 • Menghilangkan keletihan mata  │
 │                                                                            │
 │   ███████████████████                      30% STRUKTUR KAD & TEKS         │
-│   #FFFFFF (Kad Putih) / #0284C7            • Kad Bergaris, Bar Navigasi    │
+│   #FFFFFF (Kad Putih) / #9A1F3F            • Kad Bergaris, Bar Navigasi    │
 │   Deep Navy Slate & Biru Struktur KPM      • Tipografi Jelas & Grid Jadual │
 │                                                                            │
 │   ██████                                   10% AKSEN TINDAKAN & BINTANG    │
@@ -115,7 +115,7 @@ graph TD
 │                   SLOTIFY ANDROID ARCHITECTURE                   │
 ├──────────────────────────────────────────────────────────────────┤
 │  📱 Presentation Layer : Jetpack Compose + Navigation Compose    │
-│  🎨 Design System      : Minimal flat UI + collapsible sections │
+│  🎨 Design System      : Bordeaux tokens + hero & status cards  │
 │  🧠 State & Logic      : ViewModels (StateFlow) + Repositories   │
 │  💾 Data Storage       : Room 2.8 (v7) + DataStore (Local-First) │
 │  🗺️ Map & Routing      : OpenStreetMap (OSMDroid + OSRM Engine)  │

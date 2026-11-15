@@ -44,7 +44,7 @@ import my.slotify.app.core.designsystem.theme.statusColors
 
 /** Big screen title with an optional date/subtitle (style guide: screen title + body). */
 @Composable
-fun SlotifyScreenTitle(title: String, subtitle: String? = null, modifier: Modifier = Modifier) {
+fun SlotifyScreenTitle(title: String, modifier: Modifier = Modifier, subtitle: String? = null) {
     Column(modifier = modifier.padding(top = 4.dp, bottom = 4.dp)) {
         Text(title, style = MaterialTheme.typography.displayLarge, color = SlotifyColors.TextPrimary)
         if (!subtitle.isNullOrBlank()) {

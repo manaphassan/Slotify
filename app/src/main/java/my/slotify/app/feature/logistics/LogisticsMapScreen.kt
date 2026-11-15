@@ -86,7 +86,8 @@ import my.slotify.app.core.designsystem.component.ScheduleCard
 import my.slotify.app.core.designsystem.component.SlotifyScreenTitle
 import my.slotify.app.core.designsystem.theme.SlotStatus
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.LocalDensity
 
 enum class PoiCategory {
     ALL, SEKOLAH, TRANSIT, RUMAH, PEJABAT
@@ -722,7 +723,8 @@ fun LogisticsMapScreen(
         in 12..18 -> sch.greetingAfternoon
         else -> sch.greetingEvening
     }
-    val mapHeight = if (LocalConfiguration.current.screenHeightDp < 720) 190.dp else 260.dp
+    val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
+    val mapHeight = if (windowHeight < 720.dp) 190.dp else 260.dp
     Column(
         modifier = Modifier
             .fillMaxSize()

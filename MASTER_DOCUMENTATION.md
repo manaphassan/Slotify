@@ -7,7 +7,7 @@
 > **Architecture:** Single-module MVVM — Compose screens ➜ feature ViewModels (`StateFlow`) ➜ repositories ➜ Room / DataStore, with Navigation Compose
 > **Data Philosophy:** 🔒 Local-First, Privacy-Focused (user owns all data on-device; personal seed data never committed — see §11)
 > **Map & Routing Engine:** OpenStreetMap via `osmdroid` + OSRM Driving API
-> **UI Style:** Minimal flat UI — neutral canvas, outlined cards, one accent colour, collapsible sections (§3)
+> **UI Style:** Bordeaux design system — hero cards, status-coloured schedule cards, Space Grotesk + Inter (§3)
 
 ---
 
@@ -92,13 +92,19 @@ flowchart TD
 
 ---
 
-## 🎨 3. Minimal Design System
+## 🎨 3. Design System (Bordeaux)
 
-Flat, calm surfaces so the information is what stands out (replaced the dual-shadow neumorphic style on 2026-11-15):
-- **Cards:** white (light) / near-black (dark) on a neutral canvas, separated by a 1 dp hairline outline. `Modifier.neumorphic()` keeps its old signature but now draws only that outline, so existing call sites did not change.
-- **Colour:** one accent (`KpmSkyBlue` `#0284C7`); status colours are muted and used sparingly. Subject colours are kept for the small subject badges.
-- **Type:** Inter throughout, SemiBold for headings.
-- **Themes:** Light, Dark and Nord remain selectable in the settings drawer.
+Calm by default, loud only when something changes. Adopted 2026-11-15, inspired by the *Cxrili* timetable style guide (hierarchy, status cards, Bordeaux palette) and *FoxTransit* (trip-first logistics).
+- **Colour:** brand Bordeaux `#9A1F3F` (dark `#7C1D33`, on-dark accent `#C94A68`), warm off-white canvas `#F8F6F7`, white cards with a 1 dp hairline, text `#120A0A` / `#75696D`. The brand token keeps its old name `SlotifyColors.KpmSkyBlue` (alias `Brand`) so existing call sites did not change. Light, Dark and Nord remain selectable; Nord keeps its own frost accent.
+- **Type:** Space Grotesk for screen titles, section headings and card titles; Inter for body, labels and metadata (`Typography.kt`, downloadable Google Fonts with system fallback).
+- **Spacing & shape:** card radius 16, button radius 12, touch targets ≥ 44 dp, card gap 8–12 dp.
+- **Status system** (`SlotStatus` + `statusColors()` in `Color.kt`): every state has a tinted card, a coloured accent bar and a chip with icon + label — Completed (green ✓), Now (Bordeaux ●), Next / In 1h 26m (clock), Upcoming (grey), Break (beige), Exam (purple), Cancelled, Room changed, Make-up, On time, Delayed, Offline. `SlotStates.forDay()` (`core/time/SlotStates.kt`, unit-tested) derives the state of each slot from the clock.
+- **Components** (`core/designsystem/component/SlotifySchedule.kt`): `SlotifyScreenTitle`, `SlotifySectionTitle`, `HeroCard` (deep brand card with decorative circles), `ScheduleCard` (accent bar + title + time/place lines + chip), `StatusChip`, `MetaLine`. Collapsible groups use `slotifySection` (`SlotifySection.kt`).
+- **Screens:**
+  - *Today*: big title + date → child chips → hero card (current class with "Now" and time left; next class with "In 1h 26m"; "All classes completed"; or a free-day card linking to the week) → "Jadual hari ini" status cards → Persediaan / Akademik / Takwim & Waktu Solat / Rutin.
+  - *Timetable*: title + week range, segmented Today/Week/Tomorrow, day pills with date and a dot on today, day heading, status cards with subject-coloured accent bars (delete via the ⋮ menu).
+  - *Logistics*: greeting + selected route → map (190 dp on small screens, 260 dp otherwise) → category filter → trip hero (estimated arrival time, duration/distance, vehicle, destination, **Navigate** / simulate / refresh) → route option cards → driver contact.
+  - *Rewards / Finance / Profile*: same title pattern; Rewards leads with a hero star balance.
 
 ### 3.1 Layout
 - **Bottom navigation:** Hari Ini · Jadual · Logistik · Ganjaran · Kewangan. Profile is the person icon in the top bar; the star balance opens Ganjaran.
@@ -118,10 +124,11 @@ Flat, calm surfaces so the information is what stands out (replaced the dual-sha
 ### 3.2 Color Palette Tokens (`SlotifyColors`)
 | Token Name | Hex Code | Purpose |
 |---|---|---|
-| `CanvasBase` | `#F6F7F9` / `#0E1014` | Screen background (light / dark) |
-| `SurfaceCard` | `#FFFFFF` / `#171A1F` | Cards |
-| `BorderSubtle` | `#E6E8EC` / `#262A31` | Card outline and dividers |
-| `KpmBlue` | `#0284C7` | The single accent: selection, primary actions |
+| `CanvasBase` | `#F8F6F7` / `#141012` | Screen background (light / dark) |
+| `SurfaceCard` | `#FFFFFF` / `#1E191B` | Cards |
+| `BorderSubtle` | `#EEE8EA` / `#2E272A` | Card outline and dividers |
+| `KpmSkyBlue` / `Brand` | `#9A1F3F` (dark theme `#C94A68`) | The single brand accent: selection, primary actions, hero cards |
+| `SurfacePink` / `SelectedPink` | `#FBE7EC` / `#F3C4D0` | "Now" card tint, selected states |
 | `ScienceGreen` | `#10B981` | Sains, safe geofence arrival, completed tasks |
 | `MathAmber` | `#F59E0B` | Matematik, Waktu Rehat, due alerts |
 | `IslamTeal` | `#0D9488` | Pendidikan Islam, Bahasa Arab, Jawi, PASTI |
@@ -486,3 +493,8 @@ Personal data already exists in pushed commits. After the code fix is committed,
 - Navigation: bottom bar replaces the drawer's screen list and the speed-dial FAB; the drawer keeps settings; the top bar shows the screen and the active child.
 - Every screen grouped into collapsible sections (§3.1). Removed two cards that repeated information already on Today (a second "current session" card and a second bag card with the same book list and "bag packed" button) and the large per-screen titles that repeated the top bar.
 - Fixed: past exams showed "0 HARI" (now a neutral ✓ "Lepas" badge, sorted after upcoming exams, and excluded from the section summary); at the weekend the attire card was titled "today" while showing Monday's attire.
+
+**2026-11-15 — Bordeaux redesign.** Inspired by the Cxrili style guide and FoxTransit. Unit tests **66/66** (adds `SlotStatesTest`), lint **0 errors**; checked on the Sony (Android 8) in Light and Nord.
+- New tokens (Bordeaux palette, status colours), Space Grotesk headings, shared hero/schedule/chip components (§3).
+- Today leads with the current or next class and a status-coloured schedule; the old "real-time class widget" card is replaced by the hero card.
+- Timetable becomes a week view with dated day pills and status cards; Logistics leads with an estimated-arrival trip card and route option cards; every tab has a screen title.
