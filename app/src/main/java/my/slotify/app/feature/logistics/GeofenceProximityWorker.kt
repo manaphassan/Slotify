@@ -7,6 +7,7 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import my.slotify.app.core.data.currentAppStrings
 
 /**
  * Periodic background geofence check.
@@ -34,7 +35,8 @@ class GeofenceProximityWorker(
                 GeofenceManager.evaluateProximity(
                     context = ctx,
                     currentLat = fix.latitude,
-                    currentLng = fix.longitude
+                    currentLng = fix.longitude,
+                    alertStrings = ctx.currentAppStrings().systemUi
                 )
             }
             Result.success()

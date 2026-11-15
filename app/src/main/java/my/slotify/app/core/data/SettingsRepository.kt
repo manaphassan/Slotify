@@ -7,9 +7,12 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import my.slotify.app.core.designsystem.theme.AppLanguage
+import my.slotify.app.core.designsystem.theme.AppStrings
 import my.slotify.app.core.designsystem.theme.AppThemeMode
+import my.slotify.app.core.designsystem.theme.stringsFor
 
 data class AppSettings(
     val themeMode: AppThemeMode = AppThemeMode.LIGHT,
@@ -18,6 +21,12 @@ data class AppSettings(
 )
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "slotify_settings")
+
+/** In-app language for code running outside Compose (workers, receivers, widget). */
+suspend fun Context.currentAppLanguage(): AppLanguage = SettingsRepository(this).settings.first().language
+
+/** String table for the in-app language, for code running outside Compose. */
+suspend fun Context.currentAppStrings(): AppStrings = stringsFor(currentAppLanguage())
 
 /** User preferences persisted across launches (previously lost on every cold start). */
 class SettingsRepository(context: Context) {

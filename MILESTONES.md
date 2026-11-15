@@ -79,5 +79,5 @@ Pelan penuh dan status terperinci: [MASTER_DOCUMENTATION.md §13](MASTER_DOCUMEN
 - [x] P4 — ViewModel + NavHost, wang dalam sen (migrasi 6→7), tetapan DataStore.
 - [x] P5 — Satu sistem bahasa, aksesibiliti (sasaran sentuh 48dp), CI GitHub Actions.
 - [x] P5-3 — Semua teks skrin dipindahkan ke SlotifyStrings (BM/EN) mengikut kumpulan ciri.
-- [ ] P5-3 susulan — Widget skrin utama & notifikasi masih BM sahaja.
+- [x] P5-3 susulan — Widget skrin utama, notifikasi & alamat sandaran kini ikut bahasa aplikasi.
 - [x] P5-5 — Naik taraf AGP 9.5 / Kotlin 2.4 / compileSdk 37 / targetSdk 36 dan kebergantungan AndroidX terkini.

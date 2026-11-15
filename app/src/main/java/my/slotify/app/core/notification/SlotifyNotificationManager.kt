@@ -15,6 +15,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import my.slotify.app.MainActivity
+import my.slotify.app.core.designsystem.theme.SystemStrings
 import java.util.Calendar
 
 object SlotifyNotificationManager {
@@ -28,33 +29,34 @@ object SlotifyNotificationManager {
     const val NOTIFICATION_ID_TRANSIT = 1003
     const val NOTIFICATION_ID_FINANCE = 1004
 
-    fun createNotificationChannels(context: Context) {
+    /** Creates or renames the channels; call again with the new table when the language changes. */
+    fun createNotificationChannels(context: Context, s: SystemStrings) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         val attireChannel = NotificationChannel(
             CHANNEL_ATTIRE,
-            "Slotify: Peringatan Uniform Sekolah",
+            s.channelAttireName,
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "Peringatan jadual uniform KPM dan buku sekolah harian"
+            description = s.channelAttireDesc
             enableVibration(true)
         }
 
         val transitChannel = NotificationChannel(
             CHANNEL_TRANSIT,
-            "Slotify: Transit & Logistik",
+            s.channelTransitName,
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "Peringatan drop beg transit dan jadual van sekolah"
+            description = s.channelTransitDesc
             enableVibration(true)
         }
 
         val financeChannel = NotificationChannel(
             CHANNEL_FINANCE,
-            "Slotify: Peringatan Yuran",
+            s.channelFinanceName,
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "Peringatan komitmen yuran bulanan dan belanja kantin"
+            description = s.channelFinanceDesc
         }
 
         notificationManager.createNotificationChannels(
@@ -88,8 +90,8 @@ object SlotifyNotificationManager {
         return PendingIntent.getActivity(context, 0, intent, flags)
     }
 
-    fun showTestNotification(context: Context, title: String, message: String) {
-        createNotificationChannels(context)
+    fun showTestNotification(context: Context, s: SystemStrings, title: String, message: String) {
+        createNotificationChannels(context, s)
 
         val pendingIntent = getLaunchPendingIntent(context)
 
@@ -105,17 +107,17 @@ object SlotifyNotificationManager {
         notifySafely(context, NOTIFICATION_ID_TEST, builder.build())
     }
 
-    fun showAttireReminder(context: Context, childName: String, attire: String, books: String) {
-        createNotificationChannels(context)
+    fun showAttireReminder(context: Context, s: SystemStrings, childName: String, attire: String, books: String) {
+        createNotificationChannels(context, s)
 
         val pendingIntent = getLaunchPendingIntent(context)
-        val title = "Peringatan Uniform Esok: $childName"
-        val body = "Pakaian: $attire\nBawa: $books"
+        val title = s.attireNotificationTitle(childName)
+        val body = s.attireNotificationBody(attire, books)
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ATTIRE)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
-            .setContentText("Uniform: $attire • Semak beg sekolah!")
+            .setContentText(s.attireNotificationShort(attire))
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
@@ -124,11 +126,11 @@ object SlotifyNotificationManager {
         notifySafely(context, NOTIFICATION_ID_ATTIRE, builder.build())
     }
 
-    fun showTransitAlert(context: Context, childName: String, transitMsg: String) {
-        createNotificationChannels(context)
+    fun showTransitAlert(context: Context, s: SystemStrings, childName: String, transitMsg: String) {
+        createNotificationChannels(context, s)
 
         val pendingIntent = getLaunchPendingIntent(context)
-        val title = "Logistik Transit: $childName"
+        val title = s.transitNotificationTitle(childName)
 
         val builder = NotificationCompat.Builder(context, CHANNEL_TRANSIT)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -147,23 +149,24 @@ object SlotifyNotificationManager {
      */
     fun showGeofenceProximityAlert(
         context: Context,
+        s: SystemStrings,
         locationName: String,
         distanceMeters: Double,
         eventType: String
     ) {
-        createNotificationChannels(context)
+        createNotificationChannels(context, s)
 
         val pendingIntent = getLaunchPendingIntent(context)
         val title = when (eventType) {
-            "ENTERED" -> "📍 Ketibaan di Zon: $locationName"
-            "APPROACHING" -> "🔔 Menghampiri: $locationName"
-            else -> "📡 Zon Logistik: $locationName"
+            "ENTERED" -> s.geofenceEnteredTitle(locationName)
+            "APPROACHING" -> s.geofenceApproachingTitle(locationName)
+            else -> s.geofenceUpdateTitle(locationName)
         }
 
         val message = when (eventType) {
-            "ENTERED" -> "Kenderaan / anak kini telah tiba dalam radius ${distanceMeters.toInt()}m $locationName."
-            "APPROACHING" -> "Kenderaan sedang menghampiri $locationName (~${distanceMeters.toInt()}m lagi)."
-            else -> "Status logistik dikemaskini untuk $locationName."
+            "ENTERED" -> s.geofenceEnteredBody(locationName, distanceMeters.toInt())
+            "APPROACHING" -> s.geofenceApproachingBody(locationName, distanceMeters.toInt())
+            else -> s.geofenceUpdateBody(locationName)
         }
 
         val notificationId = 3000 + (locationName.hashCode() and 0x7FFF) % 1000
@@ -181,8 +184,6 @@ object SlotifyNotificationManager {
     }
 
     fun scheduleDailyReminders(context: Context) {
-        createNotificationChannels(context)
-
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val immutableFlag = PendingIntent.FLAG_IMMUTABLE
 

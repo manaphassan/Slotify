@@ -13,7 +13,11 @@ import androidx.core.content.ContextCompat
 import androidx.work.*
 import my.slotify.app.MainActivity
 import my.slotify.app.R
+import my.slotify.app.core.data.currentAppLanguage
 import my.slotify.app.core.database.SlotifyDatabase
+import my.slotify.app.core.designsystem.theme.AppLanguage
+import my.slotify.app.core.designsystem.theme.SystemStrings
+import my.slotify.app.core.designsystem.theme.stringsFor
 import my.slotify.app.core.model.AttireGuide
 import my.slotify.app.core.profile.FamilyProfileData
 import my.slotify.app.core.profile.zoneAt
@@ -89,10 +93,12 @@ class SlotifyAppWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetId: Int
     ) {
+        val s = cachedStrings(context)
         val views = RemoteViews(context.packageName, R.layout.widget_slotify_class)
-        views.setTextViewText(R.id.widget_child_name, "Memuatkan…")
-        views.setTextViewText(R.id.widget_zone_text, "📍 Membaca Zon GPS…")
-        views.setTextViewText(R.id.widget_current_class, "⏳ Mengambil jadual…")
+        applyStaticLabels(views, s)
+        views.setTextViewText(R.id.widget_child_name, s.widgetLoadingChild)
+        views.setTextViewText(R.id.widget_zone_text, s.widgetLoadingZone)
+        views.setTextViewText(R.id.widget_current_class, s.widgetLoadingSchedule)
         views.setTextViewText(R.id.widget_next_class, "")
         views.setTextViewText(R.id.widget_books, "")
         views.setTextViewText(R.id.widget_siblings_status, "")
@@ -106,6 +112,32 @@ class SlotifyAppWidgetProvider : AppWidgetProvider() {
         const val ACTION_SWITCH_STUDENT = "my.slotify.app.ACTION_SWITCH_STUDENT"
         const val PREFS_NAME         = "slotify_widget_prefs"
         const val PREF_STUDENT_INDEX = "key_selected_student_index"
+        const val PREF_LANGUAGE      = "key_language"
+
+        /** Re-renders the widget now, e.g. after the in-app language changes. */
+        fun requestUpdate(context: Context) {
+            val ids = AppWidgetManager.getInstance(context)
+                .getAppWidgetIds(android.content.ComponentName(context, SlotifyAppWidgetProvider::class.java))
+            if (ids.isEmpty()) return
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                WORK_NAME,
+                ExistingWorkPolicy.REPLACE,
+                OneTimeWorkRequestBuilder<WidgetUpdateWorker>().build()
+            )
+        }
+
+        /** Last language the worker rendered with, for the synchronous loading state. */
+        internal fun cachedStrings(context: Context): SystemStrings {
+            val name = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(PREF_LANGUAGE, null)
+            val language = name?.let { runCatching { AppLanguage.valueOf(it) }.getOrNull() } ?: AppLanguage.BM
+            return stringsFor(language).systemUi
+        }
+
+        private fun applyStaticLabels(views: RemoteViews, s: SystemStrings) {
+            views.setTextViewText(R.id.widget_switch_child_btn, s.widgetSwitch)
+            views.setTextViewText(R.id.widget_zone_btn, s.widgetMap)
+            views.setTextViewText(R.id.widget_open_action, s.widgetOpenTimetable)
+        }
 
         /**
          * Builds and pushes a fully-populated RemoteViews to all widget instances.
@@ -113,13 +145,14 @@ class SlotifyAppWidgetProvider : AppWidgetProvider() {
          */
         fun pushUpdate(
             context: Context,
+            s: SystemStrings,
             childName: String,
             sessionLabel: String,
             currentClass: String,
             nextClass: String,
             books: String,
             attire: String,
-            locationZone: String = "📍 Zon: Memuatkan...",
+            locationZone: String,
             siblingsSummary: String = ""
         ) {
             val appWidgetManager = AppWidgetManager.getInstance(context)
@@ -127,6 +160,7 @@ class SlotifyAppWidgetProvider : AppWidgetProvider() {
             val appWidgetIds = appWidgetManager.getAppWidgetIds(component)
 
             val views = RemoteViews(context.packageName, R.layout.widget_slotify_class)
+            applyStaticLabels(views, s)
             views.setTextViewText(R.id.widget_child_name, "$childName • $sessionLabel")
             views.setTextViewText(R.id.widget_zone_text, locationZone)
             views.setTextViewText(R.id.widget_current_class, currentClass)
@@ -176,7 +210,14 @@ class WidgetUpdateWorker(
     params: WorkerParameters
 ) : CoroutineWorker(context, params) {
 
+    private var s: SystemStrings = stringsFor(AppLanguage.BM).systemUi
+
     override suspend fun doWork(): Result {
+        val language = runCatching { context.currentAppLanguage() }.getOrDefault(AppLanguage.BM)
+        val appStrings = stringsFor(language)
+        s = appStrings.systemUi
+        context.getSharedPreferences(SlotifyAppWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(SlotifyAppWidgetProvider.PREF_LANGUAGE, language.name).apply()
         return try {
             val dao = SlotifyDatabase.getDatabase(context).slotifyDao()
 
@@ -212,8 +253,8 @@ class WidgetUpdateWorker(
             val routine = FamilyProfileData.routineZones[student.id].orEmpty()
             val zoneText: String = when {
                 gpsFix != null -> gpsZoneText(gpsFix.latitude, gpsFix.longitude)
-                isWeekend -> "📍 Zon: 🏠 Rumah (Hujung Minggu)"
-                else -> routine.zoneAt(minuteOfDay)?.let { "📍 ${it.label}" } ?: "📍 Zon: Buka Peta Logistik"
+                isWeekend -> s.widgetZoneWeekendHome
+                else -> routine.zoneAt(minuteOfDay)?.let { "📍 ${it.label}" } ?: s.widgetZoneOpenMap
             }
 
             // 3. Siblings summary (active child in brackets)
@@ -225,17 +266,19 @@ class WidgetUpdateWorker(
             }
 
             val prayerSchedule = JakimPrayerTimeHelper.getSchedule(now)
+            val prayerText = "🕌 ${prayerSchedule.nextPrayerName} (${appStrings.dashboardUi.prayerCountdown(prayerSchedule.minutesUntilNext)})"
             val isBagPacked = SchoolBagHelper.isBagPackedToday(context, student.id)
 
             if (isWeekend) {
                 SlotifyAppWidgetProvider.pushUpdate(
                     context = context,
+                    s = s,
                     childName = "${student.avatarEmoji} ${student.nickname}",
                     sessionLabel = sessionLabel(session.sessionTimeType),
-                    currentClass = "🎉 Hujung Minggu! Rehat & Enjoy",
-                    nextClass = "⏩ Sekolah semula Isnin",
-                    books = if (isBagPacked) "🎒 Beg Siap Dikemas ✓" else "📚 Semak beg untuk Isnin",
-                    attire = "👕 Santai • 🕌 ${prayerSchedule.nextPrayerName} (${prayerSchedule.countdownText})",
+                    currentClass = s.widgetWeekendCurrent,
+                    nextClass = s.widgetWeekendNext,
+                    books = if (isBagPacked) s.widgetBagPacked else s.widgetCheckBagMonday,
+                    attire = "👕 ${s.widgetCasualAttire} • $prayerText",
                     locationZone = zoneText,
                     siblingsSummary = siblingsSummary
                 )
@@ -248,17 +291,18 @@ class WidgetUpdateWorker(
             val nextSlot = slots.firstOrNull { it.startTime > nowText }
 
             val currentText = currentSlot?.let { "⏳ ${it.subjectName} (${it.startTime} - ${it.endTime})" }
-                ?: if (nextSlot != null) "⏳ Belum bermula — bersedia sekarang!" else "✅ Kelas hari ini selesai"
-            val nextText = nextSlot?.let { "⏩ Seterusnya: ${it.subjectName} (${it.startTime})" } ?: "⏩ Tamat sesi hari ini ✓"
+                ?: if (nextSlot != null) s.widgetNotStarted else s.widgetClassesDone
+            val nextText = nextSlot?.let { s.widgetNextClass(it.subjectName, it.startTime) } ?: s.widgetSessionOver
 
             SlotifyAppWidgetProvider.pushUpdate(
                 context      = context,
+                s            = s,
                 childName    = "${student.avatarEmoji} ${student.nickname}",
                 sessionLabel = "${session.className} (${sessionLabel(session.sessionTimeType)})",
                 currentClass = currentText,
                 nextClass    = nextText,
-                books        = if (isBagPacked) "🎒 Beg Siap Dikemas ✓" else bookHintForSubject(currentSlot?.subjectCode ?: nextSlot?.subjectCode),
-                attire       = "👕 ${AttireGuide.forSchoolDay(schoolDay)} • 🕌 ${prayerSchedule.nextPrayerName} (${prayerSchedule.countdownText})",
+                books        = if (isBagPacked) s.widgetBagPacked else s.widgetBookHint(currentSlot?.subjectCode ?: nextSlot?.subjectCode),
+                attire       = "👕 ${AttireGuide.forSchoolDay(schoolDay, language)} • $prayerText",
                 locationZone = zoneText,
                 siblingsSummary = siblingsSummary
             )
@@ -278,25 +322,29 @@ class WidgetUpdateWorker(
     private fun gpsZoneText(lat: Double, lng: Double): String {
         val targets = GeofenceManager.getDefaultTargets(context)
         val closest = targets.minByOrNull { GeofenceManager.calculateDistanceMeters(lat, lng, it.lat, it.lng) }
-            ?: return "📍 Koordinat: ${String.format(Locale.US, "%.4f, %.4f", lat, lng)}"
+            ?: return s.widgetZoneCoordinates(String.format(Locale.US, "%.4f, %.4f", lat, lng))
         val dist = GeofenceManager.calculateDistanceMeters(lat, lng, closest.lat, closest.lng)
         return when {
-            dist <= closest.radiusMeters -> "📍 Zon: ${closest.iconEmoji} ${closest.name} (Dalam Zon)"
-            dist <= closest.radiusMeters * 2 -> "📍 Menghampiri ${closest.iconEmoji} ${closest.name} (~${dist.roundToInt()}m)"
-            else -> "📍 Zon: ${closest.iconEmoji} ${closest.name} (~${String.format(Locale.US, "%.1f", dist / 1000.0)}km)"
+            dist <= closest.radiusMeters -> s.widgetZoneInside("${closest.iconEmoji} ${closest.name}")
+            dist <= closest.radiusMeters * 2 -> s.widgetZoneApproaching("${closest.iconEmoji} ${closest.name}", dist.roundToInt())
+            else -> s.widgetZoneDistance(
+                "${closest.iconEmoji} ${closest.name}",
+                "${String.format(Locale.US, "%.1f", dist / 1000.0)}km"
+            )
         }
     }
 
     private fun pushFallback(): Result {
         SlotifyAppWidgetProvider.pushUpdate(
             context = context,
-            childName = "Murid",
+            s = s,
+            childName = s.widgetFallbackChild,
             sessionLabel = "–",
-            currentClass = "⏳ Buka Slotify untuk maklumat",
+            currentClass = s.widgetFallbackCurrent,
             nextClass = "",
-            books = "📚 Buka app untuk semak beg",
-            attire = "👕 Semak pakaian sekolah",
-            locationZone = "📍 Zon: Buka Peta Logistik",
+            books = s.widgetFallbackBooks,
+            attire = s.widgetFallbackAttire,
+            locationZone = s.widgetZoneOpenMap,
             siblingsSummary = ""
         )
         return Result.success()
@@ -305,30 +353,9 @@ class WidgetUpdateWorker(
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private fun sessionLabel(sessionTimeType: String) = when (sessionTimeType) {
-        "PAGI"     -> "Sesi Pagi"
-        "PETANG"   -> "Sesi Petang"
-        "FULL_DAY" -> "Seharian"
+        "PAGI"     -> s.widgetSessionMorning
+        "PETANG"   -> s.widgetSessionAfternoon
+        "FULL_DAY" -> s.widgetSessionFullDay
         else       -> sessionTimeType
-    }
-
-    private fun bookHintForSubject(subjectCode: String?) = when (subjectCode) {
-        "BM"     -> "📚 Bawa: Buku Teks Bahasa Melayu Jilid 1 & Buku Latihan"
-        "MT"     -> "📚 Bawa: Buku Teks Matematik & Buku Latihan Jilid 1"
-        "SN"     -> "📚 Bawa: Buku Teks Sains & Buku Amali Sains"
-        "BI"     -> "📚 Bawa: Buku Teks Bahasa Inggeris & Reading Log"
-        "SEJ"    -> "📚 Bawa: Buku Teks Sejarah & Nota Sejarah"
-        "PI"     -> "📚 Bawa: Buku Teks Pendidikan Islam & Buku Latihan PI"
-        "TAWHID" -> "📚 Bawa: Kitab Tauhid & Buku Nota SRA"
-        "JAWI"   -> "📚 Bawa: Buku Latihan Jawi & Kaedah Baghdadiyyah"
-        "BA"     -> "📚 Bawa: Buku Teks Bahasa Arab & Kamus Arab-Melayu"
-        "TAHFIZ",
-        "QURAN"  -> "📚 Bawa: Al-Quran & Buku Rekod Hafazan"
-        "FIQH"   -> "📚 Bawa: Buku Teks Fiqah & Buku Latihan"
-        "PJPK"   -> "👟 Bawa: Kasut Sukan & Baju Sukan"
-        "PSV"    -> "🎨 Bawa: Palet Warna & Buku Lukisan"
-        "KH"     -> "🔧 Bawa: Set Jahitan / Alat Masakan (semak jadual)"
-        "IQRA"   -> "📚 Bawa: Buku Iqra' & Buku Doa Harian"
-        "RBT"    -> "🔩 Bawa: Buku Reka Bentuk & Teknologi"
-        else     -> "📚 Semak beg mengikut jadual hari ini"
     }
 }

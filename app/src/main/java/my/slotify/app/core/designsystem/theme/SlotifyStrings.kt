@@ -202,7 +202,8 @@ data class AppStrings(
     val timetableUi: TimetableStrings,
     val financeUi: FinanceStrings,
     val shellUi: ShellStrings,
-    val locationPickerUi: LocationPickerStrings
+    val locationPickerUi: LocationPickerStrings,
+    val systemUi: SystemStrings
 )
 
 val BmStrings = AppStrings(
@@ -388,7 +389,8 @@ val BmStrings = AppStrings(
     timetableUi = BmTimetableStrings,
     financeUi = BmFinanceStrings,
     shellUi = BmShellStrings,
-    locationPickerUi = BmLocationPickerStrings
+    locationPickerUi = BmLocationPickerStrings,
+    systemUi = BmSystemStrings
 )
 
 val EnStrings = AppStrings(
@@ -574,7 +576,8 @@ val EnStrings = AppStrings(
     timetableUi = EnTimetableStrings,
     financeUi = EnFinanceStrings,
     shellUi = EnShellStrings,
-    locationPickerUi = EnLocationPickerStrings
+    locationPickerUi = EnLocationPickerStrings,
+    systemUi = EnSystemStrings
 )
 
 /** Non-composable access (ViewModels, workers); prefer `strings` inside composition. */

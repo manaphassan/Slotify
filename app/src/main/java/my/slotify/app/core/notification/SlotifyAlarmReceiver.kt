@@ -8,7 +8,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import my.slotify.app.core.data.currentAppLanguage
+import my.slotify.app.core.data.currentAppStrings
 import my.slotify.app.core.database.SlotifyDatabase
+import my.slotify.app.core.designsystem.theme.stringsFor
 import my.slotify.app.core.model.AttireGuide
 import my.slotify.app.core.profile.FamilyProfileData
 import my.slotify.app.core.time.SchoolDay
@@ -54,17 +57,20 @@ class SlotifyAlarmReceiver : BroadcastReceiver() {
         val students = dao.getAllStudentsOnce()
         if (students.isEmpty()) return
 
+        val language = context.currentAppLanguage()
+        val s = stringsFor(language).systemUi
         val books = students.flatMap { dao.getStudentSlotsForDayOnce(it.id, schoolDay) }
             .filter { !it.isRehat }
             .map { it.subjectName }
             .distinct()
             .joinToString(", ")
-            .ifBlank { "Semak jadual esok" }
+            .ifBlank { s.attireBooksFallback }
 
         SlotifyNotificationManager.showAttireReminder(
             context = context,
+            s = s,
             childName = students.joinToString(" & ") { it.nickname },
-            attire = AttireGuide.forSchoolDay(schoolDay),
+            attire = AttireGuide.forSchoolDay(schoolDay, language),
             books = books
         )
     }
@@ -77,6 +83,7 @@ class SlotifyAlarmReceiver : BroadcastReceiver() {
         if (students.isEmpty()) return
         SlotifyNotificationManager.showTransitAlert(
             context = context,
+            s = context.currentAppStrings().systemUi,
             childName = students.joinToString(" & ") { it.nickname },
             transitMsg = message
         )

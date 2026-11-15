@@ -1,6 +1,7 @@
 <resources>
     <!-- UI text lives in core/designsystem/theme/SlotifyStrings.kt (follows the in-app BM/EN switch).
-         Only text rendered outside Compose belongs here: the launcher label and home-screen widget. -->
+         Only the launcher label and the widget layout's initial labels belong here; the widget
+         overwrites its labels from SystemStrings on every render. -->
     <string name="app_name">Slotify</string>
     <string name="widget_brand">SLOTIFY</string>
     <string name="widget_switch">⇄ Tukar</string>

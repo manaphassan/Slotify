@@ -56,6 +56,7 @@ fun FinanceScreen(
 ) {
     val context = LocalContext.current
     val fs = strings.financeUi
+    val sys = strings.systemUi
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val vmMessage by viewModel.message.collectAsStateWithLifecycle()
 
@@ -162,7 +163,11 @@ fun FinanceScreen(
                             )
                         }
                         IconButton(onClick = { celebrationMessage = null }, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = strings.close, tint = SlotifyColors.TextSecondary)
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = strings.close,
+                                tint = SlotifyColors.TextSecondary
+                            )
                         }
                     }
                 }
@@ -467,7 +472,11 @@ fun FinanceScreen(
                                 color = SlotifyColors.TextPrimary
                             )
                             Text(
-                                text = "$settledCount / ${commitmentList.size} ${strings.paidLabel} (${Money.format(state.paidFeesSen)} / ${Money.format(state.totalFeesSen)})",
+                                text = "$settledCount / ${commitmentList.size} ${strings.paidLabel} (${
+                                    Money.format(
+                                        state.paidFeesSen
+                                    )
+                                } / ${Money.format(state.totalFeesSen)})",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = SlotifyColors.TextSecondary
                             )
@@ -724,6 +733,7 @@ fun FinanceScreen(
                             val unpaid = commitmentList.filter { !it.isPaid }
                             SlotifyNotificationManager.showTestNotification(
                                 context,
+                                sys,
                                 fs.feeReminderNotificationTitle,
                                 if (unpaid.isEmpty()) fs.allFeesSettledNotification
                                 else unpaid.joinToString("\n") {

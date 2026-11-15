@@ -1127,6 +1127,7 @@ fun TodayDashboardScreen(
                                 onClick = {
                                     my.slotify.app.core.notification.SlotifyNotificationManager.showTransitAlert(
                                         context = context,
+                                        s = str.systemUi,
                                         childName = students.joinToString(" & ") { it.nickname }
                                             .ifBlank { str.childFallback },
                                         transitMsg = FamilyProfileData.morningTransitReminder
@@ -1151,6 +1152,7 @@ fun TodayDashboardScreen(
                                 onClick = {
                                     my.slotify.app.core.notification.SlotifyNotificationManager.showAttireReminder(
                                         context = context,
+                                        s = str.systemUi,
                                         childName = selectedStudent?.nickname ?: str.childFallback,
                                         attire = AttireGuide.forSchoolDay(nextSchoolDayOfWeek, appLanguage),
                                         books = tomorrowSlots.filter { !it.isRehat }.map { it.subjectName }.distinct()

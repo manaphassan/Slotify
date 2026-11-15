@@ -113,7 +113,7 @@ fun PreciseLocationPickerModal(
     LaunchedEffect(centerLat, centerLng) {
         isGeocoding = true
         delay(400) // 400ms debounce
-        resolvedAddress = LocationAddressHelper.resolveAddress(context, centerLat, centerLng)
+        resolvedAddress = LocationAddressHelper.resolveAddress(context, centerLat, centerLng, str.systemUi)
         isGeocoding = false
     }
 

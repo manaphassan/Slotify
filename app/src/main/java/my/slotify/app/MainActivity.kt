@@ -101,6 +101,7 @@ import my.slotify.app.core.designsystem.theme.SlotifyColors
 import my.slotify.app.core.designsystem.theme.SlotifyTheme
 import my.slotify.app.core.designsystem.theme.neumorphic
 import my.slotify.app.core.designsystem.theme.strings
+import my.slotify.app.core.designsystem.theme.stringsFor
 import my.slotify.app.core.notification.SlotifyNotificationManager
 import my.slotify.app.feature.dashboard.TodayDashboardScreen
 import my.slotify.app.feature.finance.FinanceScreen
@@ -149,8 +150,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         // Only schedule alarms if notification permission is already granted; the runtime
-        // request is issued inside setContent.
-        SlotifyNotificationManager.createNotificationChannels(this)
+        // request is issued inside setContent. Channels are (re)created per language below.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(
                 this,
@@ -164,6 +164,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             val mainViewModel: MainViewModel = viewModel(factory = SlotifyViewModelFactory)
             val ui by mainViewModel.uiState.collectAsStateWithLifecycle()
+
+            // Text outside Compose (channel names, home-screen widget) follows the in-app language.
+            LaunchedEffect(ui.isLoaded, ui.language) {
+                if (!ui.isLoaded) return@LaunchedEffect
+                val system = stringsFor(ui.language).systemUi
+                SlotifyNotificationManager.createNotificationChannels(this@MainActivity, system)
+                if (SlotifyAppWidgetProvider.cachedStrings(this@MainActivity) != system) {
+                    SlotifyAppWidgetProvider.requestUpdate(this@MainActivity)
+                }
+            }
 
             val notifPermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestPermission()

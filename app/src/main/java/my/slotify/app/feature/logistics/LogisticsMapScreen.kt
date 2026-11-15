@@ -320,6 +320,7 @@ fun LogisticsMapScreen(
     // State-backed so long-running effects and map callbacks always see the current language.
     val ls by rememberUpdatedState(strings.logisticsUi)
     val ps by rememberUpdatedState(strings.locationPickerUi)
+    val sys by rememberUpdatedState(strings.systemUi)
     val logisticsState by viewModel.uiState.collectAsStateWithLifecycle()
     val selectedRoute = logisticsState.selectedRoute
     var selectedPoiCategory by remember { mutableStateOf(PoiCategory.ALL) }
@@ -420,6 +421,7 @@ fun LogisticsMapScreen(
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 SlotifyNotificationManager.showTransitAlert(
                     context = context,
+                    s = sys,
                     childName = "$simTag $vanName",
                     transitMsg = ls.simAlert3km
                 )
@@ -433,6 +435,7 @@ fun LogisticsMapScreen(
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 SlotifyNotificationManager.showTransitAlert(
                     context = context,
+                    s = sys,
                     childName = "$simTag $vanName",
                     transitMsg = ls.simAlert1km(vanName)
                 )
@@ -446,6 +449,7 @@ fun LogisticsMapScreen(
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 SlotifyNotificationManager.showTransitAlert(
                     context = context,
+                    s = sys,
                     childName = "$simTag $vanName",
                     transitMsg = ls.simAlert300m
                 )
@@ -458,6 +462,7 @@ fun LogisticsMapScreen(
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 SlotifyNotificationManager.showTransitAlert(
                     context = context,
+                    s = sys,
                     childName = "$simTag $vanName",
                     transitMsg = ls.simAlertArrived(vanName)
                 )
@@ -543,7 +548,7 @@ fun LogisticsMapScreen(
                 userGpsFix = fix
 
                 // Real-time Geofence Proximity Check
-                val proximityEvents = GeofenceManager.evaluateProximity(context, fix.latitude, fix.longitude)
+                val proximityEvents = GeofenceManager.evaluateProximity(context, fix.latitude, fix.longitude, sys)
                 val targetEvent =
                     proximityEvents.firstOrNull { it.eventType == GeofenceEventType.ENTERED || it.eventType == GeofenceEventType.APPROACHING }
 
@@ -590,7 +595,7 @@ fun LogisticsMapScreen(
             GpsLocationHelper.observeLocationUpdates(context, minTimeMs = 2500L, minDistanceM = 3.0f)
                 .collect { fix ->
                     userGpsFix = fix
-                    val proximityEvents = GeofenceManager.evaluateProximity(context, fix.latitude, fix.longitude)
+                    val proximityEvents = GeofenceManager.evaluateProximity(context, fix.latitude, fix.longitude, sys)
                     val targetEvent =
                         proximityEvents.firstOrNull { it.eventType == GeofenceEventType.ENTERED || it.eventType == GeofenceEventType.APPROACHING }
                     if (targetEvent != null) {
@@ -1247,7 +1252,8 @@ fun LogisticsMapScreen(
                                         val addr = LocationAddressHelper.resolveAddress(
                                             context,
                                             dropPt.latitude,
-                                            dropPt.longitude
+                                            dropPt.longitude,
+                                            sys
                                         )
                                         editingPoi = PoiItem(
                                             id = "poi-${UUID.randomUUID().toString().take(8)}",
@@ -2545,6 +2551,7 @@ private fun PoiEditDialog(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val ls = strings.logisticsUi
+    val sys = strings.systemUi
     val isEdit = poi != null
     var name by remember { mutableStateOf(poi?.name ?: "") }
     var category by remember { mutableStateOf(poi?.category ?: PoiCategory.SEKOLAH) }
@@ -2740,7 +2747,8 @@ private fun PoiEditDialog(
                                     val resolved = LocationAddressHelper.resolveAddress(
                                         context,
                                         userGpsFix.latitude,
-                                        userGpsFix.longitude
+                                        userGpsFix.longitude,
+                                        sys
                                     )
                                     if (address.isBlank() && resolved.isNotBlank()) {
                                         address = resolved

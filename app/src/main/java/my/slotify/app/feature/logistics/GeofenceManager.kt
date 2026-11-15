@@ -2,6 +2,7 @@ package my.slotify.app.feature.logistics
 
 import android.content.Context
 import androidx.work.*
+import my.slotify.app.core.designsystem.theme.SystemStrings
 import my.slotify.app.core.notification.SlotifyNotificationManager
 import java.util.concurrent.TimeUnit
 import kotlin.math.*
@@ -109,6 +110,7 @@ object GeofenceManager {
         context: Context,
         currentLat: Double,
         currentLng: Double,
+        alertStrings: SystemStrings,
         targets: List<GeofenceTarget> = getDefaultTargets(context),
         now: Long = System.currentTimeMillis()
     ): List<GeofenceProximityStatus> {
@@ -128,6 +130,7 @@ object GeofenceManager {
                     editor.putLong(key, now)
                     SlotifyNotificationManager.showGeofenceProximityAlert(
                         context = context,
+                        s = alertStrings,
                         locationName = target.name,
                         distanceMeters = dist,
                         eventType = event.name

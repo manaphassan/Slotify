@@ -43,7 +43,8 @@ class SlotifyStringsTest {
             "timetableUi.",
             "financeUi.",
             "shellUi.",
-            "locationPickerUi."
+            "locationPickerUi.",
+            "systemUi."
         ).forEach { group ->
             assertTrue("no strings found in $group", names.any { it.startsWith(group) })
         }
@@ -67,6 +68,18 @@ class SlotifyStringsTest {
             assertTrue(s.dashboardUi.prayerCountdown(45).contains("45"))
             assertTrue(s.dashboardUi.prayerCountdown(125).let { it.contains("2") && it.contains("5") })
         }
+    }
+
+    @Test
+    fun systemStrings_formatArgumentsAndBookHints() {
+        listOf(BmStrings, EnStrings).forEach { t ->
+            val s = t.systemUi
+            assertTrue(s.widgetNextClass("Sains", "10:30").let { it.contains("Sains") && it.contains("10:30") })
+            assertTrue(s.geofenceApproachingBody("Sekolah", 250).let { it.contains("Sekolah") && it.contains("250") })
+            assertTrue(s.addressCoordinates(3.1, 101.6).contains("3.10000"))
+            assertTrue(s.widgetBookHint("MT") != s.widgetBookHint(null))
+        }
+        assertEquals("Lokasi Peta (3.10000° U, 101.60000° T)", BmStrings.systemUi.addressCoordinates(3.1, 101.6))
     }
 
     @Test

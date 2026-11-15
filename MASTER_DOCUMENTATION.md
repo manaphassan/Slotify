@@ -303,7 +303,7 @@ erDiagram
 - **ViewModels** emit typed results (`FinanceMessage`, `PbdRecordResult`, `RedeemFailed`) that the screen turns into text, so messages follow a language switch. `stringsFor(language)` exists for non-Compose code.
 - **Persisted values stay Malay:** strings that are stored and compared (fee due-date presets such as "1hb Setiap Bulan", "Semua Anak", homework due-date "Hari Ini", PBD subject names) are kept as storage keys and only mapped to a display label.
 - **Deliberately not translated:** data and content (child/school/POI names, subject names, KPM holiday and term names, seeded reward/fee titles typed by the family), TTS phrases (the voice is fixed to ms-MY), language self-names ("🇲🇾 Melayu" / "🇬🇧 English").
-- **Remaining work:** the home-screen widget (`SlotifyAppWidgetProvider`), notifications (`SlotifyNotificationManager`, `SlotifyAlarmReceiver`) and the geocoder fallback addresses (`LocationAddressHelper`) run outside Compose and are still BM-only; they would read the language from `SettingsRepository` and use `stringsFor`. KPM term/holiday data has `titleEn` for holidays but no English term names.
+- **Outside Compose:** the home-screen widget, notification channels and messages, and geocoder fallback addresses use `strings.systemUi` (`SystemStrings.kt`). Background code reads the language with `context.currentAppStrings()` / `currentAppLanguage()` (`SettingsRepository.kt`). When the language changes, `MainActivity` renames the notification channels and re-renders the widget. The widget caches the last language it rendered with, so its synchronous loading state matches. KPM term/holiday data has `titleEn` for holidays but no English term names.
 
 ---
 
@@ -439,6 +439,11 @@ Remaining follow-ups: the Focus timer is still an in-screen overlay rather than 
 - About 350 BM/EN entries added across seven per-feature string files (§10); every screen, dialog, toast and content description in `feature/*`, `MainActivity` and the speed-dial now follows the in-app language. BM text is unchanged.
 - Fixed along the way: the dashboard's "Hari Ini (Isnin)" badge and the timetable's "Pakaian Hari Esok (Selasa)" title had hard-coded weekdays; the attire guide, prayer countdown/transit note and GPS accuracy labels are now bilingual; the Takwim banner shows the holiday's English title in EN; map markers rebuild when the language changes; the reward catalogue uses a stable `id` instead of its title as the list key.
 - Still BM-only (outside Compose): widget, notifications, geocoder fallback addresses — see §10.
+
+**2026-11-15 — Widget, notifications and address fallbacks localised.** Verified with the same two commands; unit tests **62/62**, lint **0 errors**:
+- New `SystemStrings` group (widget labels and lines, per-subject book hints, notification channels and messages, geofence alerts, compass directions, coordinate fallback); the geocoder uses `ms-MY` or `en-MY` to match.
+- `SlotifyNotificationManager`, `GeofenceManager.evaluateProximity` and `LocationAddressHelper.resolveAddress` now take the string table explicitly, so every caller passes the active language; workers and the alarm receiver read it from DataStore.
+- The widget's static labels ("⇄ Tukar", "Peta", "Jadual") are set from code on every render.
 
 ### Execution order
 1. **P1 + P2** — privacy, security and data-loss fixes (blocking any further push).

@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import my.slotify.app.core.data.currentAppStrings
 import my.slotify.app.core.database.DatabaseSeeder
 import my.slotify.app.core.database.SlotifyDatabase
 import my.slotify.app.core.di.AppContainer
@@ -25,8 +26,11 @@ class SlotifyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        SlotifyNotificationManager.createNotificationChannels(this)
         GeofenceManager.scheduleBackgroundMonitoring(this)
+
+        applicationScope.launch {
+            SlotifyNotificationManager.createNotificationChannels(this@SlotifyApplication, currentAppStrings().systemUi)
+        }
 
         // Single seeding path (versioned, insert-or-ignore). See DatabaseSeeder.
         applicationScope.launch {
