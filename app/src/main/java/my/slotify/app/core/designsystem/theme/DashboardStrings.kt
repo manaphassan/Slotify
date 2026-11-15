@@ -2,6 +2,16 @@ package my.slotify.app.core.designsystem.theme
 
 /** Today dashboard and school-bag dialog copy. Accessed as `strings.dashboardUi`. */
 data class DashboardStrings(
+    // Section headers (collapsible groups on the Today screen)
+    val groupNow: String,
+    val groupPrep: String,
+    val groupAcademic: String,
+    val groupInfo: String,
+    val groupRoutine: String,
+    val groupAcademicSummary: (Int, Int) -> String,
+    val expandSection: String,
+    val collapseSection: String,
+
     // Takwim (academic calendar) banner
     val holidayBannerTitle: (String) -> String,
     val takwimBannerTitle: (String) -> String,
@@ -108,6 +118,15 @@ data class DashboardStrings(
 )
 
 val BmDashboardStrings = DashboardStrings(
+    groupNow = "Sekarang",
+    groupPrep = "Persediaan",
+    groupAcademic = "Akademik",
+    groupInfo = "Takwim & Waktu Solat",
+    groupRoutine = "Rutin & Notifikasi",
+    groupAcademicSummary = { pending, exams -> "$pending tugasan belum siap • $exams ujian" },
+    expandSection = "Buka bahagian",
+    collapseSection = "Tutup bahagian",
+
     // Takwim (academic calendar) banner
     holidayBannerTitle = { title -> "Cuti: $title" },
     takwimBannerTitle = { term -> "Takwim KPM • $term" },
@@ -214,6 +233,15 @@ val BmDashboardStrings = DashboardStrings(
 )
 
 val EnDashboardStrings = DashboardStrings(
+    groupNow = "Now",
+    groupPrep = "Preparation",
+    groupAcademic = "Academics",
+    groupInfo = "Calendar & Prayer Times",
+    groupRoutine = "Routine & Notifications",
+    groupAcademicSummary = { pending, exams -> "$pending tasks pending • $exams exams" },
+    expandSection = "Expand section",
+    collapseSection = "Collapse section",
+
     // Takwim (academic calendar) banner
     holidayBannerTitle = { title -> "Holiday: $title" },
     takwimBannerTitle = { term -> "KPM Takwim • $term" },
