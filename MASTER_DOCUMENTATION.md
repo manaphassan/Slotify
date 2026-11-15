@@ -7,7 +7,7 @@
 > **Architecture:** Single-module MVVM — Compose screens ➜ feature ViewModels (`StateFlow`) ➜ repositories ➜ Room / DataStore, with Navigation Compose
 > **Data Philosophy:** 🔒 Local-First, Privacy-Focused (user owns all data on-device; personal seed data never committed — see §11)
 > **Map & Routing Engine:** OpenStreetMap via `osmdroid` + OSRM Driving API
-> **UI Style:** Tactile Neumorphic Soft UI (Dual-Shadow Canvas Shaders + Pastel KPM Palettes)
+> **UI Style:** Minimal flat UI — neutral canvas, outlined cards, one accent colour, collapsible sections (§3)
 
 ---
 
@@ -75,7 +75,7 @@ flowchart TD
 
 - **Dependency wiring:** `core/di/AppContainer` (created once in `SlotifyApplication`) builds repositories; `SlotifyViewModelFactory` creates every ViewModel. Screens obtain theirs with `viewModel(factory = SlotifyViewModelFactory)`, scoped to the navigation destination.
 - **Shared selection:** the selected student is persisted in DataStore and exposed by `StudentRepository.selectedStudent`, so every ViewModel observes the same child without passing it through the UI.
-- **Navigation:** each tab is a `NavHost` destination stacked on Dashboard (`popUpTo(DASHBOARD)` + `saveState/restoreState`). Back closes the drawer / speed-dial first, then returns to Dashboard, then exits. Widget and notification deep links use the `EXTRA_SCREEN` extra.
+- **Navigation:** each tab is a `NavHost` destination stacked on Dashboard (`popUpTo(DASHBOARD)` + `saveState/restoreState`). Tabs are reached from the bottom bar. Back closes the settings drawer first, then returns to Dashboard, then exits. Widget and notification deep links use the `EXTRA_SCREEN` extra.
 - **Still in the UI layer:** map rendering, GPS, TTS and the vehicle simulation in `LogisticsMapScreen` (Android-view and sensor bound); dialogs' local form state.
 
 ### 2.2 Technical Stack Matrix
@@ -92,24 +92,41 @@ flowchart TD
 
 ---
 
-## 🎨 3. Tactile Neumorphic Design System
+## 🎨 3. Minimal Design System
 
-Neumorphism creates a realistic, extruded physical surface using dual light sources:
-- **Specular Glow (Top-Left):** `#FFFFFF` with blur radius matching elevation.
-- **Drop Shadow (Bottom-Right):** `#CBD5E1` with soft slate opacity.
-- **Base Canvas:** `#EDF2F7` (Soft Pearl Light) / `#141820` (Dark Slate).
+Flat, calm surfaces so the information is what stands out (replaced the dual-shadow neumorphic style on 2026-11-15):
+- **Cards:** white (light) / near-black (dark) on a neutral canvas, separated by a 1 dp hairline outline. `Modifier.neumorphic()` keeps its old signature but now draws only that outline, so existing call sites did not change.
+- **Colour:** one accent (`KpmSkyBlue` `#0284C7`); status colours are muted and used sparingly. Subject colours are kept for the small subject badges.
+- **Type:** Inter throughout, SemiBold for headings.
+- **Themes:** Light, Dark and Nord remain selectable in the settings drawer.
 
-### 3.1 Color Palette Tokens (`SlotifyColors`)
+### 3.1 Layout
+- **Bottom navigation:** Hari Ini · Jadual · Logistik · Ganjaran · Kewangan. Profile is the person icon in the top bar; the star balance opens Ganjaran.
+- **Top bar:** settings menu, current screen title and active child, stars, profile.
+- **Settings drawer:** active child, language, theme, home-screen widget, version.
+- **Sections:** each screen groups its cards under collapsible headers (`slotifySection` in `core/designsystem/component/SlotifySection.kt`). A collapsed header shows a one-line summary. Defaults:
+
+| Screen | Open by default | Collapsed by default |
+|---|---|---|
+| Hari Ini | Sekarang, Persediaan, Akademik | Takwim & Waktu Solat, Rutin & Notifikasi |
+| Jadual | view tabs and the day/week/tomorrow content | Penjejak Masa Nyata |
+| Logistik | map, category filter, Laluan | Panduan Arah, Lokasi Tersimpan |
+| Ganjaran | star balance, Bonus Harian, Katalog Ganjaran | Tetapan Ibu Bapa |
+| Kewangan | Duit Poket & Tabung, Yuran Bulanan | Takwim KPM, Notifikasi |
+| Profil | hero card, Sekolah & Pengangkutan, Pentaksiran (PBD) | Maklumat Peribadi |
+
+### 3.2 Color Palette Tokens (`SlotifyColors`)
 | Token Name | Hex Code | Purpose |
 |---|---|---|
-| `BackgroundLight` | `#EDF2F7` | Main screen background canvas |
-| `SurfaceCard` | `#EAF0F8` | Elevated tactile cards and buttons |
-| `KpmBlue` | `#0284C7` | Bahasa Melayu & Primary KPM brand color |
+| `CanvasBase` | `#F6F7F9` / `#0E1014` | Screen background (light / dark) |
+| `SurfaceCard` | `#FFFFFF` / `#171A1F` | Cards |
+| `BorderSubtle` | `#E6E8EC` / `#262A31` | Card outline and dividers |
+| `KpmBlue` | `#0284C7` | The single accent: selection, primary actions |
 | `ScienceGreen` | `#10B981` | Sains, safe geofence arrival, completed tasks |
 | `MathAmber` | `#F59E0B` | Matematik, Waktu Rehat, due alerts |
 | `IslamTeal` | `#0D9488` | Pendidikan Islam, Bahasa Arab, Jawi, PASTI |
 | `EnglishRed` | `#EF4444` | Bahasa Inggeris & urgent alerts |
-| `KokuPurple` | `#8B5CF6` | Unit Beruniform, Kokurikulum & Rewards |
+| `KokuPurple` | `#7C3AED` | Unit Beruniform, Kokurikulum & Rewards |
 | `VanPrimaryBlue` | `#2563EB` | Primary school-van route identifier |
 | `VanSecondaryGold`| `#D97706` | Secondary school-van route identifier |
 | `ParentGreen` | `#059669` | Parent evening pickup route identifier |
@@ -463,3 +480,9 @@ Remaining follow-ups: screens are still long files (split into smaller composabl
 
 ### History purge (P1-1, manual step)
 Personal data already exists in pushed commits. After the code fix is committed, rewrite history (e.g. `git filter-repo` with a replace-text file covering names, coordinates and phone numbers), force-push, and ask GitHub support to purge cached views if the repository was ever public. Rotate the release keystore if its password was ever used for a real key.
+
+**2026-11-15 — Layout reorganised, minimal theme.** All features kept; the screens are regrouped so each one opens on what matters now. Unit tests **62/62**, lint **0 errors** (warnings: `OldTargetApi`, and newer `kotlinx.serialization` releases than the pinned 1.8.1), demo release build passes.
+- Theme: flat outlined cards, neutral palette, Inter font (§3).
+- Navigation: bottom bar replaces the drawer's screen list and the speed-dial FAB; the drawer keeps settings; the top bar shows the screen and the active child.
+- Every screen grouped into collapsible sections (§3.1). Removed two cards that repeated information already on Today (a second "current session" card and a second bag card with the same book list and "bag packed" button) and the large per-screen titles that repeated the top bar.
+- Fixed: past exams showed "0 HARI" (now a neutral ✓ "Lepas" badge, sorted after upcoming exams, and excluded from the section summary); at the weekend the attire card was titled "today" while showing Monday's attire.

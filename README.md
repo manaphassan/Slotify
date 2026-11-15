@@ -7,10 +7,10 @@
 
 [![Platform: Android](https://img.shields.io/badge/Platform-Android%20Native%20(API%2026%2B)-3DDC84.svg?logo=android&logoColor=white)](https://developer.android.com/)
 [![Language: Kotlin](https://img.shields.io/badge/Language-Kotlin%202.4-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
-[![UI: Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%7C%20Neumorphic-4285F4.svg?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
+[![UI: Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%7C%20Minimal-4285F4.svg?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![Database: Room](https://img.shields.io/badge/Storage-Room%20DB%20(Local--First)-F43F5E.svg)](https://developer.android.com/training/data-storage/room)
 [![Map: OpenStreetMap](https://img.shields.io/badge/Maps-OpenStreetMap%20(OSRM)-7EBC6F.svg?logo=openstreetmap&logoColor=white)](https://www.openstreetmap.org/)
-[![Design: 60:30:10 Rule](https://img.shields.io/badge/Design-60%3A30%3A10%20Neumorphic-FF7A00.svg)]()
+[![Design: Minimal](https://img.shields.io/badge/Design-Minimal%20Flat%20UI-FF7A00.svg)]()
 [![Version](https://img.shields.io/badge/Version-v1.1.0-blue.svg)]() [![Android CI](https://github.com/manaphassan/Slotify/actions/workflows/android.yml/badge.svg)](https://github.com/manaphassan/Slotify/actions/workflows/android.yml)
 
 </div>
@@ -19,7 +19,7 @@
 
 ## 📖 Pengenalan (Overview)
 
-**Slotify** ialah aplikasi mudah alih Android Native berasaskan reka bentuk **Neumorphic Soft UI Taktil** yang direka khas untuk memudahkan urusan harian ibu bapa serta murid sekolah rendah di Malaysia (**Sekolah Kebangsaan - SK**, **Sekolah Rendah Agama - SRA/SRAI**, dan **Tadika / PASTI**).
+**Slotify** ialah aplikasi mudah alih Android Native berasaskan reka bentuk **minimal dan rata (flat)** yang direka khas untuk memudahkan urusan harian ibu bapa serta murid sekolah rendah di Malaysia (**Sekolah Kebangsaan - SK**, **Sekolah Rendah Agama - SRA/SRAI**, dan **Tadika / PASTI**).
 
 Aplikasi ini bertindak sebagai **Pusat Logistik & Waktu Sehenti Keluarga**, menyelesaikan kekusutan harian seperti dwi-sesi pagi/petang, senarai semak beg sekolah, panduan baju seragam mingguan, pengesanan dua aliran van sekolah, serta pemupukan motivasi anak melalui tabung ganjaran bintang.
 
@@ -115,7 +115,7 @@ graph TD
 │                   SLOTIFY ANDROID ARCHITECTURE                   │
 ├──────────────────────────────────────────────────────────────────┤
 │  📱 Presentation Layer : Jetpack Compose + Navigation Compose    │
-│  🎨 Design System      : NeumorphicModifier + 60:30:10 Tokens    │
+│  🎨 Design System      : Minimal flat UI + collapsible sections │
 │  🧠 State & Logic      : ViewModels (StateFlow) + Repositories   │
 │  💾 Data Storage       : Room 2.8 (v7) + DataStore (Local-First) │
 │  🗺️ Map & Routing      : OpenStreetMap (OSMDroid + OSRM Engine)  │
