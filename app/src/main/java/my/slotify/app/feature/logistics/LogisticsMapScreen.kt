@@ -80,6 +80,13 @@ import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
 import my.slotify.app.core.designsystem.component.slotifySection
 import androidx.compose.runtime.saveable.rememberSaveable
+import my.slotify.app.core.designsystem.component.HeroCard
+import my.slotify.app.core.designsystem.component.HeroMetaLine
+import my.slotify.app.core.designsystem.component.ScheduleCard
+import my.slotify.app.core.designsystem.component.SlotifyScreenTitle
+import my.slotify.app.core.designsystem.theme.SlotStatus
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.ui.platform.LocalConfiguration
 
 enum class PoiCategory {
     ALL, SEKOLAH, TRANSIT, RUMAH, PEJABAT
@@ -233,9 +240,9 @@ fun DriverContactCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = SlotifyShapes.Medium,
-        color = SlotifyColors.CanvasBase,
-        border = BorderStroke(1.dp, SlotifyColors.KpmSkyBlue.copy(alpha = 0.25f))
+        shape = SlotifyShapes.Large,
+        color = SlotifyColors.SurfaceCard,
+        border = BorderStroke(1.dp, SlotifyColors.BorderSubtle)
     ) {
         Row(
             modifier = Modifier
@@ -709,16 +716,28 @@ fun LogisticsMapScreen(
 
     // The map sits outside the LazyColumn so it is never recycled while scrolling
     // (recycling destroyed the MapView and orphaned its GPS/compass overlays).
+    val sch = strings.scheduleUi
+    val greeting = when (java.time.LocalTime.now().hour) {
+        in 0..11 -> sch.greetingMorning
+        in 12..18 -> sch.greetingAfternoon
+        else -> sch.greetingEvening
+    }
+    val mapHeight = if (LocalConfiguration.current.screenHeightDp < 720) 190.dp else 260.dp
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(SlotifyColors.CanvasBase)
             .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
+        SlotifyScreenTitle(
+            title = greeting,
+            subtitle = FamilyProfileData.routes[selectedRoute]?.tabTitle ?: strings.logisticsMap
+        )
+        Spacer(Modifier.height(8.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(280.dp)
+                .height(mapHeight)
                 .neumorphic(elevation = NeumorphicElevation.HIGH, cornerRadius = SlotifyShapes.LargeDp)
                 .clip(SlotifyShapes.Large)
         ) {
@@ -1717,161 +1736,112 @@ fun LogisticsMapScreen(
                 }
             }
 
+            // Trip hero: estimated arrival for the selected route
+            item {
+                val route = FamilyProfileData.routes[selectedRoute]
+                val destination = resolveRouteWaypoints(selectedRoute, pois).lastOrNull()
+                val arrival = osrmRoute?.let {
+                    java.time.LocalTime.now().plusMinutes(it.totalDurationMinutes.toLong())
+                        .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                }
+                HeroCard(
+                    label = ls.tripHeroLabel,
+                    title = when {
+                        isOsrmLoading -> ls.routeCalculating
+                        arrival != null -> arrival
+                        else -> ls.routeOffline
+                    },
+                    chip = if (osrmRoute != null) ls.routeLive else if (!isOsrmLoading) sch.statusOffline else null,
+                    chipStatus = if (osrmRoute != null) SlotStatus.ON_TIME else SlotStatus.OFFLINE
+                ) {
+                    osrmRoute?.let {
+                        HeroMetaLine(Icons.Outlined.Schedule, ls.routeEta(it.totalDurationMinutes.toInt(), it.totalDistanceKm))
+                    }
+                    route?.let { HeroMetaLine(Icons.Default.DirectionsBus, "${it.vehicleEmoji} ${it.vehicleLabel} • ${it.passengerLabel}") }
+                    destination?.let { HeroMetaLine(Icons.Default.Place, it.name) }
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Button(
+                            onClick = {
+                                destination?.let { launchNavigationIntent(context, it.lat, it.lng, it.name) }
+                            },
+                            enabled = destination != null,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = SlotifyColors.HeroContainer),
+                            shape = SlotifyShapes.Medium,
+                            modifier = Modifier.weight(1f).heightIn(min = 44.dp)
+                        ) {
+                            Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(ls.navigateButton, style = MaterialTheme.typography.labelLarge)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                isSimulating = !isSimulating
+                                if (!isSimulating) {
+                                    voiceHelper.stop()
+                                    simulatedVehicleState = null
+                                    simulationStep = 0
+                                }
+                            },
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.6f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            shape = SlotifyShapes.Medium,
+                            modifier = Modifier.heightIn(min = 44.dp)
+                        ) {
+                            Text(if (isSimulating) ls.stopSimShort else ls.startSimShort, style = MaterialTheme.typography.labelLarge)
+                        }
+                        IconButton(onClick = { viewModel.refreshRoute() }, modifier = Modifier.size(44.dp)) {
+                            Icon(Icons.Default.Refresh, contentDescription = ls.recalculateRoute, tint = Color.White)
+                        }
+                    }
+                }
+            }
+
             slotifySection(
                 key = "routes",
                 title = ls.groupRoutes,
                 expanded = routesOpen,
                 onToggle = { routesOpen = !routesOpen }
             ) {
-                // Active Route Selector Cards: [Parent | Van A | Van B] (labels from FamilyProfile)
+                // Route options (labels from FamilyProfile)
+                items(RouteSelection.entries.filter { FamilyProfileData.routes[it] != null }, key = { "route-" + it.name }) { option ->
+                    val profile = FamilyProfileData.routes.getValue(option)
+                    val selected = option == selectedRoute
+                    ScheduleCard(
+                        title = profile.tabTitle,
+                        time = when {
+                            selected && isOsrmLoading -> ls.routeCalculating
+                            selected && osrmRoute != null -> ls.routeEta(osrmRoute!!.totalDurationMinutes.toInt(), osrmRoute!!.totalDistanceKm)
+                            selected -> ls.routeOffline
+                            else -> profile.passengerLabel
+                        },
+                        status = if (selected) SlotStatus.NOW else SlotStatus.UPCOMING,
+                        subtitle = "${profile.vehicleEmoji} ${profile.vehicleLabel}",
+                        subtitleIcon = Icons.Default.DirectionsBus,
+                        chip = if (selected) sch.statusNow else null,
+                        accent = when (option) {
+                            RouteSelection.PARENT_PICKUP -> SlotifyColors.ParentGreen
+                            RouteSelection.VAN_PRIMARY -> SlotifyColors.VanPrimaryBlue
+                            RouteSelection.VAN_SECONDARY -> SlotifyColors.VanSecondaryGold
+                        }.takeUnless { selected },
+                        onClick = { viewModel.selectRoute(option) }
+                    )
+                }
+
+                // Driver WhatsApp & Direct Call Dispatch Card
                 item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .neumorphic(elevation = NeumorphicElevation.MEDIUM, cornerRadius = SlotifyShapes.LargeDp)
-                            .background(SlotifyColors.SurfaceCard, SlotifyShapes.Large)
-                            .padding(14.dp)
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Default.Route,
-                                        contentDescription = null,
-                                        tint = SlotifyColors.KpmSkyBlue,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(
-                                        text = strings.routeChainTitle,
-                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = SlotifyColors.TextPrimary
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                    Surface(
-                                        shape = SlotifyShapes.Small,
-                                        color = SlotifyColors.SuccessMint.copy(alpha = 0.15f)
-                                    ) {
-                                        Text(
-                                            text = if (isOsrmLoading) "OSRM..." else "OSRM Live",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = SlotifyColors.SuccessMint,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                        )
-                                    }
-                                }
-
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    IconButton(
-                                        onClick = { viewModel.refreshRoute() },
-                                        modifier = Modifier.size(48.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Refresh,
-                                            contentDescription = ls.recalculateRoute,
-                                            tint = SlotifyColors.KpmSkyBlue,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-
-                                    // Simulation button with Geofence Alerts & Smooth Animation
-                                    Button(
-                                        onClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            isSimulating = !isSimulating
-                                            if (!isSimulating) {
-                                                voiceHelper.stop()
-                                                simulatedVehicleState = null
-                                                simulationStep = 0
-                                            }
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (isSimulating) Color(0xFFEF4444) else SlotifyColors.ActionAmber
-                                        ),
-                                        shape = SlotifyShapes.Small,
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                                    ) {
-                                        Text(
-                                            text = if (isSimulating) ls.stopSimShort else ls.startSimShort,
-                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                            color = Color.White
-                                        )
-                                    }
-                                }
-                            }
-
-                            // 3 Route Tabs with dynamic OSRM ETA / KM
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                val abahSubtitle =
-                                    if (isOsrmLoading && selectedRoute == RouteSelection.PARENT_PICKUP) ls.routeCalculating
-                                    else if (osrmRoute != null && selectedRoute == RouteSelection.PARENT_PICKUP) ls.routeEta(
-                                        osrmRoute!!.totalDurationMinutes.toInt(),
-                                        osrmRoute!!.totalDistanceKm
-                                    )
-                                    else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.PARENT_PICKUP) ls.routeOffline
-                                    else FamilyProfileData.routes[RouteSelection.PARENT_PICKUP]?.passengerLabel ?: ""
-                                RouteTabCard(
-                                    title = FamilyProfileData.routes[RouteSelection.PARENT_PICKUP]?.tabTitle
-                                        ?: "PARENT_PICKUP",
-                                    subtitle = abahSubtitle,
-                                    isSelected = selectedRoute == RouteSelection.PARENT_PICKUP,
-                                    modifier = Modifier.weight(1f)
-                                ) { viewModel.selectRoute(RouteSelection.PARENT_PICKUP) }
-
-                                val vanPrimarySubtitle =
-                                    if (isOsrmLoading && selectedRoute == RouteSelection.VAN_PRIMARY) ls.routeCalculating
-                                    else if (osrmRoute != null && selectedRoute == RouteSelection.VAN_PRIMARY) ls.routeEta(
-                                        osrmRoute!!.totalDurationMinutes.toInt(),
-                                        osrmRoute!!.totalDistanceKm
-                                    )
-                                    else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.VAN_PRIMARY) ls.routeOffline
-                                    else FamilyProfileData.routes[RouteSelection.VAN_PRIMARY]?.passengerLabel ?: ""
-                                RouteTabCard(
-                                    title = FamilyProfileData.routes[RouteSelection.VAN_PRIMARY]?.tabTitle ?: "VAN_PRIMARY",
-                                    subtitle = vanPrimarySubtitle,
-                                    isSelected = selectedRoute == RouteSelection.VAN_PRIMARY,
-                                    modifier = Modifier.weight(1f)
-                                ) { viewModel.selectRoute(RouteSelection.VAN_PRIMARY) }
-
-                                val vanSecondarySubtitle =
-                                    if (isOsrmLoading && selectedRoute == RouteSelection.VAN_SECONDARY) ls.routeCalculating
-                                    else if (osrmRoute != null && selectedRoute == RouteSelection.VAN_SECONDARY) ls.routeEta(
-                                        osrmRoute!!.totalDurationMinutes.toInt(),
-                                        osrmRoute!!.totalDistanceKm
-                                    )
-                                    else if (osrmRoute == null && !isOsrmLoading && selectedRoute == RouteSelection.VAN_SECONDARY) ls.routeOffline
-                                    else FamilyProfileData.routes[RouteSelection.VAN_SECONDARY]?.passengerLabel ?: ""
-                                RouteTabCard(
-                                    title = FamilyProfileData.routes[RouteSelection.VAN_SECONDARY]?.tabTitle
-                                        ?: "VAN_SECONDARY",
-                                    subtitle = vanSecondarySubtitle,
-                                    isSelected = selectedRoute == RouteSelection.VAN_SECONDARY,
-                                    modifier = Modifier.weight(1f)
-                                ) { viewModel.selectRoute(RouteSelection.VAN_SECONDARY) }
-                            }
-
-                            // Driver WhatsApp & Direct Call Dispatch Card
-                            DriverContactCard(
-                                selectedRoute = selectedRoute,
-                                onWhatsAppClick = { phone, msg ->
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    launchWhatsAppIntent(context, phone, msg)
-                                },
-                                onCallClick = { phone ->
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    launchDialerIntent(context, phone)
-                                }
-                            )
+                    DriverContactCard(
+                        selectedRoute = selectedRoute,
+                        onWhatsAppClick = { phone, msg ->
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            launchWhatsAppIntent(context, phone, msg)
+                        },
+                        onCallClick = { phone ->
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            launchDialerIntent(context, phone)
                         }
-                    }
+                    )
                 }
             }
 
@@ -2878,37 +2848,4 @@ private fun PoiEditDialog(
             }
         }
     )
-}
-
-@Composable
-private fun RouteTabCard(
-    title: String,
-    subtitle: String,
-    isSelected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .clip(SlotifyShapes.Medium)
-            .background(if (isSelected) SlotifyColors.KpmSkyBlue else SlotifyColors.CanvasBase)
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp, horizontal = 4.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = if (isSelected) Color.White else SlotifyColors.TextPrimary,
-                maxLines = 1
-            )
-            Text(
-                text = subtitle,
-                fontSize = 10.sp,
-                color = if (isSelected) Color.White.copy(alpha = 0.85f) else SlotifyColors.TextSecondary,
-                maxLines = 1
-            )
-        }
-    }
 }

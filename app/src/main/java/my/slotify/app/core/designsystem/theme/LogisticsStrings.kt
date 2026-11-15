@@ -9,6 +9,10 @@ data class LogisticsStrings(
     val groupDirections: String,
     val groupPlaces: String,
     val placesSummary: (Int) -> String,
+    val tripHeroLabel: String,
+    val routeLive: String,
+    val navigateButton: String,
+    val arrivalBy: (String) -> String,
 
     // Driver contact card
     val driverActiveBadge: String,
@@ -146,6 +150,10 @@ val BmLogisticsStrings = LogisticsStrings(
     groupDirections = "Panduan Arah",
     groupPlaces = "Lokasi Tersimpan",
     placesSummary = { n -> "$n lokasi" },
+    tripHeroLabel = "ANGGARAN TIBA",
+    routeLive = "Masa nyata",
+    navigateButton = "Navigasi",
+    arrivalBy = { t -> "Tiba $t" },
 
     // Driver contact card
     driverActiveBadge = "Aktif",
@@ -289,6 +297,10 @@ val EnLogisticsStrings = LogisticsStrings(
     groupDirections = "Directions",
     groupPlaces = "Saved Places",
     placesSummary = { n -> "$n places" },
+    tripHeroLabel = "ESTIMATED ARRIVAL",
+    routeLive = "Live",
+    navigateButton = "Navigate",
+    arrivalBy = { t -> "Arrive $t" },
 
     // Driver contact card
     driverActiveBadge = "Active",
